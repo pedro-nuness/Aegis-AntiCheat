@@ -7,13 +7,13 @@
 #include <algorithm>
 #include <cctype>
 #include <string>
-
+#include <thread>
 
 #include "Triggers.h"
 #include "../Utils/crypt_str.h"
 #include "../Memory/memory.h"
 #include "../Utils/utils.h"
-
+#include "../Monitoring/Monitoring.h"
 
 
 void Triggers::SetupFiles( ) {
@@ -217,8 +217,11 @@ std::vector<Trigger> Triggers::CheckBlackListedProcesses( ) {
 
 	std::vector<Trigger> FoundTriggers;
 
-
 	for ( auto Process : Mem::Get( ).EnumAllProcesses( ) ) {
+		DWORD PID = Mem::Get( ).GetProcessID( Process.c_str( ));
+		if ( PID == this->MomProcess || PID == this->ProtectProcess ) 
+			continue;
+		std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
 
 		std::transform( Process.begin( ) , Process.end( ) , Process.begin( ) , &Mem::asciitolower );
 	
@@ -227,7 +230,7 @@ std::vector<Trigger> Triggers::CheckBlackListedProcesses( ) {
 			std::transform( BLProcess.begin( ) , BLProcess.end( ) , BLProcess.begin( ) , &Mem::asciitolower );
 
 			if ( Utils::Get( ).CheckStrings( BLProcess , Process ) ) {
-				FoundTriggers.emplace_back( Trigger { crypt_str( "BlackListedProcess" ) , Process, BLProcess, DETECTED } );
+				FoundTriggers.emplace_back( Trigger { crypt_str( "BlackListedProcess" ) , Process, BLProcess, WARNING } );
 			}
 		}
 	}
@@ -235,12 +238,10 @@ std::vector<Trigger> Triggers::CheckBlackListedProcesses( ) {
 	return FoundTriggers;
 }
 
-
-
 std::vector<Trigger> Triggers::CheckBlackListedWindows( ) {
 	std::vector<Trigger> FoundTriggers;
 	for ( auto Window : Mem::Get( ).EnumAllWindows( ) ) {
-
+		std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
 		std::transform( Window.begin( ) , Window.end( ) , Window.begin( ) , &Mem::asciitolower );
 
 		for ( std::string BLWindow : this->BlackListedWindows ) {
@@ -248,12 +249,22 @@ std::vector<Trigger> Triggers::CheckBlackListedWindows( ) {
 			std::transform( BLWindow.begin( ) , BLWindow.end( ) , BLWindow.begin( ) , &Mem::asciitolower );
 
 			if ( Utils::Get( ).CheckStrings( Window , BLWindow ) ) {
-				FoundTriggers.emplace_back( Trigger { crypt_str( "BlackListedWindows" ) ,Window, BLWindow, DETECTED } );
+				FoundTriggers.emplace_back( Trigger { crypt_str( "BlackListedWindows" ) ,Window, BLWindow, WARNING } );
 			}
 		}
 	}
 
 	return FoundTriggers;
+}
+
+std::string Triggers::GenerateWarningStatus(std::vector<Trigger> Triggers ) {
+	std::string STR = crypt_str("[WARNING] Found Malicious process!\n\n");
+
+	for ( auto T : Triggers ) {
+		STR += T.Trigger + crypt_str("\n\n");
+	}
+
+	return STR;
 }
 
 std::vector<Trigger> Triggers::StartTriggers( ) {
@@ -273,6 +284,8 @@ std::vector<Trigger> Triggers::StartTriggers( ) {
 
 	if ( !Equal(Result, this->LastTriggers )) { 
 		this->LastTriggers = Result;
+		if ( !Result.empty( ) )
+			Monitoring::Get( ).SendWarningInfo( GenerateWarningStatus( Result ) );
 		return Result;
 	}
 

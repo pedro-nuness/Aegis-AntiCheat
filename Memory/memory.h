@@ -7,6 +7,18 @@
 #include "../Utils/singleton.h" // Incluindo o cabeçalho do Singleton
 
 
+struct MemoryRegion {
+    LPVOID baseAddress;
+    SIZE_T size;
+    std::vector<BYTE> buffer;
+};
+
+struct WindowInfo {
+    HWND hwnd;
+    DWORD processId;
+};
+
+
 class Mem : public CSingleton<Mem> {
 public:
     std::string ConvertWchar( WCHAR inCharText[ 260 ] );
@@ -26,6 +38,10 @@ public:
     std::string  GetFileHash( std::string path );
     bool IsPIDRunning( DWORD PID );
     std::string GetProcessName( DWORD PID );
+    bool DumpProcessMemory( HANDLE hProcess , std::vector<MemoryRegion> & memoryDump );
+    static BOOL CALLBACK EnumWindowsProc( HWND hwnd , LPARAM lParam  );
+    void SearchStringsInDump( const std::vector<MemoryRegion> & memoryDump , std::vector< std::string> & searchStrings , float & Founds );
+    bool SearchStringInDump( const std::vector<MemoryRegion> & memoryDump , const std::string & searchString );
 
 };
 

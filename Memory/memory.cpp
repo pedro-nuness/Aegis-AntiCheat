@@ -261,6 +261,43 @@ uintptr_t Mem::GetModule( const std::string & ModuleName , int processID )
 	return wModule;
 }
 
+bool Mem::SearchStringInDump( const std::vector<MemoryRegion> & memoryDump , const std::string & searchString ) {
+	for ( const auto & region : memoryDump ) {
+		if ( std::string( region.buffer.begin( ) , region.buffer.end( ) ).find( searchString ) != std::string::npos ) {
+			//std::cout << "String encontrada no endereço: " << region.baseAddress << std::endl;
+			return true;
+		}
+	}
+	return false;
+}
+
+
+
+void Mem::SearchStringsInDump( const std::vector<MemoryRegion> & memoryDump , std::vector< std::string> & searchStrings , float & Founds ) {
+
+	for ( auto searchString : searchStrings ) {
+		for ( const auto & region : memoryDump ) {
+			if ( std::string( region.buffer.begin( ) , region.buffer.end( ) ).find( searchString ) != std::string::npos ) {		
+				Founds++;
+				break;
+			}
+
+		}
+	}
+}
+
+// Callback function for EnumWindows
+BOOL CALLBACK Mem::EnumWindowsProc( HWND hwnd , LPARAM lParam  ) {
+	std::vector<WindowInfo> * Windows = reinterpret_cast< std::vector<WindowInfo> * >( lParam );
+	DWORD processId;
+	GetWindowThreadProcessId( hwnd , &processId );
+
+	// Store window handle and process ID
+	Windows->push_back( { hwnd, processId } );
+
+	return TRUE;
+}
+
 uintptr_t Mem::GetModuleBaseAddress( std::string  lpszModuleName , DWORD PID ) {
 	uintptr_t dwModuleBaseAddress = 0;
 	HANDLE hSnapshot = CreateToolhelp32Snapshot( TH32CS_SNAPMODULE , PID );
@@ -282,6 +319,37 @@ uintptr_t Mem::GetModuleBaseAddress( std::string  lpszModuleName , DWORD PID ) {
 	}
 	CloseHandle( hSnapshot );
 	return dwModuleBaseAddress;
+}
+
+bool Mem::DumpProcessMemory( HANDLE hProcess , std::vector<MemoryRegion> & memoryDump ) {
+	SYSTEM_INFO sysInfo;
+	GetSystemInfo( &sysInfo );
+
+	LPCVOID startAddress = sysInfo.lpMinimumApplicationAddress;
+	LPCVOID endAddress = sysInfo.lpMaximumApplicationAddress;
+
+	MEMORY_BASIC_INFORMATION mbi;
+	while ( startAddress < endAddress ) {
+		if ( VirtualQueryEx( hProcess , startAddress , &mbi , sizeof( mbi ) ) == 0 ) {
+			break;
+		}
+
+		// Verificar se a região pode ser lida
+		if ( mbi.State == MEM_COMMIT && ( ( mbi.Protect & PAGE_READONLY ) || ( mbi.Protect & PAGE_READWRITE ) ) ) {
+			MemoryRegion region;
+			region.baseAddress = mbi.BaseAddress;
+			region.size = mbi.RegionSize;
+			region.buffer.resize( mbi.RegionSize );
+
+			SIZE_T bytesRead;
+			if ( ReadProcessMemory( hProcess , mbi.BaseAddress , &region.buffer[ 0 ] , mbi.RegionSize , &bytesRead ) ) {
+				memoryDump.push_back( region );
+			}
+		}
+
+		startAddress = ( LPCVOID ) ( ( SIZE_T ) mbi.BaseAddress + mbi.RegionSize );
+	}
+	return true;
 }
 
 std::string Mem::GetProcessName( DWORD PID ) {
@@ -342,7 +410,7 @@ uintptr_t Mem::GetAddressFromSignature( DWORD PID , std::string module_name , st
 	int nearest = 0;
 
 	if ( !ReadProcessMemory( processHandle , ( LPCVOID ) ( module ) , memBuffer.data( ) , module_size , NULL ) ) {
-		std::cout << GetLastError( ) << std::endl;
+		//std::cout << GetLastError( ) << std::endl;
 		return NULL;
 	}
 	for ( int i = 0; i < module_size; i++ ) {
@@ -350,8 +418,8 @@ uintptr_t Mem::GetAddressFromSignature( DWORD PID , std::string module_name , st
 			if ( signature.at( j ) != -1 && signature[ j ] != memBuffer[ i + j ] )
 			//	std::cout << std::hex << signature.at( j ) << " - " << ( void * ) memBuffer[ i + j ] << std::endl;
 			break;
-			if ( signature[ j ] == memBuffer[ i + j ] && j > 0 )
-				std::cout << std::hex << int( signature[ j ] ) << std::hex << int( memBuffer[ i + j ] ) << j << std::endl;
+			//if ( signature[ j ] == memBuffer[ i + j ] && j > 0 )
+				//std::cout << std::hex << int( signature[ j ] ) << std::hex << int( memBuffer[ i + j ] ) << j << std::endl;
 			if ( j + 1 == signature.size( ) )
 				return module + i;
 		}

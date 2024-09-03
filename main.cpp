@@ -3,21 +3,34 @@
 #include <string>
 #include <thread>
 
-#include "../Globals/Globals.h"
-#include "../Triggers/Triggers.h"
-#include "../Utils/crypt_str.h"
-#include "../LogSystem/Log.h"
-#include "../Communication/Communication.h"
-#include "../Utils/utils.h"
-#include "../Memory/memory.h"
+#include "Triggers/Triggers.h"
+#include "Communication/Communication.h"
+#include "LogSystem/Log.h"
+#include "Globals/Globals.h"
+#include "Utils/utils.h"
+#include "Utils/crypt_str.h"
+#include "Memory/memory.h"
+#include "Detections/Detections.h"
+#include "Monitoring/Monitoring.h"
 
-Triggers EventTriggers;
+
 
 int main( int argc , char * argv[ ] ) {
 	system( "Title Aegis" );
+
+#ifdef _DEBUG
 	::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
 
-	/*if ( argc < 3 ) {
+	Triggers EventTriggers( 0 , 0 );
+	Detections DetectionEvents( 0 , 0 );
+	
+
+	DetectionEvents.Init( );
+
+#else
+	::ShowWindow( ::GetConsoleWindow( ) , SW_HIDE );
+
+	if ( argc < 3 ) {
 		LogSystem::Get( ).Log( crypt_str( "[401] Initialization failed" ) );
 		return 0;
 	}
@@ -27,23 +40,29 @@ int main( int argc , char * argv[ ] ) {
 		return 0;
 	}
 
-	Globals::Get( ).OriginalProcess = stoi((std::string)argv[ 1 ]);
-	Globals::Get( ).ProtectProcess = stoi((std::string)argv[ 2 ]);
+	Globals::Get( ).OriginalProcess = stoi( ( std::string ) argv[ 1 ] );
+	Globals::Get( ).ProtectProcess = stoi( ( std::string ) argv[ 2 ] );
 
-	Communication LauncherCommunication( Globals::Get( ).OriginalProcess , Globals::Get().ProtectProcess );
-	LauncherCommunication.StartCommunicationThread( );*/
-	
+	Communication LauncherCommunication( Globals::Get( ).OriginalProcess , Globals::Get( ).ProtectProcess );
+	LauncherCommunication.StartCommunicationThread( );
 
-	std::cout << "OriginalProcess: " << Globals::Get( ).OriginalProcess << std::endl;
-	std::cout << "ProtectProcess: " << Globals::Get( ).ProtectProcess << std::endl;
+	Triggers EventTriggers( Globals::Get().OriginalProcess , Globals::Get( ).ProtectProcess );
+	Detections DetectionEvents( Globals::Get( ).OriginalProcess , Globals::Get( ).ProtectProcess );
+	DetectionEvents.Init( );
+
+#endif // !DEBUG
+
+	Monitoring MonitoringEvent;
+	std::thread( &Monitoring::Init , &MonitoringEvent ).detach();
+
 
 	while ( true ) {
 		std::vector<Trigger> EventResult = EventTriggers.StartTriggers( );
 
 		for ( Trigger Event : EventResult ) {
-			std::cout << "Event: " << "DETECTED " << Event.Area << ", " << ", " << Event.Trigger << ", " << Event.ExpectedTrigger << "\n";
+			std::cout << "[WARNING]: " << Event.Area << ", " << Event.Trigger << ", " << Event.ExpectedTrigger << "\n";
 		}
 
-		Sleep( 10 );
+		Sleep( 500 );
 	}
 }

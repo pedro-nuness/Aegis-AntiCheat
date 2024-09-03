@@ -44,7 +44,7 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -52,6 +52,7 @@
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
+    <UseOfMfc>false</UseOfMfc>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -72,8 +73,14 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>D:\Code\Projects\Software\AntiCheat\Dependencies;$(IncludePath)</IncludePath>
-    <TargetName>Aegis</TargetName>
+    <IncludePath>$(ProjectDir)Dependencies\release\include\dpp-10.0;$(IncludePath)</IncludePath>
+    <TargetName>AegisRelease.exe</TargetName>
+    <LibraryPath>$(ProjectDir)Dependencies\release\lib\dpp-10.0;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>$(ProjectDir)Dependencies\debug\include\dpp-10.0;$(IncludePath)</IncludePath>
+    <LibraryPath>$(ProjectDir)Dependencies\debug\lib\dpp-10.0;$(LibraryPath)</LibraryPath>
+    <TargetName>AegisDebug.exe</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -107,12 +114,14 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>dpp.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -124,6 +133,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>$(ProjectDir)Dependencies\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -131,25 +141,34 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
+      <AdditionalDependencies>dpp.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Communication\Communication.cpp" />
+    <ClCompile Include="Detections\Detections.cpp" />
     <ClCompile Include="Globals\Globals.cpp" />
+    <ClCompile Include="Communication\HeartBeat\HeartBeat.cpp" />
     <ClCompile Include="LogSystem\Log.cpp" />
     <ClCompile Include="LogSystem\File\File.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Memory\memory.cpp" />
+    <ClCompile Include="Monitoring\Monitoring.cpp" />
+    <ClCompile Include="Monitoring\WebHook\WebHook.cpp" />
     <ClCompile Include="Triggers\Triggers.cpp" />
     <ClCompile Include="Utils\SHA1\sha1.cpp" />
     <ClCompile Include="Utils\utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Communication\Communication.h" />
+    <ClInclude Include="Detections\Detections.h" />
     <ClInclude Include="Globals\Globals.h" />
+    <ClInclude Include="Communication\HeartBeat\HeartBeat.h" />
     <ClInclude Include="LogSystem\Log.h" />
     <ClInclude Include="LogSystem\File\File.h" />
     <ClInclude Include="Memory\memory.h" />
+    <ClInclude Include="Monitoring\Monitoring.h" />
+    <ClInclude Include="Monitoring\WebHook\WebHook.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Triggers\Triggers.h" />
     <ClInclude Include="Utils\crypt_str.h" />
