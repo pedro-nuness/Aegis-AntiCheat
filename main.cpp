@@ -3,15 +3,19 @@
 #include <string>
 #include <thread>
 
-#include "Triggers/Triggers.h"
-#include "Communication/Communication.h"
-#include "LogSystem/Log.h"
+#include "Modules/Triggers/Triggers.h"
+#include "Modules/Communication/Communication.h"
+#include "Modules/ThreadMonitor/MonitorThread.h"
+#include "Modules/Detections/Detections.h"
+
+#include "Systems/LogSystem/Log.h"
+#include "Systems/Utils/utils.h"
+#include "Systems/Utils/crypt_str.h"
+#include "Systems/Memory/memory.h"
+#include "Systems/Monitoring/Monitoring.h"
+
 #include "Globals/Globals.h"
-#include "Utils/utils.h"
-#include "Utils/crypt_str.h"
-#include "Memory/memory.h"
-#include "Detections/Detections.h"
-#include "Monitoring/Monitoring.h"
+
 
 
 
@@ -21,11 +25,25 @@ int main( int argc , char * argv[ ] ) {
 #ifdef _DEBUG
 	::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
 
-	Triggers EventTriggers( 0 , 0 );
-	Detections DetectionEvents( 0 , 0 );
-	
+	Triggers TriggerEvent( 0 , 0 );
+	Detections DetectionEvent( 0 , 0 );
+	Communication CommunicationEvent( 0 , 0 );
 
-	DetectionEvents.Init( );
+	CommunicationEvent.start( );
+
+	while ( !Globals::Get( ).VerifiedSession ) {
+		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
+	}
+
+	std::vector<std::pair<ThreadMonitor *, int>> threads = { std::make_pair( &TriggerEvent, TRIGGERS ) , 
+		std::make_pair( &DetectionEvent, DETECTIONS ),
+		std::make_pair( &CommunicationEvent, COMMUNICATION ) };
+
+	DetectionEvent.start( );
+	TriggerEvent.start( );
+	
+	MonitorThread monitor( threads );
+	monitor.start( );
 
 #else
 	::ShowWindow( ::GetConsoleWindow( ) , SW_HIDE );
@@ -43,26 +61,33 @@ int main( int argc , char * argv[ ] ) {
 	Globals::Get( ).OriginalProcess = stoi( ( std::string ) argv[ 1 ] );
 	Globals::Get( ).ProtectProcess = stoi( ( std::string ) argv[ 2 ] );
 
-	Communication LauncherCommunication( Globals::Get( ).OriginalProcess , Globals::Get( ).ProtectProcess );
-	LauncherCommunication.StartCommunicationThread( );
+	Triggers TriggerEvent( Globals::Get().OriginalProcess , Globals::Get( ).ProtectProcess );
+	Detections DetectionEvent( Globals::Get( ).OriginalProcess , Globals::Get( ).ProtectProcess );
+	Communication CommunicationEvent( Globals::Get( ).OriginalProcess , Globals::Get( ).ProtectProcess );
 
-	Triggers EventTriggers( Globals::Get().OriginalProcess , Globals::Get( ).ProtectProcess );
-	Detections DetectionEvents( Globals::Get( ).OriginalProcess , Globals::Get( ).ProtectProcess );
-	DetectionEvents.Init( );
+	std::vector<ThreadMonitor *> threads = { &TriggerEvent, &DetectionEvent, &CommunicationEvent };
+
+	DetectionEvent.start( );
+	TriggerEvent.start( );
+	CommunicationEvent.start( );
+
+	MonitorThread monitor( threads );
+	monitor.start( );
 
 #endif // !DEBUG
 
-	Monitoring MonitoringEvent;
-	std::thread( &Monitoring::Init , &MonitoringEvent ).detach();
-
+	std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
 
 	while ( true ) {
-		std::vector<Trigger> EventResult = EventTriggers.StartTriggers( );
+		std::cout << crypt_str("[main] Ping!\n");
 
-		for ( Trigger Event : EventResult ) {
-			std::cout << "[WARNING]: " << Event.Area << ", " << Event.Trigger << ", " << Event.ExpectedTrigger << "\n";
+		if ( !monitor.isRunning( ) ) {
+			std::cout << crypt_str( "[main] thread monitor is not running\n" );
+			monitor.reset( );
 		}
+		else
+			monitor.requestupdate( );
 
-		Sleep( 500 );
+		std::this_thread::sleep_for( std::chrono::minutes( 1 ) );
 	}
 }

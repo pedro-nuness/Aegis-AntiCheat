@@ -18,87 +18,111 @@
     <ClCompile Include="main.cpp">
       <Filter>Arquivos de Origem</Filter>
     </ClCompile>
-    <ClCompile Include="Memory\memory.cpp">
+    <ClCompile Include="Systems\Memory\memory.cpp">
       <Filter>Arquivos de Origem</Filter>
     </ClCompile>
-    <ClCompile Include="Utils\utils.cpp">
+    <ClCompile Include="Systems\Utils\utils.cpp">
       <Filter>Arquivos de Origem</Filter>
     </ClCompile>
-    <ClCompile Include="Triggers\Triggers.cpp">
+    <ClCompile Include="Modules\Triggers\Triggers.cpp">
       <Filter>Arquivos de Origem</Filter>
     </ClCompile>
     <ClCompile Include="Globals\Globals.cpp">
       <Filter>Arquivos de Origem</Filter>
     </ClCompile>
-    <ClCompile Include="LogSystem\Log.cpp">
+    <ClCompile Include="Systems\LogSystem\Log.cpp">
       <Filter>Arquivos de Origem</Filter>
     </ClCompile>
-    <ClCompile Include="LogSystem\File\File.cpp">
+    <ClCompile Include="Systems\LogSystem\File\File.cpp">
       <Filter>Arquivos de Origem</Filter>
     </ClCompile>
-    <ClCompile Include="Communication\Communication.cpp">
+    <ClCompile Include="Modules\Communication\Communication.cpp">
       <Filter>Arquivos de Origem</Filter>
     </ClCompile>
-    <ClCompile Include="Utils\SHA1\sha1.cpp">
+    <ClCompile Include="Systems\Utils\SHA1\sha1.cpp">
       <Filter>Arquivos de Origem</Filter>
     </ClCompile>
-    <ClCompile Include="Monitoring\Monitoring.cpp">
+    <ClCompile Include="Systems\Monitoring\Monitoring.cpp">
       <Filter>Arquivos de Origem</Filter>
     </ClCompile>
-    <ClCompile Include="Detections\Detections.cpp">
+    <ClCompile Include="Modules\Detections\Detections.cpp">
       <Filter>Arquivos de Origem</Filter>
     </ClCompile>
-    <ClCompile Include="Communication\HeartBeat\HeartBeat.cpp">
+    <ClCompile Include="Systems\Monitoring\WebHook\WebHook.cpp">
       <Filter>Arquivos de Origem</Filter>
     </ClCompile>
-    <ClCompile Include="Monitoring\WebHook\WebHook.cpp">
+    <ClCompile Include="Systems\Utils\StringCrypt\StringCrypt.cpp">
+      <Filter>Arquivos de Origem</Filter>
+    </ClCompile>
+    <ClCompile Include="Systems\Monitoring\Http\httplib.cpp">
+      <Filter>Arquivos de Origem</Filter>
+    </ClCompile>
+    <ClCompile Include="Modules\ThreadMonitor\MonitorThread.cpp">
+      <Filter>Arquivos de Origem</Filter>
+    </ClCompile>
+    <ClCompile Include="Systems\Injection\injector.cpp">
       <Filter>Arquivos de Origem</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Memory\memory.h">
+    <ClInclude Include="Systems\Memory\memory.h">
       <Filter>Arquivos de Cabeçalho</Filter>
     </ClInclude>
-    <ClInclude Include="Utils\singleton.h">
+    <ClInclude Include="Systems\Utils\singleton.h">
       <Filter>Arquivos de Cabeçalho</Filter>
     </ClInclude>
-    <ClInclude Include="Utils\utils.h">
+    <ClInclude Include="Systems\Utils\utils.h">
       <Filter>Arquivos de Cabeçalho</Filter>
     </ClInclude>
-    <ClInclude Include="Triggers\Triggers.h">
+    <ClInclude Include="Modules\Triggers\Triggers.h">
       <Filter>Arquivos de Cabeçalho</Filter>
     </ClInclude>
-    <ClInclude Include="Utils\crypt_str.h">
+    <ClInclude Include="Systems\Utils\crypt_str.h">
       <Filter>Arquivos de Cabeçalho</Filter>
     </ClInclude>
     <ClInclude Include="Globals\Globals.h">
       <Filter>Arquivos de Cabeçalho</Filter>
     </ClInclude>
-    <ClInclude Include="LogSystem\Log.h">
+    <ClInclude Include="Systems\LogSystem\Log.h">
       <Filter>Arquivos de Cabeçalho</Filter>
     </ClInclude>
-    <ClInclude Include="LogSystem\File\File.h">
+    <ClInclude Include="Systems\LogSystem\File\File.h">
       <Filter>Arquivos de Cabeçalho</Filter>
     </ClInclude>
-    <ClInclude Include="Communication\Communication.h">
+    <ClInclude Include="Modules\Communication\Communication.h">
       <Filter>Arquivos de Cabeçalho</Filter>
     </ClInclude>
-    <ClInclude Include="Utils\SHA1\sha1.h">
+    <ClInclude Include="Systems\Utils\SHA1\sha1.h">
       <Filter>Arquivos de Cabeçalho</Filter>
     </ClInclude>
     <ClInclude Include="resource.h">
       <Filter>Arquivos de Cabeçalho</Filter>
     </ClInclude>
-    <ClInclude Include="Monitoring\Monitoring.h">
+    <ClInclude Include="Systems\Monitoring\Monitoring.h">
       <Filter>Arquivos de Cabeçalho</Filter>
     </ClInclude>
-    <ClInclude Include="Detections\Detections.h">
+    <ClInclude Include="Modules\Detections\Detections.h">
       <Filter>Arquivos de Cabeçalho</Filter>
     </ClInclude>
-    <ClInclude Include="Communication\HeartBeat\HeartBeat.h">
+    <ClInclude Include="Systems\Monitoring\WebHook\WebHook.h">
       <Filter>Arquivos de Cabeçalho</Filter>
     </ClInclude>
-    <ClInclude Include="Monitoring\WebHook\WebHook.h">
+    <ClInclude Include="Systems\Utils\StringCrypt\StringCrypt.h">
+      <Filter>Arquivos de Cabeçalho</Filter>
+    </ClInclude>
+    <ClInclude Include="Systems\Monitoring\Http\httplib.h">
+      <Filter>Arquivos de Cabeçalho</Filter>
+    </ClInclude>
+    <ClInclude Include="Modules\ThreadMonitor\ThreadMonitor.h">
+      <Filter>Arquivos de Cabeçalho</Filter>
+    </ClInclude>
+    <ClInclude Include="Modules\ThreadMonitor\MonitorThread.h">
+      <Filter>Arquivos de Cabeçalho</Filter>
+    </ClInclude>
+    <ClInclude Include="Systems\Injection\Injection.h">
+      <Filter>Arquivos de Cabeçalho</Filter>
+    </ClInclude>
+    <ClInclude Include="Systems\Injection\injector.h">
       <Filter>Arquivos de Cabeçalho</Filter>
     </ClInclude>
   </ItemGroup>
