@@ -29,6 +29,7 @@ class Triggers : public ThreadMonitor {
 	std::vector<std::string> AllowedModules;
 
 	void SetupFiles( );
+	void CleanFiles( );
 
 	std::vector< Trigger> FoundTriggers;
 	std::vector< Trigger> LastTriggers;
@@ -51,7 +52,6 @@ class Triggers : public ThreadMonitor {
 
 public:
 	Triggers ( DWORD _MomProcess , DWORD _ProtectProcess ) {
-		SetupFiles( );
 		this->MomProcess = _MomProcess;
 		this->ProtectProcess = _ProtectProcess;
 	}

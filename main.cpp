@@ -2,6 +2,9 @@
 #include <Windows.h>
 #include <string>
 #include <thread>
+#include <windows.h>
+#include <winternl.h>
+#include <iostream>
 
 #include "Modules/Triggers/Triggers.h"
 #include "Modules/Communication/Communication.h"
@@ -10,24 +13,53 @@
 
 #include "Systems/LogSystem/Log.h"
 #include "Systems/Utils/utils.h"
-#include "Systems/Utils/crypt_str.h"
+#include "Systems/Utils/xorstr.h"
 #include "Systems/Memory/memory.h"
 #include "Systems/Monitoring/Monitoring.h"
+#include "Systems/FileChecking/FileChecking.h"
 
 #include "Globals/Globals.h"
 
 
 
 
+
+
 int main( int argc , char * argv[ ] ) {
-	system( "Title Aegis" );
+	if ( !Mem::Get( ).RestrictProcessAccess( ) ){
+		LogSystem::Get( ).Log( xorstr_( "[9] Failed to protect process" ) );
+	}
+
+	Globals::Get( ).SelfID = ::_getpid( );
+
+	
 
 #ifdef _DEBUG
 	::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
+#else
+	::ShowWindow( ::GetConsoleWindow( ) , SW_HIDE );
+#endif // !DEBUG
 
-	Triggers TriggerEvent( 0 , 0 );
-	Detections DetectionEvent( 0 , 0 );
-	Communication CommunicationEvent( 0 , 0 );
+	::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
+
+	if ( argc < 3 ) {
+		LogSystem::Get( ).Log( xorstr_( "[401] Initialization failed" ) );
+		return 0;
+	}
+
+	if ( !Utils::Get( ).isNumber( argv[ 1 ] ) || !Utils::Get( ).isNumber( argv[ 2 ] ) ) {
+		LogSystem::Get( ).Log( xorstr_( "[401] Invalid Input" ) );
+		return 0;
+	}
+
+	Globals::Get( ).OriginalProcess = stoi( ( std::string ) argv[ 1 ] );
+	Globals::Get( ).ProtectProcess = stoi( ( std::string ) argv[ 2 ] );
+
+	FileChecking::Get( ).ValidateFiles( );
+
+	Triggers TriggerEvent( Globals::Get( ).OriginalProcess , Globals::Get( ).ProtectProcess );
+	Detections DetectionEvent( Globals::Get( ).OriginalProcess , Globals::Get( ).ProtectProcess );
+	Communication CommunicationEvent( Globals::Get( ).OriginalProcess , Globals::Get( ).ProtectProcess );
 
 	CommunicationEvent.start( );
 
@@ -35,54 +67,24 @@ int main( int argc , char * argv[ ] ) {
 		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
 	}
 
-	std::vector<std::pair<ThreadMonitor *, int>> threads = { std::make_pair( &TriggerEvent, TRIGGERS ) , 
+	std::vector<std::pair<ThreadMonitor * , int>> threads = { 
+		std::make_pair( &TriggerEvent, TRIGGERS ) ,
 		std::make_pair( &DetectionEvent, DETECTIONS ),
 		std::make_pair( &CommunicationEvent, COMMUNICATION ) };
 
 	DetectionEvent.start( );
 	TriggerEvent.start( );
-	
-	MonitorThread monitor( threads );
-	monitor.start( );
-
-#else
-	::ShowWindow( ::GetConsoleWindow( ) , SW_HIDE );
-
-	if ( argc < 3 ) {
-		LogSystem::Get( ).Log( crypt_str( "[401] Initialization failed" ) );
-		return 0;
-	}
-
-	if ( !Utils::Get( ).isNumber( argv[ 1 ] ) || !Utils::Get( ).isNumber( argv[ 2 ] ) ) {
-		LogSystem::Get( ).Log( crypt_str( "[401] Invalid Input" ) );
-		return 0;
-	}
-
-	Globals::Get( ).OriginalProcess = stoi( ( std::string ) argv[ 1 ] );
-	Globals::Get( ).ProtectProcess = stoi( ( std::string ) argv[ 2 ] );
-
-	Triggers TriggerEvent( Globals::Get().OriginalProcess , Globals::Get( ).ProtectProcess );
-	Detections DetectionEvent( Globals::Get( ).OriginalProcess , Globals::Get( ).ProtectProcess );
-	Communication CommunicationEvent( Globals::Get( ).OriginalProcess , Globals::Get( ).ProtectProcess );
-
-	std::vector<ThreadMonitor *> threads = { &TriggerEvent, &DetectionEvent, &CommunicationEvent };
-
-	DetectionEvent.start( );
-	TriggerEvent.start( );
-	CommunicationEvent.start( );
 
 	MonitorThread monitor( threads );
 	monitor.start( );
-
-#endif // !DEBUG
 
 	std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
 
 	while ( true ) {
-		std::cout << crypt_str("[main] Ping!\n");
+		Utils::Get( ).WarnMessage( LIGHT_WHITE , xorstr_( "PING" ) , xorstr_( "main" ) , GRAY );
 
 		if ( !monitor.isRunning( ) ) {
-			std::cout << crypt_str( "[main] thread monitor is not running\n" );
+			Utils::Get( ).WarnMessage( BLUE , xorstr_( "main" ) , xorstr_( "thread monitor is not running" ) , RED );
 			monitor.reset( );
 		}
 		else

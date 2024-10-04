@@ -2,6 +2,8 @@
 #include <Windows.h>
 #include <string>
 #include <thread>
+#include <chrono>
+
 #include "../ThreadMonitor/ThreadMonitor.h"
 
 
@@ -15,6 +17,10 @@ class Communication : public ThreadMonitor {
 
 	std::string CommunicationHash;
 
+	int PingLimit = 25;
+	std::chrono::steady_clock::time_point LastClientPing;
+	bool PingInTime( );
+	void UpdatePingTime( );
 
 	void threadFunction( );
 
@@ -22,15 +28,14 @@ class Communication : public ThreadMonitor {
 	std::atomic<bool> m_running;
 	std::atomic<bool> m_healthy;
 
-	SOCKET openconnection( );
+	SOCKET openConnection( const char * ipAdress );
 	void closeconnection( SOCKET socket );
 	SOCKET listenForClient( SOCKET socket , int timeoutSeconds );
 	void sendMessage( SOCKET ClientSocket , const char * message );
-	std::string receiveMessage( SOCKET ClientSocket );
+	std::string receiveMessage( SOCKET ClientSocket, int time);
 
 	SOCKET ListenSocket;
 	SOCKET ClientSocket;
-
 public:
 
 	Communication( DWORD Pid , DWORD GamePid  )

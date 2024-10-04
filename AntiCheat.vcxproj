@@ -73,14 +73,14 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(ProjectDir)Dependencies\release\include\dpp-10.0;$(IncludePath)</IncludePath>
-    <TargetName>AegisRelease.exe</TargetName>
-    <LibraryPath>$(ProjectDir)Dependencies\release\lib\dpp-10.0;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(ProjectDir)Dependencies\release\include\dpp-10.0;$(ProjectDir)Dependencies\release\include\kernelbridge;$(ProjectDir)Dependencies\release\include\minhook;$(IncludePath)</IncludePath>
+    <TargetName>aegis</TargetName>
+    <LibraryPath>$(ProjectDir)Dependencies\release\lib\dpp-10.0;$(ProjectDir)Dependencies\release\lib\kernelbridge;$(ProjectDir)Dependencies\release\lib\minhook;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(ProjectDir)Dependencies\debug\include\dpp-10.0;$(IncludePath)</IncludePath>
-    <LibraryPath>$(ProjectDir)Dependencies\debug\lib\dpp-10.0;$(LibraryPath)</LibraryPath>
-    <TargetName>AegisDebug.exe</TargetName>
+    <IncludePath>$(ProjectDir)Dependencies\debug\include\dpp-10.0;$(ProjectDir)Dependencies\debug\include\kernelbridge;$(ProjectDir)Dependencies\release\include\minhook;$(IncludePath)</IncludePath>
+    <LibraryPath>$(ProjectDir)Dependencies\debug\lib\dpp-10.0;$(ProjectDir)Dependencies\debug\lib\kernelbridge;$(ProjectDir)Dependencies\release\lib\minhook;$(LibraryPath)</LibraryPath>
+    <TargetName>aegis</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -121,7 +121,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>dpp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>dpp.lib;User-Bridge.lib;MinHook.x64.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -141,13 +141,15 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
-      <AdditionalDependencies>dpp.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>dpp.lib;User-Bridge.lib;MinHook.x64.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Systems\FileChecking\FileChecking.cpp" />
     <ClCompile Include="Modules\Communication\Communication.cpp" />
     <ClCompile Include="Modules\Detections\Detections.cpp" />
     <ClCompile Include="Globals\Globals.cpp" />
+    <ClCompile Include="Systems\Punishing\PunishSystem.cpp" />
     <ClCompile Include="Systems\Injection\injector.cpp" />
     <ClCompile Include="Systems\LogSystem\Log.cpp" />
     <ClCompile Include="Systems\LogSystem\File\File.cpp" />
@@ -157,15 +159,18 @@
     <ClCompile Include="Systems\Monitoring\Monitoring.cpp" />
     <ClCompile Include="Systems\Monitoring\WebHook\WebHook.cpp" />
     <ClCompile Include="Modules\ThreadMonitor\MonitorThread.cpp" />
+    <ClCompile Include="Systems\Utils\AES\AES.cpp" />
     <ClCompile Include="Systems\Utils\StringCrypt\StringCrypt.cpp" />
     <ClCompile Include="Modules\Triggers\Triggers.cpp" />
     <ClCompile Include="Systems\Utils\SHA1\sha1.cpp" />
     <ClCompile Include="Systems\Utils\utils.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Systems\FileChecking\FileChecking.h" />
     <ClInclude Include="Modules\Communication\Communication.h" />
     <ClInclude Include="Modules\Detections\Detections.h" />
     <ClInclude Include="Globals\Globals.h" />
+    <ClInclude Include="Systems\Punishing\PunishSystem.h" />
     <ClInclude Include="Systems\Injection\Injection.h" />
     <ClInclude Include="Systems\Injection\injector.h" />
     <ClInclude Include="Systems\LogSystem\Log.h" />
@@ -177,12 +182,14 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="Modules\ThreadMonitor\MonitorThread.h" />
     <ClInclude Include="Modules\ThreadMonitor\ThreadMonitor.h" />
+    <ClInclude Include="Systems\Utils\AES\AES.h" />
     <ClInclude Include="Systems\Utils\StringCrypt\StringCrypt.h" />
     <ClInclude Include="Modules\Triggers\Triggers.h" />
-    <ClInclude Include="Systems\Utils\crypt_str.h" />
+    <ClInclude Include="Systems\Utils\xorstr.h" />
     <ClInclude Include="Systems\Utils\SHA1\sha1.h" />
     <ClInclude Include="Systems\Utils\singleton.h" />
     <ClInclude Include="Systems\Utils\utils.h" />
+    <ClInclude Include="Systems\Utils\XorString\XorString.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="AntiCheat.rc" />

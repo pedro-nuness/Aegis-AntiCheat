@@ -1,7 +1,7 @@
 #include "Injection.h"
 #include "injector.h"
 
-#include "../Utils/crypt_str.h"
+#include "../Utils/xorstr.h"
 #if defined(DISABLE_OUTPUT)
 #define ILog(data, ...)
 #else
@@ -22,7 +22,7 @@ bool Injector::ManualMapDll( HANDLE hProc , BYTE * pSrcData , SIZE_T FileSize , 
 	BYTE * pTargetBase = nullptr;
 
 	if ( reinterpret_cast< IMAGE_DOS_HEADER * >( pSrcData )->e_magic != 0x5A4D ) { //"MZ"
-		ILog( "Invalid file\n" );
+		ILog( xorstr_("Invalid file\n" ) );
 		return false;
 	}
 
@@ -32,7 +32,7 @@ bool Injector::ManualMapDll( HANDLE hProc , BYTE * pSrcData , SIZE_T FileSize , 
 	pOldFileHeader = &pOldNtHeader->FileHeader;
 
 	if ( pOldFileHeader->Machine != CURRENT_ARCH ) {
-		ILog( "Invalid platform\n" );
+		ILog( xorstr_("Invalid platform\n" ) );
 		return false;
 	}
 
@@ -40,7 +40,7 @@ bool Injector::ManualMapDll( HANDLE hProc , BYTE * pSrcData , SIZE_T FileSize , 
 
 	pTargetBase = reinterpret_cast< BYTE * >( VirtualAllocEx( hProc , nullptr , pOldOptHeader->SizeOfImage , MEM_COMMIT | MEM_RESERVE , PAGE_READWRITE ) );
 	if ( !pTargetBase ) {
-		ILog( "Target process memory allocation failed (ex) 0x%X\n" , GetLastError( ) );
+		ILog( xorstr_("Target process memory allocation failed (ex) 0x%X\n" ) , GetLastError( ) );
 		return false;
 	}
 
@@ -62,7 +62,7 @@ bool Injector::ManualMapDll( HANDLE hProc , BYTE * pSrcData , SIZE_T FileSize , 
 
 	//File header
 	if ( !WriteProcessMemory( hProc , pTargetBase , pSrcData , 0x1000 , nullptr ) ) { //only first 0x1000 bytes for the header
-		ILog( "Can't write file header 0x%X\n" , GetLastError( ) );
+		ILog( xorstr_("Can't write file header 0x%X\n" ) , GetLastError( ) );
 		VirtualFreeEx( hProc , pTargetBase , 0 , MEM_RELEASE );
 		return false;
 	}
@@ -71,7 +71,7 @@ bool Injector::ManualMapDll( HANDLE hProc , BYTE * pSrcData , SIZE_T FileSize , 
 	for ( UINT i = 0; i != pOldFileHeader->NumberOfSections; ++i , ++pSectionHeader ) {
 		if ( pSectionHeader->SizeOfRawData ) {
 			if ( !WriteProcessMemory( hProc , pTargetBase + pSectionHeader->VirtualAddress , pSrcData + pSectionHeader->PointerToRawData , pSectionHeader->SizeOfRawData , nullptr ) ) {
-				ILog( "Can't map sections: 0x%x\n" , GetLastError( ) );
+				ILog( xorstr_("Can't map sections: 0x%x\n" ) , GetLastError( ) );
 				VirtualFreeEx( hProc , pTargetBase , 0 , MEM_RELEASE );
 				return false;
 			}
@@ -81,13 +81,13 @@ bool Injector::ManualMapDll( HANDLE hProc , BYTE * pSrcData , SIZE_T FileSize , 
 	//Mapping params
 	BYTE * MappingDataAlloc = reinterpret_cast< BYTE * >( VirtualAllocEx( hProc , nullptr , sizeof( MANUAL_MAPPING_DATA ) , MEM_COMMIT | MEM_RESERVE , PAGE_READWRITE ) );
 	if ( !MappingDataAlloc ) {
-		ILog( "Target process mapping allocation failed (ex) 0x%X\n" , GetLastError( ) );
+		ILog( xorstr_("Target process mapping allocation failed (ex) 0x%X\n" ) , GetLastError( ) );
 		VirtualFreeEx( hProc , pTargetBase , 0 , MEM_RELEASE );
 		return false;
 	}
 
 	if ( !WriteProcessMemory( hProc , MappingDataAlloc , &data , sizeof( MANUAL_MAPPING_DATA ) , nullptr ) ) {
-		ILog( "Can't write mapping 0x%X\n" , GetLastError( ) );
+		ILog( xorstr_("Can't write mapping 0x%X\n" ) , GetLastError( ) );
 		VirtualFreeEx( hProc , pTargetBase , 0 , MEM_RELEASE );
 		VirtualFreeEx( hProc , MappingDataAlloc , 0 , MEM_RELEASE );
 		return false;
@@ -96,14 +96,14 @@ bool Injector::ManualMapDll( HANDLE hProc , BYTE * pSrcData , SIZE_T FileSize , 
 	//Shell code
 	void * pShellcode = VirtualAllocEx( hProc , nullptr , 0x1000 , MEM_COMMIT | MEM_RESERVE , PAGE_EXECUTE_READWRITE );
 	if ( !pShellcode ) {
-		ILog( "Memory shellcode allocation failed (ex) 0x%X\n" , GetLastError( ) );
+		ILog( xorstr_("Memory shellcode allocation failed (ex) 0x%X\n" ) , GetLastError( ) );
 		VirtualFreeEx( hProc , pTargetBase , 0 , MEM_RELEASE );
 		VirtualFreeEx( hProc , MappingDataAlloc , 0 , MEM_RELEASE );
 		return false;
 	}
 
 	if ( !WriteProcessMemory( hProc , pShellcode , Shellcode , 0x1000 , nullptr ) ) {
-		ILog( "Can't write shellcode 0x%X\n" , GetLastError( ) );
+		ILog( xorstr_("Can't write shellcode 0x%X\n" ) , GetLastError( ) );
 		VirtualFreeEx( hProc , pTargetBase , 0 , MEM_RELEASE );
 		VirtualFreeEx( hProc , MappingDataAlloc , 0 , MEM_RELEASE );
 		VirtualFreeEx( hProc , pShellcode , 0 , MEM_RELEASE );
@@ -111,20 +111,20 @@ bool Injector::ManualMapDll( HANDLE hProc , BYTE * pSrcData , SIZE_T FileSize , 
 	}
 
 
-	ILog( "Mapped DLL at %p\n" , pTargetBase );
-	ILog( "Mapping info at %p\n" , MappingDataAlloc );
-	ILog( "Shell code at %p\n" , pShellcode );
-
-	ILog( "Data allocated\n" );
-
 #ifdef _DEBUG
-	ILog( "My shellcode pointer %p\n" , Shellcode );
-	ILog( "Target point %p\n" , pShellcode );
+	ILog( xorstr_("Mapped DLL at %p\n" ) , pTargetBase );
+	ILog( xorstr_("Mapping info at %p\n" ) , MappingDataAlloc );
+	ILog( xorstr_("Shell code at %p\n" ) , pShellcode );
+
+	ILog( xorstr_("Data allocated\n" ) );
+
+	ILog( xorstr_("My shellcode pointer %p\n" ) , Shellcode );
+	ILog( xorstr_("Target point %p\n" ) , pShellcode );
 #endif
 
 	HANDLE hThread = CreateRemoteThread( hProc , nullptr , 0 , reinterpret_cast< LPTHREAD_START_ROUTINE >( pShellcode ) , MappingDataAlloc , 0 , nullptr );
 	if ( !hThread ) {
-		ILog( "Thread creation failed 0x%X\n" , GetLastError( ) );
+		ILog( xorstr_("Thread creation failed 0x%X\n" ) , GetLastError( ) );
 		VirtualFreeEx( hProc , pTargetBase , 0 , MEM_RELEASE );
 		VirtualFreeEx( hProc , MappingDataAlloc , 0 , MEM_RELEASE );
 		VirtualFreeEx( hProc , pShellcode , 0 , MEM_RELEASE );
@@ -139,7 +139,7 @@ bool Injector::ManualMapDll( HANDLE hProc , BYTE * pSrcData , SIZE_T FileSize , 
 		DWORD exitcode = 0;
 		GetExitCodeProcess( hProc , &exitcode );
 		if ( exitcode != STILL_ACTIVE ) {
-			ILog( "Process crashed, exit code: %d\n" , exitcode );
+			ILog( xorstr_("Process crashed, exit code: %d\n" ) , exitcode );
 			return false;
 		}
 
@@ -148,14 +148,14 @@ bool Injector::ManualMapDll( HANDLE hProc , BYTE * pSrcData , SIZE_T FileSize , 
 		hCheck = data_checked.hMod;
 
 		if ( hCheck == ( HINSTANCE ) 0x404040 ) {
-			ILog( "Wrong mapping ptr\n" );
+			ILog( xorstr_("Wrong mapping ptr\n" ) );
 			VirtualFreeEx( hProc , pTargetBase , 0 , MEM_RELEASE );
 			VirtualFreeEx( hProc , MappingDataAlloc , 0 , MEM_RELEASE );
 			VirtualFreeEx( hProc , pShellcode , 0 , MEM_RELEASE );
 			return false;
 		}
 		else if ( hCheck == ( HINSTANCE ) 0x505050 ) {
-			ILog( "WARNING: Exception support failed!\n" );
+			ILog( xorstr_("WARNING: Exception support failed!\n" ) );
 		}
 
 		Sleep( 10 );
@@ -163,7 +163,7 @@ bool Injector::ManualMapDll( HANDLE hProc , BYTE * pSrcData , SIZE_T FileSize , 
 
 	BYTE * emptyBuffer = ( BYTE * ) malloc( 1024 * 1024 * 20 );
 	if ( emptyBuffer == nullptr ) {
-		ILog( "Unable to allocate memory\n" );
+		ILog( xorstr_("Unable to allocate memory\n" ) );
 		return false;
 	}
 	memset( emptyBuffer , 0 , 1024 * 1024 * 20 );
@@ -173,7 +173,7 @@ bool Injector::ManualMapDll( HANDLE hProc , BYTE * pSrcData , SIZE_T FileSize , 
 	//CLEAR PE HEAD
 	if ( ClearHeader ) {
 		if ( !WriteProcessMemory( hProc , pTargetBase , emptyBuffer , 0x1000 , nullptr ) ) {
-			ILog( "WARNING!: Can't clear HEADER\n" );
+			ILog( xorstr_("WARNING!: Can't clear HEADER\n" ) );
 		}
 	}
 	//END CLEAR PE HEAD
@@ -188,7 +188,7 @@ bool Injector::ManualMapDll( HANDLE hProc , BYTE * pSrcData , SIZE_T FileSize , 
 					strcmp( ( char * ) pSectionHeader->Name , ".reloc" ) == 0 ) {
 					//ILog("Processing %s removal\n", pSectionHeader->Name);
 					if ( !WriteProcessMemory( hProc , pTargetBase + pSectionHeader->VirtualAddress , emptyBuffer , pSectionHeader->Misc.VirtualSize , nullptr ) ) {
-						ILog( "Can't clear section %s: 0x%x\n" , pSectionHeader->Name , GetLastError( ) );
+						ILog( xorstr_("Can't clear section %s: 0x%x\n" ) , pSectionHeader->Name , GetLastError( ) );
 					}
 				}
 			}
@@ -212,7 +212,7 @@ bool Injector::ManualMapDll( HANDLE hProc , BYTE * pSrcData , SIZE_T FileSize , 
 					//ILog("section %s set as %lX\n", (char*)pSectionHeader->Name, newP);
 				}
 				else {
-					ILog( "FAIL: section %s not set as %lX\n" , ( char * ) pSectionHeader->Name , newP );
+					ILog( xorstr_("FAIL: section %s not set as %lX\n" ) , ( char * ) pSectionHeader->Name , newP );
 				}
 			}
 		}
@@ -223,13 +223,13 @@ bool Injector::ManualMapDll( HANDLE hProc , BYTE * pSrcData , SIZE_T FileSize , 
 
 
 	if ( !WriteProcessMemory( hProc , pShellcode , emptyBuffer , 0x1000 , nullptr ) ) {
-		ILog( "WARNING: Can't clear shellcode\n" );
+		ILog( xorstr_("WARNING: Can't clear shellcode\n" ) );
 	}
 	if ( !VirtualFreeEx( hProc , pShellcode , 0 , MEM_RELEASE ) ) {
-		ILog( "WARNING: can't release shell code memory\n" );
+		ILog( xorstr_("WARNING: can't release shell code memory\n" ) );
 	}
 	if ( !VirtualFreeEx( hProc , MappingDataAlloc , 0 , MEM_RELEASE ) ) {
-		ILog( "WARNING: can't release mapping data memory\n" );
+		ILog( xorstr_("WARNING: can't release mapping data memory\n" ) );
 	}
 
 
@@ -343,7 +343,7 @@ void __stdcall Shellcode( MANUAL_MAPPING_DATA * pData ) {
 bool IsCorrectTargetArchitecture( HANDLE hProc ) {
 	BOOL bTarget = FALSE;
 	if ( !IsWow64Process( hProc , &bTarget ) ) {
-		printf( "Can't confirm target process architecture: 0x%X\n" , GetLastError( ) );
+		printf( xorstr_("Can't confirm target process architecture: 0x%X\n") , GetLastError( ) );
 		return false;
 	}
 
@@ -371,20 +371,20 @@ int Injector::Inject( std::string DllPath , DWORD PID )
 	HANDLE hProc = OpenProcess( PROCESS_ALL_ACCESS , FALSE , PID );
 	if ( !hProc ) {
 		DWORD Err = GetLastError( );
-		std::cout << ( "OpenProcess failed: 0x%X\n" , Err );
+		//std::cout << ( "OpenProcess failed: 0x%X\n" ) , Err );
 		//system("PAUSE");
 		return -2;
 	}
 
 	if ( !IsCorrectTargetArchitecture( hProc ) ) {
-		std::cout << ( "Invalid Process Architecture.\n" );
+		//std::cout << ( "Invalid Process Architecture.\n" ) );
 		CloseHandle( hProc );
 		//system("PAUSE");
 		return -3;
 	}
 
 	if ( GetFileAttributes( DllPath.c_str( ) ) == INVALID_FILE_ATTRIBUTES ) {
-		std::cout << ( "Dll file doesn't exist\n" );
+		//std::cout << ( "Dll file doesn't exist\n" ) );
 		CloseHandle( hProc );
 		//system("PAUSE");
 		return -4;
@@ -393,7 +393,7 @@ int Injector::Inject( std::string DllPath , DWORD PID )
 	std::ifstream File( DllPath , std::ios::binary | std::ios::ate );
 
 	if ( File.fail( ) ) {
-		std::cout << ( "Opening the file failed: %X\n" , ( DWORD ) File.rdstate( ) );
+		//std::cout << ( "Opening the file failed: %X\n" ) , ( DWORD ) File.rdstate( ) );
 		File.close( );
 		CloseHandle( hProc );
 		//system("PAUSE");
@@ -402,7 +402,7 @@ int Injector::Inject( std::string DllPath , DWORD PID )
 
 	auto FileSize = File.tellg( );
 	if ( FileSize < 0x1000 ) {
-		std::cout << "Filesize invalid.\n";
+		//std::cout << "Filesize invalid.\n";
 		File.close( );
 		CloseHandle( hProc );
 		//system("PAUSE");
@@ -411,7 +411,7 @@ int Injector::Inject( std::string DllPath , DWORD PID )
 
 	BYTE * pSrcData = new BYTE[ ( UINT_PTR ) FileSize ];
 	if ( !pSrcData ) {
-		std::cout << ( "Can't allocate dll file.\n" );
+		//std::cout << ( "Can't allocate dll file.\n" ) );
 		File.close( );
 		CloseHandle( hProc );
 		return -7;
@@ -421,17 +421,16 @@ int Injector::Inject( std::string DllPath , DWORD PID )
 	File.read( ( char * ) ( pSrcData ) , FileSize );
 	File.close( );
 
-	std::cout << "Mapping...\n";
+	//std::cout << "Mapping...\n";
 	if ( !ManualMapDll( hProc , pSrcData , FileSize ) ) {
 		delete[ ] pSrcData;
 		CloseHandle( hProc );
-		std::cout << "Error while mapping.\n";
+		//std::cout << "Error while mapping.\n";
 		return -8;
 	}
 	delete[ ] pSrcData;
 
 	CloseHandle( hProc );
-	std::cout << ( "OK\n" );
 	return 1;
 }
 
@@ -452,13 +451,13 @@ bool Injector::InjectBytes( std::vector<std::uint8_t> bytes , DWORD PID )
 	HANDLE hProc = OpenProcess( PROCESS_ALL_ACCESS , FALSE , PID );
 	if ( !hProc ) {
 		DWORD Err = GetLastError( );
-		std::cout << ( "OpenProcess failed: 0x%X\n" , Err );
+		//std::cout << ( "OpenProcess failed: 0x%X\n" ) , Err );
 		//system("PAUSE");
 		return false;
 	}
 
 	if ( !IsCorrectTargetArchitecture( hProc ) ) {
-		std::cout << ( "Invalid Process Architecture.\n" );
+		//std::cout << ( "Invalid Process Architecture.\n" ) );
 		CloseHandle( hProc );
 		//system("PAUSE");
 		return false;
@@ -470,7 +469,7 @@ bool Injector::InjectBytes( std::vector<std::uint8_t> bytes , DWORD PID )
 
 	if ( !pSrcData )
 	{
-		std::cout << "[+] Can't allocate memory!\n";
+		//std::cout << "[+] Can't allocate memory!\n";
 		CloseHandle( hProc );
 		return false;
 	}
@@ -480,7 +479,7 @@ bool Injector::InjectBytes( std::vector<std::uint8_t> bytes , DWORD PID )
 	{
 		delete pSrcData;
 		CloseHandle( hProc );
-		std::cout << "Error while mapping.\n";
+		//std::cout << "Error while mapping.\n";
 		//system("PAUSE");
 		return false;
 	}

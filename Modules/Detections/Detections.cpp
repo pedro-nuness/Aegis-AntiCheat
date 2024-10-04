@@ -5,187 +5,205 @@
 #include <unordered_map>
 
 #include "../../Systems/Memory/memory.h"
-#include "../../Systems/Utils/crypt_str.h"
+#include "../../Systems/Utils/xorstr.h"
 #include "../../Systems/Monitoring/Monitoring.h"
 #include "../../Systems/LogSystem/Log.h"
 #include "../../Globals/Globals.h"
+#include "../../Systems/Utils/utils.h"
+
+
+
+
+#include "WdkTypes.h"
+#include "CtlTypes.h"
+
 
 #include <dpp/colors.h>
+#include <TlHelp32.h>
 
 #define timepoint std::chrono::steady_clock::time_point
 #define now std::chrono::high_resolution_clock::now()
 
 std::vector<std::string> AllowedMomModules {
-		crypt_str( "LauncherTeste.vmp.exe" ),
-	crypt_str( "advapi32.dll" ),
-	crypt_str( "amsi.dll" ),
-	crypt_str( "apphelp.dll" ),
-	crypt_str( "bcrypt.dll" ),
-	crypt_str( "bcryptprimitives.dll" ),
-	crypt_str( "cfgmgr32.dll" ),
-	crypt_str( "clbcatq.dll" ),
-	crypt_str( "clr.dll" ),
-	crypt_str( "clrjit.dll" ),
-	crypt_str( "coloradapterclient.dll" ),
-	crypt_str( "combase.dll" ),
-	crypt_str( "CoreMessaging.dll" ),
-	crypt_str( "CoreUIComponents.dll" ),
-	crypt_str( "crypt32.dll" ),
-	crypt_str( "crypt32.dll.mui" ),
-	crypt_str( "cryptbase.dll" ),
-	crypt_str( "cryptnet.dll" ),
-	crypt_str( "cryptsp.dll" ),
-	crypt_str( "d3d11.dll" ),
-	crypt_str( "d3d9.dll" ),
-	crypt_str( "D3DCompiler_47.dll" ),
-	crypt_str( "DataExchange.dll" ),
-	crypt_str( "dcomp.dll" ),
-	crypt_str( "devobj.dll" ),
-	crypt_str( "dhcpcsvc.dll" ),
-	crypt_str( "dhcpcsvc6.dll" ),
-	crypt_str( "DiscordRPC.dll" ),
-	crypt_str( "dnsapi.dll" ),
-	crypt_str( "drvstore.dll" ),
-	crypt_str( "dwmapi.dll" ),
-	crypt_str( "DWrite.dll" ),
-	crypt_str( "DXCore.dll" ),
-	crypt_str( "dxgi.dll" ),
-	crypt_str( "fastprox.dll" ),
-	crypt_str( "FWPUCLNT.DLL" ),
-	crypt_str( "gdi32.dll" ),
-	crypt_str( "gdi32full.dll" ),
-	crypt_str( "GdiPlus.dll" ),
-	crypt_str( "gpapi.dll" ),
-	crypt_str( "icm32.dll" ),
-	crypt_str( "iertutil.dll" ),
-	crypt_str( "imagehlp.dll" ),
-	crypt_str( "imm32.dll" ),
-	crypt_str( "IPHLPAPI.DLL" ),
-	crypt_str( "kernel.appcore.dll" ),
-	crypt_str( "kernel32.dll" ),
-	crypt_str( "KernelBase.dll" ),
-	crypt_str( "KernelBase.dll.mui" ),
-	crypt_str( "locale.nls" ),
-	crypt_str( "MpOAV.dll" ),
-	crypt_str( "msasn1.dll" ),
-	crypt_str( "mscms.dll" ),
-	crypt_str( "mscoree.dll" ),
-	crypt_str( "mscoreei.dll" ),
-	crypt_str( "mscorlib.ni.dll" ),
-	crypt_str( "mscorlib.resources.dll" ),
-	crypt_str( "mscorrc.dll" ),
-	crypt_str( "msctf.dll" ),
-	crypt_str( "msctfui.dll" ),
-	crypt_str( "msctfui.dll.mui" ),
-	crypt_str( "mskeyprotect.dll" ),
-	crypt_str( "msvcp140_clr0400.dll" ),
-	crypt_str( "msvcp_win.dll" ),
-	crypt_str( "msvcrt.dll" ),
-	crypt_str( "mswsock.dll" ),
-	crypt_str( "NapiNSP.dll" ),
-	crypt_str( "ncrypt.dll" ),
-	crypt_str( "ncryptsslp.dll" ),
-	crypt_str( "netutils.dll" ),
-	crypt_str( "Newtonsoft.Json.ni.dll" ),
-	crypt_str( "nlaapi.dll" ),
-	crypt_str( "nsi.dll" ),
-	crypt_str( "ntasn1.dll" ),
-	crypt_str( "ntdll.dll" ),
-	crypt_str( "ntdll.dll" ),
-	crypt_str( "ntmarta.dll" ),
-	crypt_str( "nvd3dum.dll" ),
-	crypt_str( "nvgpucomp32.dll" ),
-	crypt_str( "nvldumd.dll" ),
-	crypt_str( "nvspcap.dll" ),
-	crypt_str( "ole32.dll" ),
-	crypt_str( "oleaut32.dll" ),
-	crypt_str( "OnDemandConnRouteHelper.dll" ),
-	crypt_str( "pnrpnsp.dll" ),
-	crypt_str( "powrprof.dll" ),
-	crypt_str( "PresentationCore.ni.dll" ),
-	crypt_str( "PresentationCore.resources.dll" ),
-	crypt_str( "PresentationFramework-SystemXml.dll" ),
-	crypt_str( "PresentationFramework.Aero2.ni.dll" ),
-	crypt_str( "PresentationFramework.ni.dll" ),
-	crypt_str( "PresentationFramework.resources.dll" ),
-	crypt_str( "PresentationNative_v0400.dll" ),
-	crypt_str( "profapi.dll" ),
-	crypt_str( "propsys.dll" ),
-	crypt_str( "psapi.dll" ),
-	crypt_str( "rasadhlp.dll" ),
-	crypt_str( "rasapi32.dll" ),
-	crypt_str( "rasman.dll" ),
-	crypt_str( "rpcrt4.dll" ),
-	crypt_str( "rsaenh.dll" ),
-	crypt_str( "rtutils.dll" ),
-	crypt_str( "schannel.dll" ),
-	crypt_str( "sechost.dll" ),
-	crypt_str( "secur32.dll" ),
-	crypt_str( "SHCore.dll" ),
-	crypt_str( "shell32.dll" ),
-	crypt_str( "shlwapi.dll" ),
-	crypt_str( "SortDefault.nls" ),
-	crypt_str( "srvcli.dll" ),
-	crypt_str( "sspicli.dll" ),
-	crypt_str( "StaticCache.dat" ),
-	crypt_str( "System.Configuration.ni.dll" ),
-	crypt_str( "System.Core.ni.dll" ),
-	crypt_str( "System.Data.dll" ),
-	crypt_str( "System.Data.ni.dll" ),
-	crypt_str( "System.Deployment.ni.dll" ),
-	crypt_str( "System.Deployment.resources.dll" ),
-	crypt_str( "System.Drawing.ni.dll" ),
-	crypt_str( "System.Management.ni.dll" ),
-	crypt_str( "System.Net.Http.ni.dll" ),
-	crypt_str( "System.ni.dll" ),
-	crypt_str( "System.Numerics.ni.dll" ),
-	crypt_str( "System.resources.dll" ),
-	crypt_str( "System.Runtime.Serialization.ni.dll" ),
-	crypt_str( "System.Windows.Forms.ni.dll" ),
-	crypt_str( "System.Xaml.ni.dll" ),
-	crypt_str( "System.Xml.ni.dll" ),
-	crypt_str( "TextInputFramework.dll" ),
-	crypt_str( "TextShaping.dll" ),
-	crypt_str( "twinapi.appcore.dll" ),
-	crypt_str( "ucrtbase.dll" ),
-	crypt_str( "ucrtbase_clr0400.dll" ),
-	crypt_str( "UIAutomationCore.dll" ),
-	crypt_str( "UIAutomationProvider.dll" ),
-	crypt_str( "UIAutomationTypes.dll" ),
-	crypt_str( "umpdc.dll" ),
-	crypt_str( "urlmon.dll" ),
-	crypt_str( "user32.dll" ),
-	crypt_str( "userenv.dll" ),
-	crypt_str( "uxtheme.dll" ),
-	crypt_str( "vcruntime140_clr0400.dll" ),
-	crypt_str( "version.dll" ),
-	crypt_str( "wbemcomn.dll" ),
-	crypt_str( "wbemprox.dll" ),
-	crypt_str( "wbemsvc.dll" ),
-	crypt_str( "win32u.dll" ),
-	crypt_str( "windows.storage.dll" ),
-	crypt_str( "WindowsBase.ni.dll" ),
-	crypt_str( "WindowsCodecs.dll" ),
-	crypt_str( "WindowsCodecsExt.dll" ),
-	crypt_str( "winhttp.dll" ),
-	crypt_str( "wininet.dll" ),
-	crypt_str( "winmm.dll" ),
-	crypt_str( "winnsi.dll" ),
-	crypt_str( "winrnr.dll" ),
-	crypt_str( "winsta.dll" ),
-	crypt_str( "wintrust.dll" ),
-	crypt_str( "WinTypes.dll" ),
-	crypt_str( "wldp.dll" ),
-	crypt_str( "WMINet_Utils.dll" ),
-	crypt_str( "wmiutils.dll" ),
-	crypt_str( "wow64.dll" ),
-	crypt_str( "wow64cpu.dll" ),
-	crypt_str( "wow64win.dll" ),
-	crypt_str( "wpfgfx_v0400.dll" ),
-	crypt_str( "ws2_32.dll" ),
-	crypt_str( "wshbth.dll" ),
-	crypt_str( "wtsapi32.dll" ),
+		xorstr_( "LauncherTeste.vmp.exe" ),
+	xorstr_( "advapi32.dll" ),
+	xorstr_( "amsi.dll" ),
+	xorstr_( "apphelp.dll" ),
+	xorstr_( "bcrypt.dll" ),
+	xorstr_( "bcryptprimitives.dll" ),
+	xorstr_( "cfgmgr32.dll" ),
+	xorstr_( "clbcatq.dll" ),
+	xorstr_( "clr.dll" ),
+	xorstr_( "clrjit.dll" ),
+	xorstr_( "coloradapterclient.dll" ),
+	xorstr_( "combase.dll" ),
+	xorstr_( "CoreMessaging.dll" ),
+	xorstr_( "CoreUIComponents.dll" ),
+	xorstr_( "crypt32.dll" ),
+	xorstr_( "crypt32.dll.mui" ),
+	xorstr_( "cryptbase.dll" ),
+	xorstr_( "cryptnet.dll" ),
+	xorstr_( "cryptsp.dll" ),
+	xorstr_( "d3d11.dll" ),
+	xorstr_( "d3d9.dll" ),
+	xorstr_( "D3DCompiler_47.dll" ),
+	xorstr_( "DataExchange.dll" ),
+	xorstr_( "dcomp.dll" ),
+	xorstr_( "devobj.dll" ),
+	xorstr_( "dhcpcsvc.dll" ),
+	xorstr_( "dhcpcsvc6.dll" ),
+	xorstr_( "DiscordRPC.dll" ),
+	xorstr_( "dnsapi.dll" ),
+	xorstr_( "drvstore.dll" ),
+	xorstr_( "dwmapi.dll" ),
+	xorstr_( "DWrite.dll" ),
+	xorstr_( "DXCore.dll" ),
+	xorstr_( "dxgi.dll" ),
+	xorstr_( "fastprox.dll" ),
+	xorstr_( "FWPUCLNT.DLL" ),
+	xorstr_( "gdi32.dll" ),
+	xorstr_( "gdi32full.dll" ),
+	xorstr_( "GdiPlus.dll" ),
+	xorstr_( "gpapi.dll" ),
+	xorstr_( "icm32.dll" ),
+	xorstr_( "iertutil.dll" ),
+	xorstr_( "imagehlp.dll" ),
+	xorstr_( "imm32.dll" ),
+	xorstr_( "IPHLPAPI.DLL" ),
+	xorstr_( "kernel.appcore.dll" ),
+	xorstr_( "kernel32.dll" ),
+	xorstr_( "KernelBase.dll" ),
+	xorstr_( "KernelBase.dll.mui" ),
+	xorstr_( "locale.nls" ),
+	xorstr_( "MpOAV.dll" ),
+	xorstr_( "msasn1.dll" ),
+	xorstr_( "mscms.dll" ),
+	xorstr_( "mscoree.dll" ),
+	xorstr_( "mscoreei.dll" ),
+	xorstr_( "mscorlib.ni.dll" ),
+	xorstr_( "mscorlib.resources.dll" ),
+	xorstr_( "mscorrc.dll" ),
+	xorstr_( "msctf.dll" ),
+	xorstr_( "msctfui.dll" ),
+	xorstr_( "msctfui.dll.mui" ),
+	xorstr_( "mskeyprotect.dll" ),
+	xorstr_( "msvcp140_clr0400.dll" ),
+	xorstr_( "msvcp_win.dll" ),
+	xorstr_( "msvcrt.dll" ),
+	xorstr_( "mswsock.dll" ),
+	xorstr_( "NapiNSP.dll" ),
+	xorstr_( "ncrypt.dll" ),
+	xorstr_( "ncryptsslp.dll" ),
+	xorstr_( "netutils.dll" ),
+	xorstr_( "Newtonsoft.Json.ni.dll" ),
+	xorstr_( "nlaapi.dll" ),
+	xorstr_( "nsi.dll" ),
+	xorstr_( "ntasn1.dll" ),
+	xorstr_( "ntdll.dll" ),
+	xorstr_( "ntmarta.dll" ),
+	xorstr_( "nvd3dum.dll" ),
+	xorstr_( "nvgpucomp32.dll" ),
+	xorstr_( "nvldumd.dll" ),
+	xorstr_( "nvspcap.dll" ),
+	xorstr_( "ole32.dll" ),
+	xorstr_( "oleaut32.dll" ),
+	xorstr_( "OnDemandConnRouteHelper.dll" ),
+	xorstr_( "pnrpnsp.dll" ),
+	xorstr_( "powrprof.dll" ),
+	xorstr_( "PresentationCore.ni.dll" ),
+	xorstr_( "PresentationCore.resources.dll" ),
+	xorstr_( "PresentationFramework-SystemXml.dll" ),
+	xorstr_( "PresentationFramework.Aero2.ni.dll" ),
+	xorstr_( "PresentationFramework.ni.dll" ),
+	xorstr_( "PresentationFramework.resources.dll" ),
+	xorstr_( "PresentationNative_v0400.dll" ),
+	xorstr_( "profapi.dll" ),
+	xorstr_( "propsys.dll" ),
+	xorstr_( "psapi.dll" ),
+	xorstr_( "rasadhlp.dll" ),
+	xorstr_( "rasapi32.dll" ),
+	xorstr_( "rasman.dll" ),
+	xorstr_( "rpcrt4.dll" ),
+	xorstr_( "rsaenh.dll" ),
+	xorstr_( "rtutils.dll" ),
+	xorstr_( "schannel.dll" ),
+	xorstr_( "sechost.dll" ),
+	xorstr_( "secur32.dll" ),
+	xorstr_( "SHCore.dll" ),
+	xorstr_( "shell32.dll" ),
+	xorstr_( "shlwapi.dll" ),
+	xorstr_( "SortDefault.nls" ),
+	xorstr_( "srvcli.dll" ),
+	xorstr_( "sspicli.dll" ),
+	xorstr_( "StaticCache.dat" ),
+	xorstr_( "System.Configuration.ni.dll" ),
+	xorstr_( "System.Core.ni.dll" ),
+	xorstr_( "System.Data.dll" ),
+	xorstr_( "System.Data.ni.dll" ),
+	xorstr_( "System.Deployment.ni.dll" ),
+	xorstr_( "System.Deployment.resources.dll" ),
+	xorstr_( "System.Drawing.ni.dll" ),
+	xorstr_( "System.Management.ni.dll" ),
+	xorstr_( "System.Net.Http.ni.dll" ),
+	xorstr_( "System.ni.dll" ),
+	xorstr_( "System.Numerics.ni.dll" ),
+	xorstr_( "System.resources.dll" ),
+	xorstr_( "System.Runtime.Serialization.ni.dll" ),
+	xorstr_( "System.Windows.Forms.ni.dll" ),
+	xorstr_( "System.Xaml.ni.dll" ),
+	xorstr_( "System.Xml.ni.dll" ),
+	xorstr_( "TextInputFramework.dll" ),
+	xorstr_( "TextShaping.dll" ),
+	xorstr_( "twinapi.appcore.dll" ),
+	xorstr_( "ucrtbase.dll" ),
+	xorstr_( "ucrtbase_clr0400.dll" ),
+	xorstr_( "UIAutomationCore.dll" ),
+	xorstr_( "UIAutomationProvider.dll" ),
+	xorstr_( "UIAutomationTypes.dll" ),
+	xorstr_( "umpdc.dll" ),
+	xorstr_( "urlmon.dll" ),
+	xorstr_( "user32.dll" ),
+	xorstr_( "userenv.dll" ),
+	xorstr_( "uxtheme.dll" ),
+	xorstr_( "vcruntime140_clr0400.dll" ),
+	xorstr_( "version.dll" ),
+	xorstr_( "wbemcomn.dll" ),
+	xorstr_( "wbemprox.dll" ),
+	xorstr_( "wbemsvc.dll" ),
+	xorstr_( "win32u.dll" ),
+	xorstr_( "windows.storage.dll" ),
+	xorstr_( "WindowsBase.ni.dll" ),
+	xorstr_( "WindowsCodecs.dll" ),
+	xorstr_( "WindowsCodecsExt.dll" ),
+	xorstr_( "winhttp.dll" ),
+	xorstr_( "wininet.dll" ),
+	xorstr_( "winmm.dll" ),
+	xorstr_( "winnsi.dll" ),
+	xorstr_( "winrnr.dll" ),
+	xorstr_( "winsta.dll" ),
+	xorstr_( "wintrust.dll" ),
+	xorstr_( "WinTypes.dll" ),
+	xorstr_( "wldp.dll" ),
+	xorstr_( "WMINet_Utils.dll" ),
+	xorstr_( "wmiutils.dll" ),
+	xorstr_( "wow64.dll" ),
+	xorstr_( "wow64cpu.dll" ),
+	xorstr_( "wow64win.dll" ),
+	xorstr_( "wpfgfx_v0400.dll" ),
+	xorstr_( "ws2_32.dll" ),
+	xorstr_( "wshbth.dll" ),
+	xorstr_( "wtsapi32.dll" ),
+
+
 };
+
+
+
+bool Detections::IsDebuggerPresentCustom( ) {
+	BOOL isDebuggerPresent = FALSE;
+	CheckRemoteDebuggerPresent( GetCurrentProcess( ) , &isDebuggerPresent );
+	return isDebuggerPresent || IsDebuggerPresent( );
+}
 
 timepoint LastFullScan = now - std::chrono::duration( std::chrono::seconds( 100 ) );
 Detections::~Detections( ) {
@@ -210,7 +228,7 @@ bool Detections::isRunning( ) const {
 
 void Detections::reset( ) {
 	// Implementation to reset the thread
-	std::cout << crypt_str( "[detection] resetting thread!\n" );
+	Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "resetting thread" ) , YELLOW );
 	if ( m_thread.joinable( ) ) {
 		m_thread.join( );
 	}
@@ -222,25 +240,25 @@ void Detections::requestupdate( ) {
 	this->m_healthy = false;
 }
 
-std::string Detections::GenerateDetectionStatus(Detection _detection) {
+std::string Detections::GenerateDetectionStatus( Detection _detection ) {
 	std::string _result = "";
 	switch ( _detection.status ) {
 	case CHEAT_DETECTED:
-		_result += crypt_str( "[DETECTION]\n" );
+		_result += xorstr_( "[DETECTION]\n" );
 		break;
 	case MAY_DETECTED:
-		_result += crypt_str( "[SUSPECT]\n" );
+		_result += xorstr_( "[SUSPECT]\n" );
 		break;
 
 	}
 
-	_result += crypt_str( "Found Infected Process\n" );
-	_result += Mem::Get( ).GetProcessName( _detection.ProcessPID ) + crypt_str( "\n" );
+	_result += xorstr_( "Found Infected Process\n" );
+	_result += Mem::Get( ).GetProcessName( _detection.ProcessPID ) + xorstr_( "\n" );
 	for ( auto module : _detection.ProcessModules ) {
-		_result += module + crypt_str( "\n" );
+		_result += module + xorstr_( "\n" );
 	}
 
-	_result += crypt_str( "\n" );
+	_result += xorstr_( "\n" );
 
 	return _result;
 }
@@ -277,7 +295,7 @@ void Detections::DigestDetections( ) {
 }
 
 void Detections::ScanWindows( ) {
-	std::cout << crypt_str( "[detection] Starting Window scan!\n" );
+	Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "starting window scan" ) , GREEN );
 	std::unordered_map<DWORD , int> Map;
 
 	// Enumerate all top-level windows
@@ -285,7 +303,7 @@ void Detections::ScanWindows( ) {
 	EnumWindows( Mem::EnumWindowsProc , ( LPARAM ) ( &Windows ) );
 
 	for ( const auto & window : Windows ) {
-		if ( window.processId == this->MomProcess || window.processId == this->ProtectProcess ) {
+		if ( window.processId == ( DWORD ) this->MomProcess || window.processId == ( DWORD ) this->ProtectProcess || window.processId == ( DWORD ) Globals::Get( ).SelfID ) {
 			continue;
 		}
 
@@ -304,62 +322,53 @@ void Detections::ScanWindows( ) {
 	for ( const auto & pair : Map ) {
 		this->ThreadUpdate = true;
 
-		std::this_thread::sleep_for( std::chrono::milliseconds( 250 ) );
-
-		std::string ProcessName = Mem::Get( ).GetProcessName( pair.first );
-		std::cout << "[SCAN]: " << ProcessName << "\n";
-
 		HANDLE hProcess = OpenProcess( PROCESS_VM_READ | PROCESS_QUERY_INFORMATION , FALSE , pair.first );
 
 		if ( hProcess == NULL ) {
 			continue;
 		}
 
+		std::string ProcessName = Mem::Get( ).GetProcessName( pair.first );
+		Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "scanning " ) + ProcessName , WHITE );
+		std::this_thread::sleep_for( std::chrono::milliseconds( 250 ) );
+
 		std::vector<std::string> TargetStrings {
-				crypt_str( "Aimbot" ),
-				crypt_str( "Box" ),
-				crypt_str( "Skeleton" ),
-				crypt_str( "Distance" ),
-				crypt_str( "ESP" ),
-				crypt_str( "Hack" ),
-				crypt_str( "Entities" ),
-				crypt_str( "dayzinfected" ),
-				crypt_str( "clothing" ),
-				crypt_str( "dayzplayer" ),
-				crypt_str( "dayzanimal" ),
-				crypt_str( "inventoryItem" ),
-				crypt_str( "ProxyMagazines" ),
-				crypt_str( "Weapon" ),
-				crypt_str( "DayZ_x64.exe" )
+				xorstr_( "Cheat" ),
+				xorstr_( "Aimbot" ),
+				xorstr_( "Skeleton" ),
+				xorstr_( "Distance" ),
+				xorstr_( "ESP" ),
+				xorstr_( "Hack" ),
+				xorstr_( "Entities" ),
+				xorstr_( "dayzinfected" ),
+				xorstr_( "clothing" ),
+				xorstr_( "dayzplayer" ),
+				xorstr_( "dayzanimal" ),
+				xorstr_( "inventoryItem" ),
+				xorstr_( "ProxyMagazines" ),
+				xorstr_( "Weapon" ),
+				xorstr_( "DayZ_x64.exe" )
 		};
 
-		std::vector<MemoryRegion> memoryDump;
+		this->ThreadUpdate = true;
+		std::vector<std::pair<std::string , LPVOID>> DumpedString = Mem::Get( ).DumpAndSearch( hProcess , TargetStrings );
+		this->ThreadUpdate = true;
 
-		if ( Mem::Get( ).DumpProcessMemory( hProcess , memoryDump ) ) {
-
-			this->ThreadUpdate = true;
-
-			if ( memoryDump.empty( ) ) {
+		if ( !DumpedString.empty( ) ) {
+			if ( ( float ) DumpedString.size( ) / ( float ) TargetStrings.size( ) > 0.7 ) {
+				Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "found infected process " ) + Mem::Get( ).GetProcessName( pair.first ) , LIGHT_RED );
+				AddDetection( Detection { pair.first, ProcessName, CHEAT_DETECTED, Mem::Get( ).GetModules( pair.first ), DumpedString } );
 				CloseHandle( hProcess );
 				continue;
 			}
 
-			std::vector<std::pair<std::string , LPVOID>> Founds = Mem::Get( ).SearchStringsInDump( memoryDump , TargetStrings );
-
-			if ( ( float ) Founds.size( ) / ( float ) TargetStrings.size( ) > 0.7 ) {
-				std::cout << crypt_str( "[DETECTION] Found Infected Process: " ) << Mem::Get( ).GetProcessName( pair.first ) << "\n";
-				AddDetection( Detection { pair.first, ProcessName, CHEAT_DETECTED, Mem::Get( ).GetModules( pair.first ), Founds } );
-				CloseHandle( hProcess );
-				continue;
-			}
-
-			AddDetection( Detection { pair.first, ProcessName, NOTHING_DETECTED, Mem::Get( ).GetModules( pair.first ), Founds } );
+			AddDetection( Detection { pair.first, ProcessName, NOTHING_DETECTED, Mem::Get( ).GetModules( pair.first ), DumpedString } );
 		}
 
 		CloseHandle( hProcess );
 
 	}
-	std::cout << crypt_str( "[detection] Ending Window scan!\n" );
+	Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "ending window scan" ) , GREEN );
 	this->ScanModules( );
 }
 
@@ -375,7 +384,7 @@ void Detections::ScanModules( ) {
 	and pop a warning
 	*/
 
-	std::cout << crypt_str( "[detection] Scanning Modules\n" );
+	Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "scanning modules" )  , WHITE );
 
 	for ( Detection Process : this->cDetections ) {
 		this->ThreadUpdate = true;
@@ -395,16 +404,17 @@ void Detections::ScanModules( ) {
 					this->ThreadUpdate = true;
 					if ( ( uint64_t ) Scan.second >= Address && ( uint64_t ) Scan.second < ( uint64_t ) Address + ( uint64_t ) ModuleSize ) {
 						InfectedModules.emplace_back( Module );
-						std::cout << "[MODULE SCAN] Infected Module: " << Module << "\n";
 						break;
 					}
 				}
 			}
 			Process.ProcessModules = InfectedModules;
 			break;
-
+		case MAY_DETECTED:
+			//? todo
+			break;
 		default:
-			
+
 			break;
 		}
 	}
@@ -426,16 +436,17 @@ void Detections::ScanParentModules( ) {
 		}
 
 		if ( !Found ) {
-			AddDetection( Detection { this->MomProcess, crypt_str( "Launcher" ), CHEAT_DETECTED, MomModules } );
+			//AddDetection( Detection { this->MomProcess, xorstr_( "Launcher" ), CHEAT_DETECTED, MomModules } );
 		}
 	}
 }
 
 void Detections::threadFunction( ) {
-	std::cout << crypt_str( "[detection] thread started sucessfully!\n" );
-	while ( m_running  ) {
+	Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "thread started sucessfully\n" )  , GREEN );
 
-		
+	while ( m_running ) {
+
+
 		if ( this->CalledScanThread ) {
 			if ( this->ThreadUpdate ) {
 				this->ThreadUpdate = false;
@@ -443,29 +454,28 @@ void Detections::threadFunction( ) {
 			}
 			else {
 				//Thread stopped answer!
-				std::cout << "[detection] Thread stopped, anomaly detected!\n";
-				AddDetection( Detection { 0, crypt_str( "Scan Thread Stopped" ), CHEAT_DETECTED, {} } );
+				Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "thread stopped, anomaly detected!" ) , RED );
+				AddDetection( Detection { 0, xorstr_( "scan thread stopped" ), CHEAT_DETECTED, {} } );
 				this->CalledScanThread = false;
 				this->DigestDetections( );
 			}
 		}
 		else {
-			std::cout << crypt_str( "[detection] Scanning parent modules!\n" );
+			Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "scanning parent modules!" ) , GRAY );
 			this->ScanParentModules( );
-
-			std::cout << crypt_str( "[detection] Digesting detections!\n" );
+			Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "scanning parent modules!" ) , GRAY );
 			this->DigestDetections( );
 		}
 
 		std::chrono::duration<double> elapsed = now - LastFullScan;
 		if ( elapsed.count( ) >= 100 && !this->CalledScanThread ) {
-			std::cout << crypt_str( "[detection] Scanning Windows\n" );
+			Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "starting window scan" ) , YELLOW );
 			std::thread( &Detections::ScanWindows , this ).detach( );
 			this->CalledScanThread = true;
 		}
 
-		
-		std::cout << crypt_str( "[detection] Ping!\n" );
+
+		Utils::Get( ).WarnMessage( LIGHT_WHITE , xorstr_( "PING" ) , xorstr_( "detection thread" ) , GRAY );
 
 		m_healthy = true;
 

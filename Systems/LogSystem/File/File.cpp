@@ -195,7 +195,6 @@ bool File::Move( std::string _path )
 			return true;
 		}
 		else {
-			std::cout << "[FS]: Failed creating file!\n";
 			return false;
 		}
 	}

@@ -1,14 +1,16 @@
 #include <fstream>
 #include "StringCrypt.h"
 #include "../utils.h"
-#include "../crypt_str.h"
+#include "../xorstr.h"
 #include "../../Memory/memory.h"
 #include "../SHA1/sha1.h"
+#include "../AES/AES.h"
+
 
 
 void StringCrypt::Init( ) {
 	CryptedString cStr;
-	cStr.Hash = crypt_str("d81df4fc01e3651581242a35aa11a56a67162563");
+	cStr.Hash = xorstr_( "d81df4fc01e3651581242a35aa11a56a67162563" );
 	cStr.EncryptedString = {
 		{803, 69}, {623, 5}, {4520, -52}, {2595, 77}, {134, -19},
 		{1553, 41}, {2129, -34}, {3133, -14}, {385, -29}, {3527, -94},
@@ -38,10 +40,30 @@ void StringCrypt::Init( ) {
 	};
 
 	Strings.emplace_back( cStr );
+
+	cStr.Hash = xorstr_("a477c5772e93d5a7f3f91d766d249e0a63b8bef5");
+	cStr.EncryptedString = {
+		{3052, -127}, {1013, -125}, {1215, -102}, {2441, -66}, {4338, 80},
+		{651, -42}, {4603, 102}, {3263, 108}, {4012, -78}, {3516, -90},
+		{3405, 45}, {207, -119}, {2524, 77}, {3842, 78}, {1918, -40},
+		{3027, 87}
+	};
+
+	Strings.emplace_back( cStr );
 }
 
-std::string StringCrypt::EncryptString( std::string str  ) {
-	
+std::vector<char> StringCrypt::GeneratePlain( std::string str ) {
+	std::vector<char> Plain;
+
+	for ( auto c : str ) {
+		Plain.emplace_back( c );
+	}
+	return Plain;
+}
+
+
+std::string StringCrypt::EncryptString( std::string str ) {
+
 	std::string Hash = Mem::Get( ).GenerateHash( str );
 	CryptedString cStr;
 	cStr.Hash = Hash;
@@ -52,11 +74,12 @@ std::string StringCrypt::EncryptString( std::string str  ) {
 		CryptedChar cChar;
 		cChar._Key = Num;
 		cChar.Letter = str[ i ] - cChar._Key;
-		Result += ( str[i ] - cChar._Key );
+		Result += ( str[ i ] - cChar._Key );
 		cStr.EncryptedString.emplace_back( cChar );
 	}
+
 	Strings.emplace_back( cStr );
-	SaveEncryptedStringsToFile( crypt_str("crypt.txt") );
+	SaveEncryptedStringsToFile( xorstr_( "crypt.txt" ) , cStr );
 	return Result;
 }
 
@@ -93,21 +116,19 @@ std::string * StringCrypt::DecryptString( CryptedString str ) {
 	return result;
 }
 
-void StringCrypt::SaveEncryptedStringsToFile( std::string  filename ) {
+void StringCrypt::SaveEncryptedStringsToFile( std::string  filename , CryptedString cStr ) {
 	std::ofstream file( filename );
 
 	if ( !file.is_open( ) ) {
 		return;
 	}
 
-	for ( const auto & cStr : Strings ) {
-		file << crypt_str("Hash: ") << cStr.Hash << "\n";
-		file << crypt_str("EncryptedString: \n");
-		for ( const auto & cChar : cStr.EncryptedString ) {
-			file << crypt_str("  Key: ") << cChar._Key << crypt_str(" Letter: ") << static_cast< int >( cChar.Letter ) << "\n";
-		}
-		file << "\n"; // Adiciona uma linha em branco entre cada string criptografada
+	file << xorstr_( "Hash: " ) << cStr.Hash << "\n";
+	file << xorstr_( "EncryptedString: \n" );
+	for ( const auto & cChar : cStr.EncryptedString ) {
+		file << xorstr_( "  Key: " ) << cChar._Key << xorstr_( " Letter: " ) << static_cast< int >( cChar.Letter ) << "\n";
 	}
+	file << "\n"; // Adiciona uma linha em branco entre cada string criptografada
 
 	file.close( );
 }

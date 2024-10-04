@@ -36,6 +36,8 @@ class Detections : public ThreadMonitor {
 
 	std::vector< Detection > cDetections;
 
+	bool IsDebuggerPresentCustom( );
+	void ScanHandles( );
 	void ScanWindows( );
 	void ScanModules( );
 	void AddDetection( Detection d );

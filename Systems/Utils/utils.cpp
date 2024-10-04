@@ -3,7 +3,7 @@
 #include <iostream>
 #include <Windows.h>
 #include <random>
-
+#include "xorstr.h"
 
 #include <Wininet.h>
 #pragma comment(lib, "wininet.lib")
@@ -19,9 +19,40 @@ bool Utils::ExistsFile( const std::string & name )
 	}
 }
 
+void Utils::WarnMessage( COLORS color , std::string custom_text , std::string Message , COLORS _col ) {
+	Warn( color , custom_text );
+	ColoredText( xorstr_( " " ) + Message + xorstr_( "\n" ) , _col );
+}
 
 
 
+std::string Utils::GetRandomCharacter( ) {
+	std::string letters[ ] = { "a", "b", "c", "d", "e", "f", "g", "h", "i",
+					"j", "k", "l", "m", "n", "o", "p", "q", "r",
+					"s", "t", "u", "v", "w", "x", "y", "z", "A", "B", "C"
+					"D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O"
+					"P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "0",
+	"1", "2", "3", "4", "5", "6", "7", "8", "9", "!", "@", "#", "%","^", "&", "*", "(", ")",
+	"_", "-", "+", "=", "?", ";", "'", "[", "]" };
+
+	std::random_device r;
+	std::seed_seq seed { r( ), r( ), r( ), r( ), r( ), r( ), r( ), r( ) };
+	std::shuffle( std::begin( letters ) , std::end( letters ) ,
+		std::mt19937( seed ) );
+
+	for ( auto c : letters )
+		return c;
+}
+
+std::string Utils::GenerateRandomKey( int size ) {
+
+	std::string name;
+
+	for ( int b = 0; b < size; b++ )
+		name += GetRandomCharacter( );
+
+	return name;
+}
 
 std::string Utils::GetRandomLetter( )
 {
@@ -88,9 +119,9 @@ bool Utils::CheckStrings( std::string bString1 , std::string bExpectedResult )
 void Utils::Warn( COLORS color , std::string custom_text )
 {
 	std::string text = custom_text == ( "" ) ? ( "-" ) : custom_text;
-	ColoredText( ( "[" ) , WHITE );
+	ColoredText(  xorstr_("[")  , WHITE );
 	ColoredText( text , color );
-	ColoredText( ( "] " ) , WHITE );
+	ColoredText( xorstr_( "] " ) , WHITE );
 }
 
 

@@ -30,10 +30,13 @@ public:
 	bool CheckStrings( std::string bString1 , std::string bExpectedResult );
 	void Warn( COLORS color , std::string custom_text = "" );
 	int RandomNumber( int min , int max );
+	void WarnMessage( COLORS color , std::string custom_text , std::string Message , COLORS _col );
 	bool isNumber( const std::string & str );
 	
 
 	std::string GetRandomWord( int size );
 	std::string GetRandomLetter( );
+	std::string GetRandomCharacter( );
+	std::string GenerateRandomKey( int size );
 	std::string DownloadString( std::string URL );
 };

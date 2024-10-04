@@ -6,24 +6,255 @@
 #include <Psapi.h>
 #include <tchar.h>
 #include <fstream>
+#include <windows.h>
+#include <winternl.h>
+#include <vector>
+#include <iostream>
+#include <wintrust.h>
+#include <Softpub.h>
+#include <iostream>
+#include <aclapi.h>
+#include <sddl.h>
+#include <unordered_map>
 
 #include "..\Utils\singleton.h"
 #include "..\Utils\utils.h"
 #include "..\Utils\SHA1\sha1.h"
+#include "..\Utils\xorstr.h"
 
 
+
+
+#define STATUS_INFO_LENGTH_MISMATCH 0xC0000004
+
+
+
+
+
+#pragma comment(lib, "wintrust.lib")
+#pragma comment(lib, "ntdll.lib")
+
+typedef NTSTATUS( NTAPI * NtQuerySystemInformationPtr )(
+	SYSTEM_INFORMATION_CLASS SystemInformationClass ,
+	PVOID                    SystemInformation ,
+	ULONG                    SystemInformationLength ,
+	PULONG                   ReturnLength
+	);
+
+
+#ifndef SystemHandleInformation
+#define SystemHandleInformation (SYSTEM_INFORMATION_CLASS)16
+#endif
+
+std::vector<SYSTEM_HANDLE> Mem::GetHandlesForProcess( DWORD processId )
+{
+	NtQuerySystemInformationPtr NtQuerySystemInformation = ( NtQuerySystemInformationPtr ) GetProcAddress(
+		GetModuleHandle( "ntdll.dll" ) , "NtQuerySystemInformation" );
+
+	if ( !NtQuerySystemInformation ) {
+		std::cerr << "Não foi possível obter NtQuerySystemInformation." << std::endl;
+		return {};
+	}
+
+	ULONG bufferSize = 0x10000;
+	PSYSTEM_HANDLE_INFORMATION handleInfo = nullptr;
+	NTSTATUS status;
+
+	do {
+		handleInfo = ( PSYSTEM_HANDLE_INFORMATION ) realloc( handleInfo , bufferSize );
+		status = NtQuerySystemInformation( SystemHandleInformation , handleInfo , bufferSize , &bufferSize );
+		if ( status == STATUS_INFO_LENGTH_MISMATCH ) {
+			bufferSize *= 2;
+		}
+		else if ( !NT_SUCCESS( status ) ) {
+			std::cerr << "NtQuerySystemInformation falhou com status: 0x" << std::hex << status << std::endl;
+			free( handleInfo );
+			return {};
+		}
+	} while ( status == STATUS_INFO_LENGTH_MISMATCH );
+
+	std::vector< SYSTEM_HANDLE > Handles;
+
+	ULONG oldPid = NULL;
+	DWORD currentPID = GetCurrentProcessId( );
+	for ( ULONG i = 0; i < handleInfo->HandleCount; i++ ) {
+		SYSTEM_HANDLE handle = handleInfo->Handles[ i ];
+		if ( handle.ProcessId != currentPID ) {
+			if ( oldPid != handle.ProcessId )
+			{
+				Handles.emplace_back( handle );
+				oldPid = handle.ProcessId;
+			}
+		}
+	}
+
+	free( handleInfo );
+
+	return Handles;
+}
+
+bool Mem::RestrictProcessAccess( ) {
+	HANDLE hProcess = GetCurrentProcess( );
+	PSECURITY_DESCRIPTOR pSD = NULL;
+	PACL pOldDACL = NULL , pNewDACL = NULL;
+	EXPLICIT_ACCESS ea = { 0 };
+	PSID pEveryoneSID = NULL;
+	SID_IDENTIFIER_AUTHORITY SIDAuthWorld = SECURITY_WORLD_SID_AUTHORITY;
+
+
+	if ( GetSecurityInfo( hProcess , SE_KERNEL_OBJECT , DACL_SECURITY_INFORMATION ,
+		NULL , NULL , &pOldDACL , NULL , &pSD ) != ERROR_SUCCESS ) {
+		return false;
+	}
+
+
+	if ( !AllocateAndInitializeSid( &SIDAuthWorld , 1 ,
+		SECURITY_WORLD_RID ,
+		0 , 0 , 0 , 0 , 0 , 0 , 0 ,
+		&pEveryoneSID ) ) {
+		if ( pSD ) LocalFree( pSD );
+		return false;
+	}
+
+	ea.grfAccessPermissions = PROCESS_CREATE_THREAD | PROCESS_VM_OPERATION | PROCESS_VM_WRITE;
+	ea.grfAccessMode = DENY_ACCESS;
+	ea.grfInheritance = NO_INHERITANCE;
+	ea.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+	ea.Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
+	ea.Trustee.ptstrName = ( LPSTR ) pEveryoneSID;
+
+	if ( SetEntriesInAcl( 1 , &ea , pOldDACL , &pNewDACL ) != ERROR_SUCCESS ) {
+		if ( pSD ) LocalFree( pSD );
+		if ( pEveryoneSID ) FreeSid( pEveryoneSID );
+		return false;
+	}
+
+	if ( SetSecurityInfo( hProcess , SE_KERNEL_OBJECT , DACL_SECURITY_INFORMATION ,
+		NULL , NULL , pNewDACL , NULL ) != ERROR_SUCCESS ) {
+		if ( pSD ) LocalFree( pSD );
+		if ( pEveryoneSID ) FreeSid( pEveryoneSID );
+		if ( pNewDACL ) LocalFree( pNewDACL );
+		return false;
+	}
+
+	if ( pSD ) LocalFree( pSD );
+	if ( pEveryoneSID ) FreeSid( pEveryoneSID );
+	if ( pNewDACL ) LocalFree( pNewDACL );
+
+	return true;
+}
+
+float Mem::GetProcessMemoryUsage( DWORD processID ) {
+	HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION | PROCESS_VM_READ , FALSE , processID );
+
+	if ( hProcess == NULL ) {
+		return 0.0f;
+	}
+
+	PROCESS_MEMORY_COUNTERS pmc;
+	if ( GetProcessMemoryInfo( hProcess , &pmc , sizeof( pmc ) ) ) {
+		float memoryUsageMB = static_cast< float >( pmc.WorkingSetSize ) / ( 1024 * 1024 );
+		CloseHandle( hProcess );
+		return memoryUsageMB;
+	}
+
+	CloseHandle( hProcess );
+	return 0.0f;
+}
+
+std::string Mem::GetProcessPath( DWORD processID ) {
+	std::string processPath;
+	HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION | PROCESS_VM_READ , FALSE , processID );
+
+	if ( hProcess != NULL ) {
+		char exePath[ MAX_PATH ];
+		if ( GetModuleFileNameEx( hProcess , NULL , exePath , MAX_PATH ) ) {
+			processPath = exePath;
+			size_t lastBackslash = processPath.find_last_of( "\\" );
+			if ( lastBackslash != std::string::npos ) {
+				return processPath.substr( 0 , lastBackslash );
+			}
+		}
+		CloseHandle( hProcess );
+	}
+
+	return processPath;
+}
+
+std::string Mem::GetProcessExecutablePath( DWORD processID ) {
+	std::string processPath;
+	HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION | PROCESS_VM_READ , FALSE , processID );
+
+	if ( hProcess != NULL ) {
+		char exePath[ MAX_PATH ];
+		if ( GetModuleFileNameEx( hProcess , NULL , exePath , MAX_PATH ) ) {
+			processPath = exePath;
+		}
+		CloseHandle( hProcess );
+	}
+
+	return processPath;
+}
+
+bool Mem::ProcessIsOnSystemFolder( int pid ) {
+	std::string Path = GetProcessExecutablePath( pid );
+
+	return Utils::Get( ).CheckStrings( Path , xorstr_( "\\System32\\" ) ) ||
+		Utils::Get( ).CheckStrings( Path , xorstr_( "\\SysWOW64\\" ) );
+}
+
+bool Mem::VerifySignature( HANDLE hProcess ) {
+	char processImagePath[ MAX_PATH ];
+	if ( GetModuleFileNameExA( hProcess , nullptr , processImagePath , MAX_PATH ) == 0 )
+	{
+		std::cerr << "Could not get process image path." << std::endl;
+		CloseHandle( hProcess );
+		return false;
+	}
+
+	// Initialize the WINTRUST_FILE_INFO structure
+	WINTRUST_FILE_INFO fileInfo;
+	memset( &fileInfo , 0 , sizeof( fileInfo ) );
+	fileInfo.cbStruct = sizeof( WINTRUST_FILE_INFO );
+
+	wchar_t wideProcessImagePath[ MAX_PATH ];
+	// Converte de multibyte (char) para wide char (wchar_t)
+	MultiByteToWideChar( CP_ACP , 0 , processImagePath , -1 , wideProcessImagePath , MAX_PATH );
+	fileInfo.pcwszFilePath = wideProcessImagePath;
+
+	// Initialize the WINTRUST_DATA structure
+	WINTRUST_DATA trustData;
+	memset( &trustData , 0 , sizeof( trustData ) );
+	trustData.cbStruct = sizeof( WINTRUST_DATA );
+	trustData.dwUIChoice = WTD_UI_NONE;
+	trustData.fdwRevocationChecks = WTD_REVOKE_NONE;
+	trustData.dwUnionChoice = WTD_CHOICE_FILE;
+	trustData.pFile = &fileInfo;
+	trustData.dwStateAction = WTD_STATEACTION_VERIFY;
+	trustData.dwProvFlags = WTD_SAFER_FLAG;  // Trust verification flag
+
+	// Use WinVerifyTrust to check if the file is signed and trusted
+	GUID actionGUID = WINTRUST_ACTION_GENERIC_VERIFY_V2;
+	LONG status = WinVerifyTrust( nullptr , &actionGUID , &trustData );
+
+	// Clean up the state data
+	trustData.dwStateAction = WTD_STATEACTION_CLOSE;
+	WinVerifyTrust( nullptr , &actionGUID , &trustData );
+
+	return status == ERROR_SUCCESS;
+}
 
 void Mem::WaitModule( int PID , std::string Module )
 {
-	std::cout << "Waiting for " << Module;
-	std::cout << std::endl;
+	//std::cout << "Waiting for " << Module;
+	//std::cout << std::endl;
 
 	while ( true )
 	{
 		if ( CheckModule( PID , Module ) )
 		{
 			Utils::Get( ).Warn( GREEN );
-			std::cout << "Successfully found " << Module << "!\n\n";
+			//std::cout << "Successfully found " << Module << "!\n\n";
 			break;
 		}
 
@@ -275,8 +506,56 @@ bool Mem::SearchStringInDump( const std::vector<MemoryRegion> & memoryDump , con
 	}
 	return false;
 }
+std::vector<std::pair<std::string , LPVOID>>  Mem::DumpAndSearch( HANDLE hProcess , std::vector< std::string> & searchStrings ) {
 
-std::vector<std::pair<std::string , LPVOID>>  Mem::SearchStringsInDump( const std::vector<MemoryRegion> & memoryDump , std::vector< std::string> & searchStrings  ) {
+	SYSTEM_INFO sysInfo;
+	GetSystemInfo( &sysInfo );
+
+	LPCVOID startAddress = sysInfo.lpMinimumApplicationAddress;
+	LPCVOID endAddress = sysInfo.lpMaximumApplicationAddress;
+
+	MEMORY_BASIC_INFORMATION mbi;
+
+	std::vector<std::pair<std::string , LPVOID>> data;
+
+	std::unordered_map<int , bool> map;
+
+	while ( startAddress < endAddress ) {
+		if ( VirtualQueryEx( hProcess , startAddress , &mbi , sizeof( mbi ) ) == 0 ) {
+			break;
+		}
+
+		// Verificar se a região pode ser lida
+		if ( mbi.State == MEM_COMMIT && ( ( mbi.Protect & PAGE_READONLY ) || ( mbi.Protect & PAGE_READWRITE ) ) ) {
+			MemoryRegion region;
+			region.baseAddress = mbi.BaseAddress;
+			region.size = mbi.RegionSize;
+			region.buffer.resize( mbi.RegionSize );
+
+			SIZE_T bytesRead;
+			if ( ReadProcessMemory( hProcess , mbi.BaseAddress , &region.buffer[ 0 ] , mbi.RegionSize , &bytesRead ) ) {
+
+				for ( int i = 0; i < searchStrings.size( ); i++ ) {
+					if ( map[ i ] )
+						continue;
+
+					if ( std::string( region.buffer.begin( ) , region.buffer.end( ) ).find( searchStrings[ i ] ) != std::string::npos ) {
+						std::cout << "found " << searchStrings[i] << " on " << region.baseAddress << "\n";
+						map[ i ] = true;
+						data.push_back( std::make_pair( searchStrings[i ] , region.baseAddress ) );
+						break;
+					}
+				}
+			}
+		}
+
+		startAddress = ( LPCVOID ) ( ( SIZE_T ) mbi.BaseAddress + mbi.RegionSize );
+	}
+
+	return data;
+}
+
+std::vector<std::pair<std::string , LPVOID>>  Mem::SearchStringsInDump( const std::vector<MemoryRegion> & memoryDump , std::vector< std::string> & searchStrings ) {
 	std::vector<std::pair<std::string , LPVOID>> data;
 	for ( auto searchString : searchStrings ) {
 		for ( const auto & region : memoryDump ) {
@@ -290,7 +569,7 @@ std::vector<std::pair<std::string , LPVOID>>  Mem::SearchStringsInDump( const st
 }
 
 // Callback function for EnumWindows
-BOOL CALLBACK Mem::EnumWindowsProc( HWND hwnd , LPARAM lParam  ) {
+BOOL CALLBACK Mem::EnumWindowsProc( HWND hwnd , LPARAM lParam ) {
 	std::vector<WindowInfo> * Windows = reinterpret_cast< std::vector<WindowInfo> * >( lParam );
 	DWORD processId;
 	GetWindowThreadProcessId( hwnd , &processId );
@@ -370,10 +649,48 @@ std::string Mem::GetProcessName( DWORD PID ) {
 		{
 			return processInfo.szExeFile;
 		}
-
 	}
 	CloseHandle( processesSnapshot );
 	return "";
+}
+
+bool Mem::IsSystemProcess( HANDLE hProcess ) {
+	HANDLE hToken;
+	if ( !OpenProcessToken( hProcess , TOKEN_QUERY , &hToken ) )
+	{
+		std::cerr << "Could not open process token." << std::endl;
+		CloseHandle( hProcess );
+		return false;
+	}
+
+	// Get the user information from the token
+	DWORD tokenInfoLength = 0;
+	GetTokenInformation( hToken , TokenUser , nullptr , 0 , &tokenInfoLength );
+
+	PTOKEN_USER tokenUser = ( PTOKEN_USER ) malloc( tokenInfoLength );
+	if ( GetTokenInformation( hToken , TokenUser , tokenUser , tokenInfoLength , &tokenInfoLength ) )
+	{
+		LPSTR sidString = nullptr;
+		ConvertSidToStringSidA( tokenUser->User.Sid , &sidString );
+
+		// SYSTEM's SID is S-1-5-18
+		if ( sidString && strcmp( sidString , "S-1-5-18" ) == 0 )
+		{
+			LocalFree( sidString );
+			free( tokenUser );
+			CloseHandle( hToken );
+			CloseHandle( hProcess );
+			return true;  // Process is running as SYSTEM
+		}
+
+		LocalFree( sidString );
+	}
+
+	free( tokenUser );
+	CloseHandle( hToken );
+	CloseHandle( hProcess );
+
+	return false;
 }
 
 HANDLE Mem::GetProcessHandle( DWORD PID )
@@ -402,13 +719,13 @@ uintptr_t Mem::GetAddressFromSignature( DWORD PID , std::string module_name , st
 	auto module = GetModuleBaseAddress( module_name.c_str( ) , PID );
 	auto module_size = GetModuleSize( module_name.c_str( ) , PID );
 
-	if ( !module  ) {
-		std::cout << "!module!\n";
+	if ( !module ) {
+		//std::cout << "!module!\n";
 		return NULL;
 	}
 
 	if ( !module_size ) {
-		std::cout << "!size\n";
+		//std::cout << "!size\n";
 		return NULL;
 	}
 
@@ -424,8 +741,8 @@ uintptr_t Mem::GetAddressFromSignature( DWORD PID , std::string module_name , st
 	for ( int i = 0; i < module_size; i++ ) {
 		for ( uintptr_t j = 0; j < signature.size( ); j++ ) {
 			if ( signature.at( j ) != -1 && signature[ j ] != memBuffer[ i + j ] )
-			//	std::cout << std::hex << signature.at( j ) << " - " << ( void * ) memBuffer[ i + j ] << std::endl;
-			break;
+				//	//std::cout << std::hex << signature.at( j ) << " - " << ( void * ) memBuffer[ i + j ] << std::endl;
+				break;
 			//if ( signature[ j ] == memBuffer[ i + j ] && j > 0 )
 				//std::cout << std::hex << int( signature[ j ] ) << std::hex << int( memBuffer[ i + j ] ) << j << std::endl;
 			if ( j + 1 == signature.size( ) ) {

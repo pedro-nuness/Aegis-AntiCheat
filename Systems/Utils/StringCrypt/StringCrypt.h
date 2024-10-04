@@ -18,6 +18,8 @@ class StringCrypt : public CSingleton<StringCrypt>
 {
 	std::vector<CryptedString> Strings;
 	void Init( );
+	std::vector<char> GeneratePlain( std::string cStr );
+	void SaveEncryptedStringsToFile( std::string  filename , CryptedString Str );
 public:
 	StringCrypt( ) { Init( ); }
 
@@ -26,6 +28,5 @@ public:
 	std::string * DecryptString( CryptedString string );
 	bool CleanString( std::string * sPtr );
 	CryptedString GetCryptString( std::string Hash );
-	void SaveEncryptedStringsToFile( std::string  filename );
 };
 

@@ -10,177 +10,189 @@
 #include <thread>
 
 #include "Triggers.h"
-#include "../../Systems/Utils/crypt_str.h"
+#include "../../Systems/Utils/xorstr.h"
 #include "../../Systems/Memory/memory.h"
 #include "../../Systems/Utils/utils.h"
 #include "../../Systems/Monitoring/Monitoring.h"
+#include "../../Systems/Punishing/PunishSystem.h"
+#include "../../Globals/Globals.h"
 #include <dpp/colors.h>
 
 
 
+void Triggers::CleanFiles( ) {
+	std::fill( this->BlackListedProcesses.begin( ) , this->BlackListedProcesses.end( ) , "" );
+	this->BlackListedProcesses.clear( );
+
+	std::fill( this->BlackListedProcesses.begin( ) , this->BlackListedProcesses.end( ) ,  "" );
+	this->BlackListedProcesses.clear( );
+}
+
 void Triggers::SetupFiles( ) {
 	this->BlackListedWindows = {
-			crypt_str( "!xSpeed" ),
-			crypt_str( "!xSpeed.net" ),
-			crypt_str( "!xSpeedPro" ),
-			crypt_str( "!xpeed.net" ),
-			crypt_str( "99QJ MU Bot" ),
-			crypt_str( "AE Bot v1.0 beta" ),
-			crypt_str( "AIO Bots" ),
-			crypt_str( "Add address" ),
-			crypt_str( "ArtMoney PRO" ),
-			crypt_str( "ArtMoney SE " ),
-			crypt_str( "Auto Combo" ),
-			crypt_str( "Auto-Repairer" ),
-			crypt_str( "AutoBuff" ),
-			crypt_str( "AutoCombo" ),
-			crypt_str( "Autoprision" ),
-			crypt_str( "Bot MG-DK-ELF" ),
-			crypt_str( "Capotecheat" ),
-			crypt_str( "Capotecheat(deltacholl)" ),
-			crypt_str( "Catastrophe" ),
-			crypt_str( "Chaos Bot" ),
-			crypt_str( "CharBlaster" ),
-			crypt_str( "CharEditor" ),
-			crypt_str( "Cheat Engine" ),
-			crypt_str( "Cheat Happens " ),
-			crypt_str( "Cheat Master" ),
-			crypt_str( "Cheat4Fun" ),
-			crypt_str( "Codehitcz" ),
-			crypt_str( "Created processes" ),
-			crypt_str( "D-C Bypass" ),
-			crypt_str( "D-C DupeHack" ),
-			crypt_str( "D-C Master Inject" ),
-			crypt_str( "DC Mu" ),
-			crypt_str( "DC-BYPASS" ),
-			crypt_str( "DK(AE)MultiStrikeByDude" ),
-			crypt_str( "DarkCheats Mu Ar" ),
-			crypt_str( "DarkLord Bot" ),
-			crypt_str( "DarkyStats (www.darkhacker.com.ar)" ),
-			crypt_str( "Dizzys Auto Buff" ),
-			crypt_str( "Dupe-Full" ),
-			crypt_str( "Easy As MuPie" ),
-			crypt_str( "Esperando Mu Online" ),
-			crypt_str( "FunnyZhyper" ),
-			crypt_str( "Game Speed Adjuster" ),
-			crypt_str( "Game Speed Changer" ),
-			crypt_str( "GodMode" ),
-			crypt_str( "Godlike" ),
-			crypt_str( "HahaMu" ) ,
-			crypt_str( "Hasty MU" ) ,
-			crypt_str( "HastyMU" ) ,
-			crypt_str( "HideToolz" ) ,
-			crypt_str( "Hit Count" ) ,
-			crypt_str( "Hit Hack" ) ,
-			crypt_str( "Injector" ) ,
-			crypt_str( "Janopn Mini Multi Cheat" ) ,
-			crypt_str( "Jewel Drop Beta" ) ,
-			crypt_str( "JoyToKey" ) ,
-			crypt_str( "Lipsum" ) ,
-			crypt_str( "Load File" ) ,
-			crypt_str( "MJB Perfect DL Bot" ) ,
-			crypt_str( "MLEngine" ) ,
-			crypt_str( "MU Lite Trainer" ) ,
-			crypt_str( "MU Utilidades" ) ,
-			crypt_str( "MU-SS4 Speed Hack" ) ,
-			crypt_str( "MUSH" ) ,
-			crypt_str( "Minimize" ) ,
-			crypt_str( "ModzMu" ) ,
-			crypt_str( "MoonLight" ) ,
-			crypt_str( "Mu Cheater 16" ) ,
-			crypt_str( "Mu Philiphinas Cheat II" ) ,
-			crypt_str( "Mu Pie Beta" ) ,
-			crypt_str( "Mu Pirata MMHack" ) ,
-			crypt_str( "Mu proxy" ) ,
-			crypt_str( "MuBot" ) ,
-			crypt_str( "MuCheat" ) ,
-			crypt_str( "MuHackRm" ) ,
-			crypt_str( "MuOnline Speed Hack" ) ,
-			crypt_str( "MuPie HG" ) ,
-			crypt_str( "MuPieHG" ) ,
-			crypt_str( "MuPieX" ) ,
-			crypt_str( "MuPie_v2Beta" ) ,
-			crypt_str( "MuProxy" ) ,
-			crypt_str( "Mugster Bot" ) ,
-			crypt_str( "Mupie Minimizer" ) ,
-			crypt_str( "Mush" ) ,
-			crypt_str( "NoNameMini" ) ,
-			crypt_str( "Olly Debugger" ) ,
-			crypt_str( "Overclock Menu" ) ,
-			crypt_str( "Perfect AutoPotion" ) ,
-			crypt_str( "Permit" ) ,
-			crypt_str( "PeruCheats" ) ,
-			crypt_str( "ProxCheatsX 2.0 - Acacias" ) ,
-			crypt_str( "Razor Code Only" ) ,
-			crypt_str( "Razor Code" ) ,
-			crypt_str( "Snd Bot" ) ,
-			crypt_str( "Speed Gear" ) ,
-			crypt_str( "Speed Hack" ) ,
-			crypt_str( "Speed Hacker" ) ,
-			crypt_str( "SpeedGear" ) ,
-			crypt_str( "SpeedMUVN" ) ,
-			crypt_str( "SpiffsAutobot" ) ,
-			crypt_str( "SpotHack" ) ,
-			crypt_str( "Super Bot" ) ,
-			crypt_str( "T Search" ) ,
-			crypt_str( "Tablet 2" ) ,
-			crypt_str( "The following opcodes accessed the selected address" ) ,
-			crypt_str( "Trade HACK" ) ,
-			crypt_str( "Ultimate Cheat" ) ,
-			crypt_str( "UoPilot" ) ,
-			crypt_str( "VaultBlaster" ) ,
-			crypt_str( "VaultEditor (www.darkhacker.com.ar)" ) ,
-			crypt_str( "WPE PRO" ) ,
-			crypt_str( "WPePro" ) ,
-			crypt_str( "WildProxy" ) ,
-			crypt_str( "Xelerator" ) ,
-			crypt_str( "ZhyperMu Packet Editor" ) ,
-			crypt_str( "[Dark-Cheats]" ) ,
-			crypt_str( "eXpLoRer" ) ,
-			crypt_str( "hacker" ) ,
-			crypt_str( "rPE - rEdoX Packet Editor" ) ,
-			crypt_str( "razorcode" ) ,
-			crypt_str( "speednet" ) ,
-			crypt_str( "speednet2" ) ,
-			crypt_str( "www.55xp.com" ) ,
-			crypt_str( "BVKHEX" ) ,
-			crypt_str( "OllyDbg" ) ,
-			crypt_str( "HxD" ) ,
-			crypt_str( "BY DARKTERRO" ) ,
-			crypt_str( "Tim Geimi Jaks - DarkTerro" ) ,
-			crypt_str( "PROCEXPL" ) ,             // Process explorer
-			crypt_str( "ProcessHacker" ) ,        // Process Hacker	
-			crypt_str( "PhTreeNew" ) ,            // Process Hacker (Process windows)
-			crypt_str( "RegEdit_RegEdit" ) ,      // Regedit
-			crypt_str( "0x150114 (1376532)" ) ,   // Win 7 - System configuration
-			crypt_str( "SysListView32" ) ,        // Lista de processos do process explorer
-			crypt_str( "TformSettings" ) ,
-			crypt_str( "Afx:400000:8:10011:0:20575" ) ,
-			crypt_str( "TWildProxyMain" ) ,
-			crypt_str( "TUserdefinedform" ) ,
-			crypt_str( "TformAddressChange" ) ,
-			crypt_str( "TMemoryBrowser" ) ,
-			crypt_str( "TFoundCodeDialog" ) ,
-			crypt_str( "IDA" ),
-			crypt_str( "DnSpy" ),
-			crypt_str( "cheat" )
+			xorstr_( "!xSpeed" ),
+			xorstr_( "!xSpeed.net" ),
+			xorstr_( "!xSpeedPro" ),
+			xorstr_( "!xpeed.net" ),
+			xorstr_( "99QJ MU Bot" ),
+			xorstr_( "AE Bot v1.0 beta" ),
+			xorstr_( "AIO Bots" ),
+			xorstr_( "Add address" ),
+			xorstr_( "ArtMoney PRO" ),
+			xorstr_( "ArtMoney SE " ),
+			xorstr_( "Auto Combo" ),
+			xorstr_( "Auto-Repairer" ),
+			xorstr_( "AutoBuff" ),
+			xorstr_( "AutoCombo" ),
+			xorstr_( "Autoprision" ),
+			xorstr_( "Bot MG-DK-ELF" ),
+			xorstr_( "Capotecheat" ),
+			xorstr_( "Capotecheat(deltacholl)" ),
+			xorstr_( "Catastrophe" ),
+			xorstr_( "Chaos Bot" ),
+			xorstr_( "CharBlaster" ),
+			xorstr_( "CharEditor" ),
+			xorstr_( "Cheat Engine" ),
+			xorstr_( "Cheat Happens " ),
+			xorstr_( "Cheat Master" ),
+			xorstr_( "Cheat4Fun" ),
+			xorstr_( "Codehitcz" ),
+			xorstr_( "Created processes" ),
+			xorstr_( "D-C Bypass" ),
+			xorstr_( "D-C DupeHack" ),
+			xorstr_( "D-C Master Inject" ),
+			xorstr_( "DC Mu" ),
+			xorstr_( "DC-BYPASS" ),
+			xorstr_( "DK(AE)MultiStrikeByDude" ),
+			xorstr_( "DarkCheats Mu Ar" ),
+			xorstr_( "DarkLord Bot" ),
+			xorstr_( "DarkyStats (www.darkhacker.com.ar)" ),
+			xorstr_( "Dizzys Auto Buff" ),
+			xorstr_( "Dupe-Full" ),
+			xorstr_( "Easy As MuPie" ),
+			xorstr_( "Esperando Mu Online" ),
+			xorstr_( "FunnyZhyper" ),
+			xorstr_( "Game Speed Adjuster" ),
+			xorstr_( "Game Speed Changer" ),
+			xorstr_( "GodMode" ),
+			xorstr_( "Godlike" ),
+			xorstr_( "HahaMu" ) ,
+			xorstr_( "Hasty MU" ) ,
+			xorstr_( "HastyMU" ) ,
+			xorstr_( "HideToolz" ) ,
+			xorstr_( "Hit Count" ) ,
+			xorstr_( "Hit Hack" ) ,
+			xorstr_( "Injector" ) ,
+			xorstr_( "Janopn Mini Multi Cheat" ) ,
+			xorstr_( "Jewel Drop Beta" ) ,
+			xorstr_( "JoyToKey" ) ,
+			xorstr_( "Lipsum" ) ,
+			xorstr_( "Load File" ) ,
+			xorstr_( "MJB Perfect DL Bot" ) ,
+			xorstr_( "MLEngine" ) ,
+			xorstr_( "MU Lite Trainer" ) ,
+			xorstr_( "MU Utilidades" ) ,
+			xorstr_( "MU-SS4 Speed Hack" ) ,
+			xorstr_( "MUSH" ) ,
+			xorstr_( "Minimize" ) ,
+			xorstr_( "ModzMu" ) ,
+			xorstr_( "MoonLight" ) ,
+			xorstr_( "Mu Cheater 16" ) ,
+			xorstr_( "Mu Philiphinas Cheat II" ) ,
+			xorstr_( "Mu Pie Beta" ) ,
+			xorstr_( "Mu Pirata MMHack" ) ,
+			xorstr_( "Mu proxy" ) ,
+			xorstr_( "MuBot" ) ,
+			xorstr_( "MuCheat" ) ,
+			xorstr_( "MuHackRm" ) ,
+			xorstr_( "MuOnline Speed Hack" ) ,
+			xorstr_( "MuPie HG" ) ,
+			xorstr_( "MuPieHG" ) ,
+			xorstr_( "MuPieX" ) ,
+			xorstr_( "MuPie_v2Beta" ) ,
+			xorstr_( "MuProxy" ) ,
+			xorstr_( "Mugster Bot" ) ,
+			xorstr_( "Mupie Minimizer" ) ,
+			xorstr_( "Mush" ) ,
+			xorstr_( "NoNameMini" ) ,
+			xorstr_( "Olly Debugger" ) ,
+			xorstr_( "Overclock Menu" ) ,
+			xorstr_( "Perfect AutoPotion" ) ,
+			xorstr_( "Permit" ) ,
+			xorstr_( "PeruCheats" ) ,
+			xorstr_( "ProxCheatsX 2.0 - Acacias" ) ,
+			xorstr_( "Razor Code Only" ) ,
+			xorstr_( "Razor Code" ) ,
+			xorstr_( "Snd Bot" ) ,
+			xorstr_( "Speed Gear" ) ,
+			xorstr_( "Speed Hack" ) ,
+			xorstr_( "Speed Hacker" ) ,
+			xorstr_( "SpeedGear" ) ,
+			xorstr_( "SpeedMUVN" ) ,
+			xorstr_( "SpiffsAutobot" ) ,
+			xorstr_( "SpotHack" ) ,
+			xorstr_( "Super Bot" ) ,
+			xorstr_( "T Search" ) ,
+			xorstr_( "Tablet 2" ) ,
+			xorstr_( "The following opcodes accessed the selected address" ) ,
+			xorstr_( "Trade HACK" ) ,
+			xorstr_( "Ultimate Cheat" ) ,
+			xorstr_( "UoPilot" ) ,
+			xorstr_( "VaultBlaster" ) ,
+			xorstr_( "VaultEditor (www.darkhacker.com.ar)" ) ,
+			xorstr_( "WPE PRO" ) ,
+			xorstr_( "WPePro" ) ,
+			xorstr_( "WildProxy" ) ,
+			xorstr_( "Xelerator" ) ,
+			xorstr_( "ZhyperMu Packet Editor" ) ,
+			xorstr_( "[Dark-Cheats]" ) ,
+			xorstr_( "eXpLoRer" ) ,
+			xorstr_( "hacker" ) ,
+			xorstr_( "rPE - rEdoX Packet Editor" ) ,
+			xorstr_( "razorcode" ) ,
+			xorstr_( "speednet" ) ,
+			xorstr_( "speednet2" ) ,
+			xorstr_( "www.55xp.com" ) ,
+			xorstr_( "BVKHEX" ) ,
+			xorstr_( "OllyDbg" ) ,
+			xorstr_( "HxD" ) ,
+			xorstr_( "BY DARKTERRO" ) ,
+			xorstr_( "Tim Geimi Jaks - DarkTerro" ) ,
+			xorstr_( "PROCEXPL" ) ,             // Process explorer
+			xorstr_( "ProcessHacker" ) ,        // Process Hacker	
+			xorstr_( "PhTreeNew" ) ,            // Process Hacker (Process windows)
+			xorstr_( "RegEdit_RegEdit" ) ,      // Regedit
+			xorstr_( "0x150114 (1376532)" ) ,   // Win 7 - System configuration
+			xorstr_( "SysListView32" ) ,        // Lista de processos do process explorer
+			xorstr_( "TformSettings" ) ,
+			xorstr_( "Afx:400000:8:10011:0:20575" ) ,
+			xorstr_( "TWildProxyMain" ) ,
+			xorstr_( "TUserdefinedform" ) ,
+			xorstr_( "TformAddressChange" ) ,
+			xorstr_( "TMemoryBrowser" ) ,
+			xorstr_( "TFoundCodeDialog" ) ,
+			xorstr_( "IDA" ),
+			xorstr_( "DnSpy" ),
+			xorstr_( "cheat" )
 	};
 
 	this->BlackListedProcesses = {
-		crypt_str( "ahk.exe" ),
-		crypt_str( "ida.exe" ),
-		crypt_str( "ollydbg.exe*32" ),
-		crypt_str( "ollydbg.exe" ),
-		crypt_str( "bvkhex.exe" ),
-		crypt_str( "cheatengine-x86_64.exe" ),
-		crypt_str( "HxD.exe" ),
-		crypt_str( "procexp2.exe" ),
-		crypt_str( "Hide Toolz3.3.3.exe" ),
-		crypt_str( "SbieSvc.exe" ),    // < sandbox 
-		crypt_str( "SbieSvc*32.exe" ), // < sandbox 
-		crypt_str( "SbieSvc*32.exe" ), // < sandbox 
-		crypt_str( "SbieCtrl.exe" ),
-		crypt_str( "ProcessHacker.exe" )
+		xorstr_( "ahk.exe" ),
+		xorstr_( "ida.exe" ),
+		xorstr_( "ollydbg" ),
+		xorstr_( "bvkhex.exe" ),
+		xorstr_( "cheat" ),
+		xorstr_( "HxD.exe" ),
+		xorstr_( "procexp2.exe" ),
+		xorstr_( "Hide Toolz3.3.3.exe" ),
+		xorstr_( "SbieSvc.exe" ),    // < sandbox 
+		xorstr_( "SbieSvc*32.exe" ), // < sandbox 
+		xorstr_( "SbieSvc*32.exe" ), // < sandbox 
+		xorstr_( "SbieCtrl.exe" ),
+		xorstr_( "ProcessHacker.exe" ),
+		xorstr_( "injector" ),
+		xorstr_( "hack" ),
+		xorstr_( "wireshark" ),
 	};
 }
 
@@ -210,12 +222,13 @@ void Triggers::requestupdate( ) {
 }
 
 void Triggers::reset( ) {
-	std::cout << crypt_str( "[TRIGGERS] resetting thread!\n" );
+
+	Utils::Get( ).WarnMessage( PINK , xorstr_( "triggers" ) , xorstr_( "resetting thread!" ) , RED );
 	// Implementation to reset the thread
 	if ( m_thread.joinable( ) ) {
 		m_thread.join( );
 	}
-	
+
 	start( );
 }
 
@@ -287,8 +300,8 @@ void Triggers::DigestTriggers( ) {
 	std::vector<Trigger> NewTriggers = GetDifferent( this->LastTriggers , this->FoundTriggers );
 
 	if ( !NewTriggers.empty( ) ) {
-		Monitoring::Get( ).SendInfo( GenerateWarningStatus( NewTriggers ), dpp::colors::yellow, true  );
-		std::cout << GenerateWarningStatus(NewTriggers ) << "\n";
+		PunishSystem::Get( ).UnsafeSession( );
+		Monitoring::Get( ).SendInfo( GenerateWarningStatus( NewTriggers ) , dpp::colors::yellow , true );
 	}
 
 	this->LastTriggers = this->FoundTriggers;
@@ -296,21 +309,26 @@ void Triggers::DigestTriggers( ) {
 
 void Triggers::CheckBlackListedProcesses( ) {
 	for ( auto Process : Mem::Get( ).EnumAllProcesses( ) ) {
-		DWORD PID = Mem::Get( ).GetProcessID( Process.c_str( ));
-		if ( PID == this->MomProcess || PID == this->ProtectProcess ) 
+		DWORD PID = Mem::Get( ).GetProcessID( Process.c_str( ) );
+		if ( PID == this->MomProcess || PID == this->ProtectProcess || PID == Globals::Get( ).SelfID )
 			continue;
 		std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
 
 		std::transform( Process.begin( ) , Process.end( ) , Process.begin( ) , &Mem::asciitolower );
-	
+
+		this->SetupFiles( );
+
 		for ( std::string BLProcess : this->BlackListedProcesses ) {
 
 			std::transform( BLProcess.begin( ) , BLProcess.end( ) , BLProcess.begin( ) , &Mem::asciitolower );
 
 			if ( Utils::Get( ).CheckStrings( BLProcess , Process ) ) {
-				AddTrigger( Trigger { crypt_str( "BlackListedProcess" ) , Process, BLProcess, WARNING } );
+				AddTrigger( Trigger { xorstr_( "BlackListedProcess" ) , Process, BLProcess, WARNING } );
+				Utils::Get( ).WarnMessage( PINK , xorstr_( "triggers" ) , xorstr_( "found black listed process: " ) + Process , YELLOW );
 			}
 		}
+
+		this->CleanFiles( );
 	}
 }
 
@@ -320,27 +338,32 @@ void Triggers::CheckBlackListedWindows( ) {
 		std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
 		std::transform( Window.begin( ) , Window.end( ) , Window.begin( ) , &Mem::asciitolower );
 
+		this->SetupFiles( );
+
 		for ( std::string BLWindow : this->BlackListedWindows ) {
 
 			std::transform( BLWindow.begin( ) , BLWindow.end( ) , BLWindow.begin( ) , &Mem::asciitolower );
 
 			if ( Utils::Get( ).CheckStrings( Window , BLWindow ) ) {
-				AddTrigger( Trigger { crypt_str( "BlackListedWindows" ) ,Window, BLWindow, WARNING } );
+				AddTrigger( Trigger { xorstr_( "BlackListedWindows" ) ,Window, BLWindow, WARNING } );
+				Utils::Get( ).WarnMessage( PINK , xorstr_( "triggers" ) , xorstr_( "found black listed window: " ) + Window , YELLOW );
 			}
 		}
+
+		this->CleanFiles( );
 	}
 }
 
-std::string Triggers::GenerateWarningStatus(std::vector<Trigger> Triggers ) {
-	std::string STR = crypt_str("[WARNING] Found Malicious process!\n\n");
+std::string Triggers::GenerateWarningStatus( std::vector<Trigger> Triggers ) {
+	std::string STR = xorstr_( "[WARNING] Found Malicious process!\n\n" );
 	for ( auto T : Triggers ) {
-		STR += T.Trigger + crypt_str("\n\n");
+		STR += T.Trigger + xorstr_( "\n\n" );
 	}
 	return STR;
 }
 
 void Triggers::threadFunction( ) {
-	std::cout << crypt_str( "[TRIGGERS] starting thread!\n" );
+	Utils::Get( ).WarnMessage( PINK , xorstr_( "triggers" ) , xorstr_( "thread started sucessfully!" ) , GREEN );
 	while ( m_running ) {
 		m_healthy = true;
 		this->CheckBlackListedProcesses( );
