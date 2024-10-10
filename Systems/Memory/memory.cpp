@@ -21,6 +21,7 @@
 #include "..\Utils\utils.h"
 #include "..\Utils\SHA1\sha1.h"
 #include "..\Utils\xorstr.h"
+#include "..\..\Globals\Globals.h"
 
 
 
@@ -568,15 +569,16 @@ std::vector<std::pair<std::string , LPVOID>>  Mem::SearchStringsInDump( const st
 	return data;
 }
 
-// Callback function for EnumWindows
 BOOL CALLBACK Mem::EnumWindowsProc( HWND hwnd , LPARAM lParam ) {
 	std::vector<WindowInfo> * Windows = reinterpret_cast< std::vector<WindowInfo> * >( lParam );
 	DWORD processId;
 	GetWindowThreadProcessId( hwnd , &processId );
 
-	// Store window handle and process ID
-	Windows->push_back( { hwnd, processId } );
+	if ( processId == Globals::Get( ).ProtectProcess ) { 
+		Globals::Get( ).ProtectProcessHandle = hwnd;
+	}
 
+	Windows->push_back( { hwnd, processId } );
 	return TRUE;
 }
 

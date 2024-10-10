@@ -10,10 +10,77 @@
 #include "../LogSystem/File/File.h"
 #include "../Utils/xorstr.h"
 #include "../Utils/utils.h"
-#include "WebHook/WebHook.h"
 #include "../Utils/StringCrypt/StringCrypt.h"
 
 
+
+HBITMAP Monitoring::ByteArrayToBitmap( const std::vector<BYTE> & bitmapData , int width , int height )
+{
+	int dataSize = width * height * 3; // Assuming 24-bit (3 bytes per pixel)
+
+	HDC hDC = GetDC( NULL );
+	BITMAPINFOHEADER biHeader = {};
+	biHeader.biSize = sizeof( BITMAPINFOHEADER );
+	biHeader.biWidth = width;
+	biHeader.biHeight = height;
+	biHeader.biPlanes = 1;
+	biHeader.biBitCount = 24;
+	biHeader.biCompression = BI_RGB;
+
+	BITMAPINFO bInfo = {};
+	bInfo.bmiHeader = biHeader;
+
+	BYTE * pBits = NULL;
+	HBITMAP hBitmap = CreateDIBSection( hDC , &bInfo , DIB_RGB_COLORS , ( VOID ** ) &pBits , NULL , 0 );
+
+	if ( hBitmap && pBits )
+	{
+		memcpy( pBits , bitmapData.data( ) , dataSize );
+	}
+
+	ReleaseDC( NULL , hDC );
+	return hBitmap;
+}
+
+void Monitoring::SaveBitmapToFile( HBITMAP hBitmap , const std::string & filePath )
+{
+	BITMAP bitmap;
+	GetObject( hBitmap , sizeof( BITMAP ) , &bitmap );
+
+	BITMAPFILEHEADER bmfHeader = {};
+	BITMAPINFOHEADER biHeader = {};
+
+	biHeader.biSize = sizeof( BITMAPINFOHEADER );
+	biHeader.biWidth = bitmap.bmWidth;
+	biHeader.biHeight = bitmap.bmHeight;
+	biHeader.biPlanes = 1;
+	biHeader.biBitCount = 24;
+	biHeader.biCompression = BI_RGB;
+	biHeader.biSizeImage = bitmap.bmWidthBytes * bitmap.bmHeight;
+
+	DWORD dwBmpSize = bitmap.bmWidthBytes * bitmap.bmHeight;
+	std::vector<BYTE> bitmapData( dwBmpSize );
+
+	HDC hDC = GetDC( NULL );
+	HDC hMemDC = CreateCompatibleDC( hDC );
+	GetDIBits( hMemDC , hBitmap , 0 , bitmap.bmHeight , bitmapData.data( ) , ( BITMAPINFO * ) &biHeader , DIB_RGB_COLORS );
+
+	DeleteDC( hMemDC );
+	ReleaseDC( NULL , hDC );
+
+	bmfHeader.bfOffBits = sizeof( BITMAPFILEHEADER ) + sizeof( BITMAPINFOHEADER );
+	bmfHeader.bfSize = bmfHeader.bfOffBits + biHeader.biSizeImage;
+	bmfHeader.bfType = 0x4D42; // "BM"
+
+	std::ofstream file( filePath , std::ios::out | std::ios::binary );
+	if ( file )
+	{
+		file.write( reinterpret_cast< const char * >( &bmfHeader ) , sizeof( BITMAPFILEHEADER ) );
+		file.write( reinterpret_cast< const char * >( &biHeader ) , sizeof( BITMAPINFOHEADER ) );
+		file.write( reinterpret_cast< const char * >( bitmapData.data( ) ) , dwBmpSize );
+		file.close( );
+	}
+}
 
 
 HBITMAP Monitoring::CaptureScreenBitmap( )
@@ -23,8 +90,8 @@ HBITMAP Monitoring::CaptureScreenBitmap( )
 
 	INT x = GetSystemMetrics( SM_XVIRTUALSCREEN );
 	INT y = GetSystemMetrics( SM_YVIRTUALSCREEN );
-	INT lWidth = GetSystemMetrics( SM_CXVIRTUALSCREEN );
-	INT lHeight = GetSystemMetrics( SM_CYVIRTUALSCREEN );
+	INT lWidth = min( GetSystemMetrics( SM_CXVIRTUALSCREEN ) , 1920 );
+	INT lHeight = min( GetSystemMetrics( SM_CYVIRTUALSCREEN ) , 1080 );
 
 	BITMAPINFOHEADER biHeader = {};
 	biHeader.biSize = sizeof( BITMAPINFOHEADER );
@@ -49,33 +116,13 @@ HBITMAP Monitoring::CaptureScreenBitmap( )
 	return hBitmap;
 }
 
-HBITMAP Monitoring::ReconstructBitmap( const BitmapData & bitmapData ) {
-	HDC hDC = GetDC( NULL );
-
-	void * pBits = nullptr;
-	HBITMAP hBitmap = CreateDIBSection(
-		hDC ,
-		( BITMAPINFO * ) &bitmapData.biHeader ,
-		DIB_RGB_COLORS ,
-		&pBits ,
-		NULL ,
-		0
-	);
-
-	if ( hBitmap && pBits ) {
-		memcpy( pBits , bitmapData.pData , bitmapData.dataSize );
-	}
-
-	ReleaseDC( NULL , hDC );
-	return hBitmap;
-}
-
-BitmapData Monitoring::ExtractBitmapMemory( HBITMAP hBitmap ) {
+std::vector<BYTE> Monitoring::BitmapToByteArray( HBITMAP hBitmap )
+{
 	BITMAP bitmap;
 	GetObject( hBitmap , sizeof( BITMAP ) , &bitmap );
 
 	int dataSize = bitmap.bmWidthBytes * bitmap.bmHeight;
-	BYTE * pBitmapData = new BYTE[ dataSize ];
+	std::vector<BYTE> bitmapData( dataSize );
 
 	HDC hDC = GetDC( NULL );
 	HDC hMemDC = CreateCompatibleDC( hDC );
@@ -88,85 +135,10 @@ BitmapData Monitoring::ExtractBitmapMemory( HBITMAP hBitmap ) {
 	biHeader.biBitCount = 24;
 	biHeader.biCompression = BI_RGB;
 
-	GetDIBits( hMemDC , hBitmap , 0 , bitmap.bmHeight , pBitmapData , ( BITMAPINFO * ) &biHeader , DIB_RGB_COLORS );
+	GetDIBits( hMemDC , hBitmap , 0 , bitmap.bmHeight , bitmapData.data( ) , ( BITMAPINFO * ) &biHeader , DIB_RGB_COLORS );
 
 	DeleteDC( hMemDC );
 	ReleaseDC( NULL , hDC );
 
-	BitmapData bitmapData = { biHeader, pBitmapData, dataSize };
 	return bitmapData;
 }
-
-BOOL Monitoring::SaveBitmapToFile( HBITMAP hBitmap , const char * wPath ) {
-	BITMAPFILEHEADER bfHeader = {};
-	BITMAPINFOHEADER biHeader = {};
-	BITMAP bAllDesktops = {};
-
-	HDC hDC = GetDC( NULL );
-	GetObject( hBitmap , sizeof( BITMAP ) , &bAllDesktops );
-
-	LONG lWidth = bAllDesktops.bmWidth;
-	LONG lHeight = bAllDesktops.bmHeight;
-
-	bfHeader.bfType = ( WORD ) ( 'B' | ( 'M' << 8 ) );
-	bfHeader.bfOffBits = sizeof( BITMAPFILEHEADER ) + sizeof( BITMAPINFOHEADER );
-
-	biHeader.biSize = sizeof( BITMAPINFOHEADER );
-	biHeader.biBitCount = 24;
-	biHeader.biCompression = BI_RGB;
-	biHeader.biPlanes = 1;
-	biHeader.biWidth = lWidth;
-	biHeader.biHeight = lHeight;
-
-	DWORD cbBits = ( ( ( 24 * lWidth + 31 ) & ~31 ) / 8 ) * lHeight;
-
-	BYTE * bBits = new BYTE[ cbBits ];
-	GetDIBits( hDC , hBitmap , 0 , lHeight , bBits , ( BITMAPINFO * ) &biHeader , DIB_RGB_COLORS );
-
-	HANDLE hFile = CreateFileA( wPath , GENERIC_WRITE , 0 , NULL , CREATE_ALWAYS , FILE_ATTRIBUTE_NORMAL , NULL );
-	if ( hFile == INVALID_HANDLE_VALUE ) {
-		ReleaseDC( NULL , hDC );
-		delete[ ] bBits;
-		return FALSE;
-	}
-
-	DWORD dwWritten = 0;
-	WriteFile( hFile , &bfHeader , sizeof( BITMAPFILEHEADER ) , &dwWritten , NULL );
-	WriteFile( hFile , &biHeader , sizeof( BITMAPINFOHEADER ) , &dwWritten , NULL );
-	WriteFile( hFile , bBits , cbBits , &dwWritten , NULL );
-
-	CloseHandle( hFile );
-	ReleaseDC( NULL , hDC );
-	delete[ ] bBits;
-
-	return TRUE;
-}
-
-void Monitoring::SendBitMap( BitmapData Bitmap ) {
-
-}
-
-WebHook wHook(  xorstr_("d81df4fc01e3651581242a35aa11a56a67162563" ) );
-
-void Monitoring::GenerateScreenShot( std::string Filename ) {
-	HBITMAP Screen = CaptureScreenBitmap( );
-	SaveBitmapToFile( Screen , Filename.c_str( ) );
-	File Screenshot( xorstr_( "" ) , Filename );
-
-	while ( !Screenshot.Exists( ) )
-		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
-}
-
-
-void Monitoring::SendInfo( std::string info , uint32_t Color , bool Capture  ){
-	if ( Capture ) {
-		std::string nFile = Utils::Get( ).GetRandomWord( 17 ) + xorstr_( ".jpg" );
-		GenerateScreenShot( nFile );
-		wHook.SendWebHookMessageWithFile( info , nFile , Color );
-		File( nFile ).Delete( );
-		return;
-	}
-
-	wHook.SendWebHookMessage( info , Color );
-}
-

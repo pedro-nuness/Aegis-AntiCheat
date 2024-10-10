@@ -10,7 +10,8 @@
 #include "../../Systems/LogSystem/Log.h"
 #include "../../Globals/Globals.h"
 #include "../../Systems/Utils/utils.h"
-
+#include "../../Systems/Injection/Injection.h"
+#include "../../Client/client.h"
 
 
 
@@ -21,8 +22,6 @@
 #include <dpp/colors.h>
 #include <TlHelp32.h>
 
-#define timepoint std::chrono::steady_clock::time_point
-#define now std::chrono::high_resolution_clock::now()
 
 std::vector<std::string> AllowedMomModules {
 		xorstr_( "LauncherTeste.vmp.exe" ),
@@ -205,7 +204,6 @@ bool Detections::IsDebuggerPresentCustom( ) {
 	return isDebuggerPresent || IsDebuggerPresent( );
 }
 
-timepoint LastFullScan = now - std::chrono::duration( std::chrono::seconds( 100 ) );
 Detections::~Detections( ) {
 	stop( );
 }
@@ -288,7 +286,8 @@ void Detections::DigestDetections( ) {
 			FinalInfo += this->GenerateDetectionStatus( Detection );
 		}
 
-		Monitoring::Get( ).SendInfo( FinalInfo , dpp::colors::red , true );
+		client::Get( ).SendPunishToServer( FinalInfo , true );
+
 	}
 
 	this->cDetections.clear( );
@@ -302,6 +301,9 @@ void Detections::ScanWindows( ) {
 	std::vector<WindowInfo> Windows;
 	EnumWindows( Mem::EnumWindowsProc , ( LPARAM ) ( &Windows ) );
 
+	std::unordered_map<HWND , DWORD> DetectedWindows;
+
+
 	for ( const auto & window : Windows ) {
 		if ( window.processId == ( DWORD ) this->MomProcess || window.processId == ( DWORD ) this->ProtectProcess || window.processId == ( DWORD ) Globals::Get( ).SelfID ) {
 			continue;
@@ -311,13 +313,49 @@ void Detections::ScanWindows( ) {
 
 		// Check for overlay characteristics
 		LONG_PTR exStyle = GetWindowLongPtr( window.hwnd , GWL_EXSTYLE );
-		if ( exStyle & WS_EX_LAYERED | WS_EX_TRANSPARENT ) {
-			if ( Map[ window.processId ] ) {
+		if ( ( exStyle & WS_EX_LAYERED ) && ( exStyle & WS_EX_TRANSPARENT ) ) {
+			if ( Map[ window.processId ] == true ) {
 				continue;
 			}
-			Map[ window.processId ]++;
+			std::string ProcessName = Mem::Get( ).GetProcessName( window.processId );
+
+			RECT overlayRect;
+			if ( GetWindowRect( window.hwnd , &overlayRect ) ) {
+
+				if ( !overlayRect.left && !overlayRect.right && !overlayRect.bottom && !overlayRect.top )
+					continue;
+
+				// Compare overlay window and target window rectangles
+				// The overlay matches the target window's size and position
+
+				Map[ window.processId ] = true;
+
+				//Backup
+				DWORD windowAffinity = NULL;
+				if ( !GetWindowDisplayAffinity( window.hwnd , &windowAffinity ) ) {
+					continue;
+				}
+
+				if ( windowAffinity != WDA_NONE ) {
+					Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "got window affinity of id " ) + std::to_string( window.processId ) , GREEN );
+					DetectedWindows[ window.hwnd ] = window.processId;
+				}
+			}
 		}
 	}
+
+	if ( !DetectedWindows.empty( ) ) {
+		std::string Log = "";
+		for ( const auto & pair : DetectedWindows ) {
+			Injector::Get( ).Inject( xorstr_("windows.dll") , pair.second );
+			Log += xorstr_( "Found window allocated on process: " ) + Mem::Get( ).GetProcessExecutablePath( pair.second ) + xorstr_("\n");
+		}	
+
+		client::Get( ).SendPunishToServer( Log , false );
+		std::this_thread::sleep_for( std::chrono::seconds( 3 ) );
+		LogSystem::Get( ).Log( xorstr_( "Unsafe!" ) );
+	}
+
 
 	for ( const auto & pair : Map ) {
 		this->ThreadUpdate = true;
@@ -329,41 +367,11 @@ void Detections::ScanWindows( ) {
 		}
 
 		std::string ProcessName = Mem::Get( ).GetProcessName( pair.first );
-		Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "scanning " ) + ProcessName , WHITE );
-		std::this_thread::sleep_for( std::chrono::milliseconds( 250 ) );
 
-		std::vector<std::string> TargetStrings {
-				xorstr_( "Cheat" ),
-				xorstr_( "Aimbot" ),
-				xorstr_( "Skeleton" ),
-				xorstr_( "Distance" ),
-				xorstr_( "ESP" ),
-				xorstr_( "Hack" ),
-				xorstr_( "Entities" ),
-				xorstr_( "dayzinfected" ),
-				xorstr_( "clothing" ),
-				xorstr_( "dayzplayer" ),
-				xorstr_( "dayzanimal" ),
-				xorstr_( "inventoryItem" ),
-				xorstr_( "ProxyMagazines" ),
-				xorstr_( "Weapon" ),
-				xorstr_( "DayZ_x64.exe" )
-		};
+		//Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "scanning " ) + ProcessName , WHITE );
 
-		this->ThreadUpdate = true;
-		std::vector<std::pair<std::string , LPVOID>> DumpedString = Mem::Get( ).DumpAndSearch( hProcess , TargetStrings );
-		this->ThreadUpdate = true;
+		Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "process " ) + ProcessName + xorstr_( " has open window!" ) , YELLOW );
 
-		if ( !DumpedString.empty( ) ) {
-			if ( ( float ) DumpedString.size( ) / ( float ) TargetStrings.size( ) > 0.7 ) {
-				Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "found infected process " ) + Mem::Get( ).GetProcessName( pair.first ) , LIGHT_RED );
-				AddDetection( Detection { pair.first, ProcessName, CHEAT_DETECTED, Mem::Get( ).GetModules( pair.first ), DumpedString } );
-				CloseHandle( hProcess );
-				continue;
-			}
-
-			AddDetection( Detection { pair.first, ProcessName, NOTHING_DETECTED, Mem::Get( ).GetModules( pair.first ), DumpedString } );
-		}
 
 		CloseHandle( hProcess );
 
@@ -384,7 +392,7 @@ void Detections::ScanModules( ) {
 	and pop a warning
 	*/
 
-	Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "scanning modules" )  , WHITE );
+	Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "scanning modules" ) , WHITE );
 
 	for ( Detection Process : this->cDetections ) {
 		this->ThreadUpdate = true;
@@ -418,10 +426,6 @@ void Detections::ScanModules( ) {
 			break;
 		}
 	}
-
-	//Reset thread call timer
-	LastFullScan = now;
-	this->CalledScanThread = false;
 }
 
 void Detections::ScanParentModules( ) {
@@ -442,38 +446,16 @@ void Detections::ScanParentModules( ) {
 }
 
 void Detections::threadFunction( ) {
-	Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "thread started sucessfully\n" )  , GREEN );
+	Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "thread started sucessfully\n" ) , GREEN );
 
 	while ( m_running ) {
 
-
-		if ( this->CalledScanThread ) {
-			if ( this->ThreadUpdate ) {
-				this->ThreadUpdate = false;
-				//Thread answer
-			}
-			else {
-				//Thread stopped answer!
-				Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "thread stopped, anomaly detected!" ) , RED );
-				AddDetection( Detection { 0, xorstr_( "scan thread stopped" ), CHEAT_DETECTED, {} } );
-				this->CalledScanThread = false;
-				this->DigestDetections( );
-			}
-		}
-		else {
-			Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "scanning parent modules!" ) , GRAY );
-			this->ScanParentModules( );
-			Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "scanning parent modules!" ) , GRAY );
-			this->DigestDetections( );
-		}
-
-		std::chrono::duration<double> elapsed = now - LastFullScan;
-		if ( elapsed.count( ) >= 100 && !this->CalledScanThread ) {
-			Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "starting window scan" ) , YELLOW );
-			std::thread( &Detections::ScanWindows , this ).detach( );
-			this->CalledScanThread = true;
-		}
-
+		Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "scanning open windows!" ) , GRAY );
+		this->ScanWindows( );
+		Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "scanning parent modules!" ) , GRAY );
+		this->ScanParentModules( );
+		Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "digesting detections!" ) , GRAY );
+		this->DigestDetections( );
 
 		Utils::Get( ).WarnMessage( LIGHT_WHITE , xorstr_( "PING" ) , xorstr_( "detection thread" ) , GRAY );
 

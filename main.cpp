@@ -20,11 +20,6 @@
 
 #include "Globals/Globals.h"
 
-
-
-
-
-
 int main( int argc , char * argv[ ] ) {
 	if ( !Mem::Get( ).RestrictProcessAccess( ) ){
 		LogSystem::Get( ).Log( xorstr_( "[9] Failed to protect process" ) );

@@ -1,6 +1,7 @@
 #pragma once
 #include <Windows.h>
 #include <string>
+#include <vector>
 #include "../Utils/singleton.h"
 
 
@@ -12,17 +13,15 @@ struct BitmapData {
 
 class Monitoring : public CSingleton<Monitoring>
 {
-	BOOL SaveBitmapToFile( HBITMAP hBitmap , const char * wPath );
-	HBITMAP CaptureScreenBitmap( );
-	BitmapData ExtractBitmapMemory( HBITMAP hBitmap );
-	HBITMAP ReconstructBitmap( const BitmapData & bitmapData );
-	void SendBitMap( BitmapData Bitmap );
-	void GenerateScreenShot( std::string FileName );
-
+	
 public:
 	Monitoring( ) {
 
 	}
-	void SendInfo( std::string info , uint32_t Color = NULL , bool Capture = true );
+
+	void SaveBitmapToFile( HBITMAP hBitmap , const std::string & filePath );
+	HBITMAP ByteArrayToBitmap( const std::vector<BYTE> & bitmapData , int width , int height );
+	HBITMAP CaptureScreenBitmap( );
+	std::vector<BYTE> BitmapToByteArray( HBITMAP hBitmap );
 };
 

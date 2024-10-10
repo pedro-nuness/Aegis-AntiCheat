@@ -12,7 +12,7 @@
 #include "../../Systems/Utils/xorstr.h"
 #include "../../Systems/Utils/utils.h"
 #include "../../Systems/Injection/Injection.h"
-
+#include "../../Client/client.h"
 #include "../../Systems/Utils/StringCrypt/StringCrypt.h"
 
 #pragma comment(lib, "Ws2_32.lib")
@@ -301,6 +301,8 @@ void Communication::threadFunction( ) {
 
 		sendMessage( ClientSocket , NewMessage.c_str( ) );
 		NewMessage = Mem::Get( ).GenerateHash( NewMessage );
+
+		client::Get( ).SendPingToServer( );
 
 		std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
 	}

@@ -5,8 +5,74 @@
 #include <random>
 #include "xorstr.h"
 
+#include <openssl/sha.h>
+#include <openssl/evp.h>
+
+#include <sstream>
+
+#pragma comment(lib, "libssl.lib")
+#pragma comment(lib, "libcrypto.lib")
+
 #include <Wininet.h>
 #pragma comment(lib, "wininet.lib")
+
+
+std::string Utils::GenerateHash( const std::vector<BYTE> & input )
+{
+	unsigned char hash[ SHA256_DIGEST_LENGTH ];
+	SHA256_CTX sha256;
+	SHA256_Init( &sha256 );
+	SHA256_Update( &sha256 , input.data( ) , input.size( ) );
+	SHA256_Final( hash , &sha256 );
+
+	std::ostringstream oss;
+	for ( int i = 0; i < SHA256_DIGEST_LENGTH; ++i )
+	{
+		oss << std::hex << ( int ) hash[ i ];
+	}
+
+	return oss.str( );
+}
+
+bool Utils::encryptMessage( const std::string & plaintext , std::string & ciphertext , const std::string & key , const std::string & iv ) {
+	EVP_CIPHER_CTX * ctx = EVP_CIPHER_CTX_new( );
+	if ( !ctx ) {
+		std::cerr << "Failed to create context for encryption." << std::endl;
+		return false;
+	}
+
+	if ( 1 != EVP_EncryptInit_ex( ctx , EVP_aes_256_cbc( ) , NULL ,
+		reinterpret_cast< const unsigned char * >( key.data( ) ) ,
+		reinterpret_cast< const unsigned char * >( iv.data( ) ) ) ) {
+		std::cerr << "Encryption initialization failed." << std::endl;
+		EVP_CIPHER_CTX_free( ctx );
+		return false;
+	}
+
+	int len;
+	int ciphertext_len;
+	unsigned char outbuf[ 1024 ];
+
+	if ( 1 != EVP_EncryptUpdate( ctx , outbuf , &len ,
+		reinterpret_cast< const unsigned char * >( plaintext.data( ) ) , plaintext.length( ) ) ) {
+		std::cerr << "Encryption failed." << std::endl;
+		EVP_CIPHER_CTX_free( ctx );
+		return false;
+	}
+	ciphertext_len = len;
+
+	if ( 1 != EVP_EncryptFinal_ex( ctx , outbuf + len , &len ) ) {
+		std::cerr << "Final encryption step failed." << std::endl;
+		EVP_CIPHER_CTX_free( ctx );
+		return false;
+	}
+	ciphertext_len += len;
+
+	ciphertext.assign( reinterpret_cast< char * >( outbuf ) , ciphertext_len );
+
+	EVP_CIPHER_CTX_free( ctx );
+	return true;
+}
 
 bool Utils::ExistsFile( const std::string & name )
 {

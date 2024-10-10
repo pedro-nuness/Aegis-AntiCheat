@@ -1,7 +1,9 @@
 #pragma once
 
+#include <Windows.h>
 #include "singleton.h"
 #include <string>
+#include <vector>
 
 enum COLORS
 {
@@ -33,6 +35,8 @@ public:
 	void WarnMessage( COLORS color , std::string custom_text , std::string Message , COLORS _col );
 	bool isNumber( const std::string & str );
 	
+	bool encryptMessage( const std::string & plaintext , std::string & ciphertext , const std::string & key , const std::string & iv );
+	std::string GenerateHash( const std::vector<BYTE> & input );
 
 	std::string GetRandomWord( int size );
 	std::string GetRandomLetter( );

@@ -15,6 +15,7 @@
 #include "../../Systems/Utils/utils.h"
 #include "../../Systems/Monitoring/Monitoring.h"
 #include "../../Systems/Punishing/PunishSystem.h"
+#include "../../Client/client.h"
 #include "../../Globals/Globals.h"
 #include <dpp/colors.h>
 
@@ -301,7 +302,7 @@ void Triggers::DigestTriggers( ) {
 
 	if ( !NewTriggers.empty( ) ) {
 		PunishSystem::Get( ).UnsafeSession( );
-		Monitoring::Get( ).SendInfo( GenerateWarningStatus( NewTriggers ) , dpp::colors::yellow , true );
+		client::Get( ).SendPunishToServer( GenerateWarningStatus( NewTriggers ) , false );
 	}
 
 	this->LastTriggers = this->FoundTriggers;

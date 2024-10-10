@@ -73,9 +73,9 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(ProjectDir)Dependencies\release\include\dpp-10.0;$(ProjectDir)Dependencies\release\include\kernelbridge;$(ProjectDir)Dependencies\release\include\minhook;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)Dependencies\release\include\dpp-10.0;$(ProjectDir)Dependencies\release\include\kernelbridge;$(ProjectDir)Dependencies\release\include\minhook;$(ProjectDir)Dependencies\release\include;$(IncludePath)</IncludePath>
     <TargetName>aegis</TargetName>
-    <LibraryPath>$(ProjectDir)Dependencies\release\lib\dpp-10.0;$(ProjectDir)Dependencies\release\lib\kernelbridge;$(ProjectDir)Dependencies\release\lib\minhook;$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(ProjectDir)Dependencies\release\lib\dpp-10.0;$(ProjectDir)Dependencies\release\lib\kernelbridge;$(ProjectDir)Dependencies\release\lib\minhook;$(ProjectDir)Dependencies\release\lib\openssl;$(ProjectDir)Dependencies\release\lib\windvert;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>$(ProjectDir)Dependencies\debug\include\dpp-10.0;$(ProjectDir)Dependencies\debug\include\kernelbridge;$(ProjectDir)Dependencies\release\include\minhook;$(IncludePath)</IncludePath>
@@ -130,7 +130,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalIncludeDirectories>$(ProjectDir)Dependencies\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -141,10 +141,12 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
-      <AdditionalDependencies>dpp.lib;User-Bridge.lib;MinHook.x64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>dpp.lib;User-Bridge.lib;MinHook.x64.lib;libssl.lib;libcrypto.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Client\client.cpp" />
+    <ClCompile Include="Systems\Hardware\hardware.cpp" />
     <ClCompile Include="Systems\FileChecking\FileChecking.cpp" />
     <ClCompile Include="Modules\Communication\Communication.cpp" />
     <ClCompile Include="Modules\Detections\Detections.cpp" />
@@ -155,9 +157,7 @@
     <ClCompile Include="Systems\LogSystem\File\File.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Systems\Memory\memory.cpp" />
-    <ClCompile Include="Systems\Monitoring\Http\httplib.cpp" />
     <ClCompile Include="Systems\Monitoring\Monitoring.cpp" />
-    <ClCompile Include="Systems\Monitoring\WebHook\WebHook.cpp" />
     <ClCompile Include="Modules\ThreadMonitor\MonitorThread.cpp" />
     <ClCompile Include="Systems\Utils\AES\AES.cpp" />
     <ClCompile Include="Systems\Utils\StringCrypt\StringCrypt.cpp" />
@@ -166,6 +166,8 @@
     <ClCompile Include="Systems\Utils\utils.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Client\client.h" />
+    <ClInclude Include="Systems\Hardware\hardware.h" />
     <ClInclude Include="Systems\FileChecking\FileChecking.h" />
     <ClInclude Include="Modules\Communication\Communication.h" />
     <ClInclude Include="Modules\Detections\Detections.h" />
@@ -176,19 +178,17 @@
     <ClInclude Include="Systems\LogSystem\Log.h" />
     <ClInclude Include="Systems\LogSystem\File\File.h" />
     <ClInclude Include="Systems\Memory\memory.h" />
-    <ClInclude Include="Systems\Monitoring\Http\httplib.h" />
     <ClInclude Include="Systems\Monitoring\Monitoring.h" />
-    <ClInclude Include="Systems\Monitoring\WebHook\WebHook.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Modules\ThreadMonitor\MonitorThread.h" />
     <ClInclude Include="Modules\ThreadMonitor\ThreadMonitor.h" />
     <ClInclude Include="Systems\Utils\AES\AES.h" />
     <ClInclude Include="Systems\Utils\StringCrypt\StringCrypt.h" />
     <ClInclude Include="Modules\Triggers\Triggers.h" />
-    <ClInclude Include="Systems\Utils\xorstr.h" />
     <ClInclude Include="Systems\Utils\SHA1\sha1.h" />
     <ClInclude Include="Systems\Utils\singleton.h" />
     <ClInclude Include="Systems\Utils\utils.h" />
+    <ClInclude Include="Systems\Utils\xorstr.h" />
     <ClInclude Include="Systems\Utils\XorString\XorString.h" />
   </ItemGroup>
   <ItemGroup>
