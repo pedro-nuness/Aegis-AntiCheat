@@ -37,14 +37,12 @@ std::string Utils::GenerateHash( const std::vector<BYTE> & input )
 bool Utils::encryptMessage( const std::string & plaintext , std::string & ciphertext , const std::string & key , const std::string & iv ) {
 	EVP_CIPHER_CTX * ctx = EVP_CIPHER_CTX_new( );
 	if ( !ctx ) {
-		std::cerr << "Failed to create context for encryption." << std::endl;
 		return false;
 	}
 
 	if ( 1 != EVP_EncryptInit_ex( ctx , EVP_aes_256_cbc( ) , NULL ,
 		reinterpret_cast< const unsigned char * >( key.data( ) ) ,
 		reinterpret_cast< const unsigned char * >( iv.data( ) ) ) ) {
-		std::cerr << "Encryption initialization failed." << std::endl;
 		EVP_CIPHER_CTX_free( ctx );
 		return false;
 	}
@@ -55,14 +53,12 @@ bool Utils::encryptMessage( const std::string & plaintext , std::string & cipher
 
 	if ( 1 != EVP_EncryptUpdate( ctx , outbuf , &len ,
 		reinterpret_cast< const unsigned char * >( plaintext.data( ) ) , plaintext.length( ) ) ) {
-		std::cerr << "Encryption failed." << std::endl;
 		EVP_CIPHER_CTX_free( ctx );
 		return false;
 	}
 	ciphertext_len = len;
 
 	if ( 1 != EVP_EncryptFinal_ex( ctx , outbuf + len , &len ) ) {
-		std::cerr << "Final encryption step failed." << std::endl;
 		EVP_CIPHER_CTX_free( ctx );
 		return false;
 	}
@@ -89,6 +85,40 @@ void Utils::WarnMessage( COLORS color , std::string custom_text , std::string Me
 	Warn( color , custom_text );
 	ColoredText( xorstr_( " " ) + Message + xorstr_( "\n" ) , _col );
 }
+
+
+void Utils::WarnMessage( MODULE_SENDER sender , std::string Message , COLORS _col ) {
+	std::string custom_text = xorstr_( "undefined" );
+	COLORS custom_col = RED;
+
+	switch ( sender ) {
+	case _DETECTION:
+		custom_text = xorstr_( "detection" );
+		custom_col = LIGHT_RED;
+		break;
+	case _COMMUNICATION:
+		custom_text = xorstr_( "communication" );
+		custom_col = LIGHT_BLUE;
+		break;
+	case _TRIGGERS:
+		custom_text = xorstr_( "triggers" );
+		custom_col = YELLOW;
+		break;
+	case _MONITOR:
+		custom_text = xorstr_( "thread monitor" );
+		custom_col = LIGHT_GREEN;
+		break;
+	case _SERVER:
+		custom_text = xorstr_( "server communication" );
+		custom_col = DARK_BLUE;
+		break;
+	}
+	
+
+	Warn( custom_col , custom_text );
+	ColoredText( xorstr_( " " ) + Message + xorstr_( "\n" ) , _col );
+}
+
 
 
 
@@ -185,7 +215,7 @@ bool Utils::CheckStrings( std::string bString1 , std::string bExpectedResult )
 void Utils::Warn( COLORS color , std::string custom_text )
 {
 	std::string text = custom_text == ( "" ) ? ( "-" ) : custom_text;
-	ColoredText(  xorstr_("[")  , WHITE );
+	ColoredText( xorstr_( "[" ) , WHITE );
 	ColoredText( text , color );
 	ColoredText( xorstr_( "] " ) , WHITE );
 }

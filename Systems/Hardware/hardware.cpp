@@ -1,19 +1,36 @@
 #include "hardware.h"
 
+
+#define WIN32_LEAN_AND_MEAN // Evita a inclusão de winsock.h pelo windows.h
+#include <winsock2.h>       // Inclua winsock2.h antes de windows.h
+#include <windows.h>        // Inclua windows.h depois de winsock2.h
+#include <ws2tcpip.h>       // Inclua ws2tcpip.h para funções de rede adicionais
+#include <iphlpapi.h>       // Inclua iphlpapi.h para funções de rede do IP Helper API
+
+// Outras bibliotecas de terceiros
 #include <iostream>
 #include <string>
 #include <vector>
-#include <windows.h>
+
+// Inclui as APIs do Windows
 #include <comdef.h>
 #include <Wbemidl.h>
 #include <iphlpapi.h>
+#include <ws2tcpip.h>
 
-#include "../Utils/xorstr.h"
+// Inclui bibliotecas de terceiros ou utilitários
+#include <iostream>
+#include <string>
+#include <vector>
 
+// Bibliotecas adicionais (caso necessário)
+#pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "wbemuuid.lib")
 #pragma comment(lib, "iphlpapi.lib")
 #pragma comment(lib, "comsuppw.lib")
 
+
+#include "../Utils/xorstr.h"
 
 std::string hardware::GetMotherboardSerialNumber( ) {
 	HRESULT hres;
@@ -233,7 +250,7 @@ std::vector<std::string> hardware::getMacAddress( ) {
 	DWORD dwBufLen = sizeof( AdapterInfo );         // Salva o tamanho da memória de AdapterInfo
 	DWORD dwStatus = GetAdaptersInfo( AdapterInfo , &dwBufLen );
 	if ( dwStatus != ERROR_SUCCESS ) {
-		std::cerr << "GetAdaptersInfo failed with error: " << dwStatus << std::endl;
+		std::cerr << xorstr_("GetAdaptersInfo failed with error: ") << dwStatus << std::endl;
 		return MACS;
 	}
 
@@ -253,4 +270,54 @@ std::vector<std::string> hardware::getMacAddress( ) {
 	}
 
 	return MACS;
+}
+
+std::string hardware::GetIp( int port ) {
+	std::string Result = "";
+	WSADATA wsaData;
+	char hostname[ 256 ];
+	struct addrinfo hints , * res = nullptr;
+
+	// Initialize Winsock
+	if ( WSAStartup( MAKEWORD( 2 , 2 ) , &wsaData ) != 0 ) {
+		std::cerr << "WSAStartup failed.\n";
+		return Result;
+	}
+
+	// Get the hostname of the local machine
+	if ( gethostname( hostname , sizeof( hostname ) ) == SOCKET_ERROR ) {
+		std::cerr << "Error getting local hostname.\n";
+		WSACleanup( );
+		return Result;
+	}
+
+	// Set up the hints for the type of address we're looking for
+	memset( &hints , 0 , sizeof( hints ) );
+	hints.ai_family = AF_INET; // IPv4
+	hints.ai_socktype = SOCK_STREAM;
+
+	// Resolve the hostname to an IP address
+	if ( getaddrinfo( hostname , NULL , &hints , &res ) != 0 ) {
+		std::cerr << "Error getting local IP address.\n";
+		WSACleanup( );
+		return Result;
+	}
+
+	// Extract the IP address from the result
+	struct sockaddr_in * addr = ( struct sockaddr_in * ) res->ai_addr;
+	char ip[ INET_ADDRSTRLEN ];
+
+	// Use inet_ntoa instead of inet_ntop for better compatibility with Windows
+	strcpy( ip , inet_ntoa( addr->sin_addr ) );
+
+	std::cout << "Local IP Address: " << ip << std::endl;
+
+	// Return the extracted IP address as a string
+	Result = std::string( ip );
+
+	// Clean up
+	freeaddrinfo( res );
+	WSACleanup( );
+
+	return Result;
 }

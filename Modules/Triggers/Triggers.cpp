@@ -224,7 +224,7 @@ void Triggers::requestupdate( ) {
 
 void Triggers::reset( ) {
 
-	Utils::Get( ).WarnMessage( PINK , xorstr_( "triggers" ) , xorstr_( "resetting thread!" ) , RED );
+	Utils::Get( ).WarnMessage( _TRIGGERS, xorstr_( "resetting thread!" ) , RED );
 	// Implementation to reset the thread
 	if ( m_thread.joinable( ) ) {
 		m_thread.join( );
@@ -325,7 +325,7 @@ void Triggers::CheckBlackListedProcesses( ) {
 
 			if ( Utils::Get( ).CheckStrings( BLProcess , Process ) ) {
 				AddTrigger( Trigger { xorstr_( "BlackListedProcess" ) , Process, BLProcess, WARNING } );
-				Utils::Get( ).WarnMessage( PINK , xorstr_( "triggers" ) , xorstr_( "found black listed process: " ) + Process , YELLOW );
+				Utils::Get( ).WarnMessage( _TRIGGERS, xorstr_( "found black listed process: " ) + Process , YELLOW );
 			}
 		}
 
@@ -347,7 +347,7 @@ void Triggers::CheckBlackListedWindows( ) {
 
 			if ( Utils::Get( ).CheckStrings( Window , BLWindow ) ) {
 				AddTrigger( Trigger { xorstr_( "BlackListedWindows" ) ,Window, BLWindow, WARNING } );
-				Utils::Get( ).WarnMessage( PINK , xorstr_( "triggers" ) , xorstr_( "found black listed window: " ) + Window , YELLOW );
+				Utils::Get( ).WarnMessage( _TRIGGERS, xorstr_( "found black listed window: " ) + Window , YELLOW );
 			}
 		}
 
@@ -364,7 +364,7 @@ std::string Triggers::GenerateWarningStatus( std::vector<Trigger> Triggers ) {
 }
 
 void Triggers::threadFunction( ) {
-	Utils::Get( ).WarnMessage( PINK , xorstr_( "triggers" ) , xorstr_( "thread started sucessfully!" ) , GREEN );
+	Utils::Get( ).WarnMessage( _TRIGGERS, xorstr_( "thread started sucessfully!" ) , GREEN );
 	while ( m_running ) {
 		m_healthy = true;
 		this->CheckBlackListedProcesses( );

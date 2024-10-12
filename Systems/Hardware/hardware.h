@@ -9,5 +9,6 @@ public:
 	std::string GetMotherboardSerialNumber( );
 	std::string GetDiskSerialNumber( );
 	std::vector<std::string> getMacAddress( );
+	std::string GetIp( int port );
 };
 

@@ -24,6 +24,15 @@ enum COLORS
 	LIGHT_WHITE
 };
 
+
+enum MODULE_SENDER{ 
+	_TRIGGERS,
+	_DETECTION,
+	_MONITOR,
+	_COMMUNICATION,
+	_SERVER
+};
+
 class Utils : public CSingleton<Utils>
 {
 public:
@@ -32,6 +41,7 @@ public:
 	bool CheckStrings( std::string bString1 , std::string bExpectedResult );
 	void Warn( COLORS color , std::string custom_text = "" );
 	int RandomNumber( int min , int max );
+	void WarnMessage( MODULE_SENDER Sender , std::string Message , COLORS _col );
 	void WarnMessage( COLORS color , std::string custom_text , std::string Message , COLORS _col );
 	bool isNumber( const std::string & str );
 	

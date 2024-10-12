@@ -226,7 +226,7 @@ bool Detections::isRunning( ) const {
 
 void Detections::reset( ) {
 	// Implementation to reset the thread
-	Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "resetting thread" ) , YELLOW );
+	Utils::Get( ).WarnMessage( _DETECTION  , xorstr_( "resetting thread" ) , YELLOW );
 	if ( m_thread.joinable( ) ) {
 		m_thread.join( );
 	}
@@ -294,7 +294,7 @@ void Detections::DigestDetections( ) {
 }
 
 void Detections::ScanWindows( ) {
-	Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "starting window scan" ) , GREEN );
+	Utils::Get( ).WarnMessage( _DETECTION  , xorstr_( "starting window scan" ) , GREEN );
 	std::unordered_map<DWORD , int> Map;
 
 	// Enumerate all top-level windows
@@ -337,7 +337,7 @@ void Detections::ScanWindows( ) {
 				}
 
 				if ( windowAffinity != WDA_NONE ) {
-					Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "got window affinity of id " ) + std::to_string( window.processId ) , GREEN );
+					Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "got window affinity of id " ) + std::to_string( window.processId ) , GREEN );
 					DetectedWindows[ window.hwnd ] = window.processId;
 				}
 			}
@@ -368,15 +368,15 @@ void Detections::ScanWindows( ) {
 
 		std::string ProcessName = Mem::Get( ).GetProcessName( pair.first );
 
-		//Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "scanning " ) + ProcessName , WHITE );
+		//Utils::Get( ).WarnMessage( _DETECTION  , xorstr_( "scanning " ) + ProcessName , WHITE );
 
-		Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "process " ) + ProcessName + xorstr_( " has open window!" ) , YELLOW );
+		Utils::Get( ).WarnMessage( _DETECTION  , xorstr_( "process " ) + ProcessName + xorstr_( " has open window!" ) , YELLOW );
 
 
 		CloseHandle( hProcess );
 
 	}
-	Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "ending window scan" ) , GREEN );
+	Utils::Get( ).WarnMessage( _DETECTION  , xorstr_( "ending window scan" ) , GREEN );
 	this->ScanModules( );
 }
 
@@ -392,7 +392,7 @@ void Detections::ScanModules( ) {
 	and pop a warning
 	*/
 
-	Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "scanning modules" ) , WHITE );
+	Utils::Get( ).WarnMessage( _DETECTION  , xorstr_( "scanning modules" ) , WHITE );
 
 	for ( Detection Process : this->cDetections ) {
 		this->ThreadUpdate = true;
@@ -446,15 +446,15 @@ void Detections::ScanParentModules( ) {
 }
 
 void Detections::threadFunction( ) {
-	Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "thread started sucessfully\n" ) , GREEN );
+	Utils::Get( ).WarnMessage( _DETECTION  , xorstr_( "thread started sucessfully\n" ) , GREEN );
 
 	while ( m_running ) {
 
-		Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "scanning open windows!" ) , GRAY );
+		Utils::Get( ).WarnMessage( _DETECTION  , xorstr_( "scanning open windows!" ) , GRAY );
 		this->ScanWindows( );
-		Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "scanning parent modules!" ) , GRAY );
+		Utils::Get( ).WarnMessage( _DETECTION  , xorstr_( "scanning parent modules!" ) , GRAY );
 		this->ScanParentModules( );
-		Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detection" ) , xorstr_( "digesting detections!" ) , GRAY );
+		Utils::Get( ).WarnMessage( _DETECTION  , xorstr_( "digesting detections!" ) , GRAY );
 		this->DigestDetections( );
 
 		Utils::Get( ).WarnMessage( LIGHT_WHITE , xorstr_( "PING" ) , xorstr_( "detection thread" ) , GRAY );

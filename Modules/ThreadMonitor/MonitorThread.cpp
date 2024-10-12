@@ -33,7 +33,7 @@ void MonitorThread::requestupdate( ) {
 }
 
 void MonitorThread::reset( ) {
-    Utils::Get( ).WarnMessage( DARK_BLUE , xorstr_( "monitor thread" ) , xorstr_( "resetting thread" ) , YELLOW );
+    Utils::Get( ).WarnMessage( _MONITOR , xorstr_( "resetting thread" ) , YELLOW );
     if ( m_thread.joinable( ) ) {
         m_thread.join( );
     }
@@ -57,7 +57,7 @@ std::string MonitorThread::GetThreadName( int thread ) {
 
 
 void MonitorThread::monitorFunction( ) {
-    Utils::Get( ).WarnMessage( DARK_BLUE , xorstr_( "monitor thread" ) , xorstr_( "thread started sucessfully" ) , GREEN );
+    Utils::Get( ).WarnMessage( _MONITOR , xorstr_( "thread started sucessfully" ) , GREEN );
     while ( m_running ) {
         healthy = true;
         std::this_thread::sleep_for( std::chrono::seconds( 30 ) ); // Check every 30 seconds
@@ -70,7 +70,7 @@ void MonitorThread::monitorFunction( ) {
         for ( auto & thread : m_threads ) {
             healthy = true;
             if ( !thread.first->isRunning( ) ) {
-                Utils::Get( ).WarnMessage( DARK_BLUE , xorstr_( "monitor thread" ) , GetThreadName( thread.second ) + xorstr_( " is not running properly , resetting... " ) , RED );
+                Utils::Get( ).WarnMessage( _MONITOR , GetThreadName( thread.second ) + xorstr_( " is not running properly , resetting... " ) , RED );
                 thread.first->reset( );
             }
             else

@@ -11,232 +11,251 @@
 #include <Wbemidl.h>
 
 #include "../Systems/Utils/utils.h"
+#include "../Systems/Utils/xorstr.h"
 #include "../Systems/Monitoring/Monitoring.h"
 #include "../Systems/Hardware/hardware.h"
 #pragma comment(lib, "wbemuuid.lib")
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "iphlpapi.lib")
 
-
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 
-
-
-
-client::client( ) {
-
-}
-client::~client( ) {
-
-}
-
+client::client( ) {}
+client::~client( ) {}
 
 bool client::InitializeConnection( ) {
-	// Inicializa Winsock
+    WSADATA wsaData;
+    if ( WSAStartup( MAKEWORD( 2 , 2 ) , &wsaData ) != 0 ) {
+        Utils::Get( ).WarnMessage( _SERVER , xorstr_( "WSAStartup failed." ) , RED );
+        return false;
+    }
 
-	WSADATA wsaData;
-	if ( WSAStartup( MAKEWORD( 2 , 2 ) , &wsaData ) != 0 ) {
-		std::cerr << "WSAStartup failed." << std::endl;
-		return false;
-	}
+    SOCKET sock = socket( AF_INET , SOCK_STREAM , 0 );
+    if ( sock == INVALID_SOCKET ) {
+        Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Socket creation failed." ) , RED );
+        WSACleanup( );
+        return false;
+    }
 
-	// Criar socket e conectar ao servidor
-	SOCKET sock = socket( AF_INET , SOCK_STREAM , 0 );
-	if ( sock == INVALID_SOCKET ) {
-		std::cerr << "Socket creation failed." << std::endl;
-		WSACleanup( );
-		return false;
-	}
+    sockaddr_in serverAddr;
+    const int serverPort = this->Port;
 
-	sockaddr_in serverAddr;
-	const int serverPort = this->Port;         // Porta que o servidor está escutando
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons( serverPort );
+    serverAddr.sin_addr.s_addr = inet_addr( this->ipaddres.c_str( ) );
 
-	serverAddr.sin_family = AF_INET;
-	serverAddr.sin_port = htons( serverPort );
-	serverAddr.sin_addr.s_addr = inet_addr( this->ipaddres.c_str( ) );
+    if ( connect( sock , ( sockaddr * ) &serverAddr , sizeof( serverAddr ) ) == SOCKET_ERROR ) {
+        Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Connection to server failed. Error code: " ) + std::to_string( WSAGetLastError( ) ) , RED );
+        closesocket( sock );
+        WSACleanup( );
+        return false;
+    }
 
-	if ( connect( sock , ( sockaddr * ) &serverAddr , sizeof( serverAddr ) ) == SOCKET_ERROR ) {
-		std::cerr << "Connection to server failed. Error code: " << WSAGetLastError( ) << std::endl;
-		closesocket( sock );
-		WSACleanup( );
-		return false;
-	}
-
-	this->CurrentSocket = sock;
-
-	return true;
+    this->CurrentSocket = sock;
+    Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Connected successfully." ) , GREEN );
+    return true;
 }
 
 bool client::CloseConnection( ) {
-	if ( this->CurrentSocket != INVALID_SOCKET ) {
-		closesocket( this->CurrentSocket );
-		WSACleanup( );
-		return true;
-	}
+    bool Result = true;
 
-	return false;
+    if ( this->CurrentSocket != INVALID_SOCKET ) {
+        if ( closesocket( this->CurrentSocket ) == SOCKET_ERROR ) {
+            int errorCode = WSAGetLastError( );
+            Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to close socket. Error code: " ) + std::to_string( errorCode ) , RED );
+            Result = false;
+        }
+        else {
+            Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Socket closed successfully." ) , GREEN );
+        }
+
+        if ( WSACleanup( ) == SOCKET_ERROR ) {
+            int errorCode = WSAGetLastError( );
+            Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to cleanup Winsock. Error code: " ) + std::to_string( errorCode ) , RED );
+            Result = false;
+        }
+        else {
+            Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Winsock cleaned up successfully." ) , GREEN );
+        }
+    }
+
+    return Result;
 }
 
-bool client::SendData( std::string Data , CommunicationType Type , bool encrypt ) {
-	if ( this->CurrentSocket == INVALID_SOCKET )
-		return false;
+bool client::SendData( std::string data , CommunicationType type , bool encrypt ) {
+    if ( this->CurrentSocket == INVALID_SOCKET ) {
+        Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Invalid socket." ) , RED );
+        return false;
+    }
 
-	std::string encryptedMessage;
+    std::string encryptedMessage;
+    if ( encrypt ) {
+        if ( !Utils::Get( ).encryptMessage( data , encryptedMessage , key , iv ) ) {
+            Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to encrypt the message." ) , RED );
+            return false;
+        }
+    }
+    else {
+        encryptedMessage = data;
+    }
 
-	if ( encrypt ) {
-		if ( !Utils::Get().encryptMessage( Data , encryptedMessage , key , iv ) ) {
-			std::cerr << "Failed to encrypt the message." << std::endl;
-			return false;
-		}
-	}
-	else
-		encryptedMessage = Data;
+    encryptedMessage = xorstr_( "aegis" ) + std::to_string( static_cast< int >( type ) ) + encryptedMessage;
+    long int messageSize = encryptedMessage.size( );
 
-	encryptedMessage = std::to_string( ( int ) Type ) + encryptedMessage;
+    Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Sending message..." ) , BLUE );
+    Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Message size: " ) + std::to_string( messageSize ) , LIGHT_BLUE );
 
-	int messageSize = encryptedMessage.size( );
-	if ( send( this->CurrentSocket , ( char * ) &messageSize , sizeof( messageSize ) , 0 ) == SOCKET_ERROR ) {
-		std::cerr << "Failed to send message size." << std::endl;
-		return false;
-	}
+    std::string messageSizeStr = xorstr_( "aegis" ) + std::to_string( messageSize );
+    if ( send( this->CurrentSocket , messageSizeStr.c_str( ) , messageSizeStr.size( ) , 0 ) == SOCKET_ERROR ) {
+        Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to send message size." ) , RED );
+        return false;
+    }
 
-	// Enviar a mensagem criptografada
-	int totalSent = 0;
-	while ( totalSent < messageSize ) {
-		int sent = send( this->CurrentSocket , encryptedMessage.c_str( ) + totalSent , messageSize - totalSent , 0 );
-		if ( sent == SOCKET_ERROR ) {
-			std::cerr << "Failed to send encrypted message." << std::endl;
-			closesocket( this->CurrentSocket );
-			WSACleanup( );
-			return false;
-		}
-		totalSent += sent;
-	}
+    int totalSent = 0;
+    while ( totalSent < messageSize ) {
+        int sent = send( this->CurrentSocket , encryptedMessage.c_str( ) + totalSent , messageSize - totalSent , 0 );
+        if ( sent == SOCKET_ERROR ) {
+            Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to send encrypted message." ) , RED );
+            closesocket( this->CurrentSocket );
+            WSACleanup( );
+            return false;
+        }
+        totalSent += sent;
+    }
 
-	return true;
+    Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Message sent successfully." ) , GREEN );
+    return true;
 }
-
-
-
 
 bool GetHWIDJson( json & js ) {
-	std::vector<std::string> MacAddress = hardware::Get().getMacAddress( );
-	if ( MacAddress.empty( ) ) {
-		return false;
-	}
+    std::vector<std::string> MacAddress = hardware::Get( ).getMacAddress( );
+    if ( MacAddress.empty( ) ) {
+        return false;
+    }
 
-	js[ "mac" ] = MacAddress;
+    js[ "mac" ] = MacAddress;
 
-	std::string DiskID = hardware::Get().GetDiskSerialNumber( );
+    std::string DiskID = hardware::Get( ).GetDiskSerialNumber( );
 
-	if ( DiskID.empty( ) )
-		return false;
+    if ( DiskID.empty( ) )
+        return false;
 
-	js[ "disk" ] = DiskID;
+    js[ "disk" ] = DiskID;
 
-	std::string MotherboardID = hardware::Get().GetMotherboardSerialNumber( );
+    std::string MotherboardID = hardware::Get( ).GetMotherboardSerialNumber( );
 
-	if ( MotherboardID.empty( ) )
-		return false;
+    if ( MotherboardID.empty( ) )
+        return false;
 
-	js[ "mb" ] = MotherboardID;
+    js[ "mb" ] = MotherboardID;
 
-	return true;
+
+    std::vector<int> Ports { 4444, 4040, 8080 };
+    std::string Ip;
+    for ( auto port : Ports ) {
+        Ip = hardware::Get( ).GetIp( 8080 );
+
+        if ( !Ip.empty( ) )
+            continue;
+    }
+
+    if ( Ip.empty( ) ) {
+        return false;
+    }
+
+    js[ "ip" ] = Ip;
+
+
+    return true;
 }
 
-
-
 bool client::SendPingToServer( ) {
+    json js;
+    if ( !GetHWIDJson( js ) ) {
+        Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Can't get HWID!" ) , YELLOW );
+        return false;
+    }
 
-	json js;
-	if ( !GetHWIDJson( js ) ) {
-		std::cout << "Cant get hwid!\n";
-		return false;
-	}
+    if ( !InitializeConnection( ) ) {
+        Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to initialize connection!" ) , RED );
+        return false;
+    }
 
-	std::cout << js.dump( ) << "\n";
+    bool success = SendData( js.dump( ) , CommunicationType::PING );
+    CloseConnection( );
 
-	if ( !InitializeConnection( ) ) {
-		std::cout << "Failed to initialize connection!\n";
-		return false;
-	}
-
-	bool sucess = SendData( js.dump( ) , CommunicationType::PING );
-
-	CloseConnection( );
-
-	return sucess;
+    return success;
 }
 
 bool client::SendMessageToServer( std::string Message ) {
-	if ( Message.empty( ) ) {
-		std::cout << "Empty message!\n";
-		return false;
-	}
+    if ( Message.empty( ) ) {
+        Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Empty message!" ) , YELLOW );
+        return false;
+    }
 
-	json js;
+    json js;
+    if ( !GetHWIDJson( js ) ) {
+        Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Can't get HWID JSON!" ) , YELLOW );
+        return false;
+    }
 
-	if ( !GetHWIDJson( js ) ) {
-		std::cout << "Cant get hwid json!\n";
-		return false;
-	}
+    js[ xorstr_( "message" ) ] = Message;
+    if ( !InitializeConnection( ) ) {
+        Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to initialize connection!" ) , RED );
+        return false;
+    }
 
-	js[ "message" ] = Message;
+    bool success = SendData( js.dump( ) , CommunicationType::MESSAGE );
+    CloseConnection( );
 
-	if ( !InitializeConnection( ) ) {
-		std::cout << "Failed to initialize connection!\n";
-		return false;
-	}
-
-	bool sucess = SendData( js.dump( ) , CommunicationType::MESSAGE );
-	CloseConnection( );
-
-	return sucess;
+    return success;
 }
 
 bool client::SendPunishToServer( std::string Message , bool Ban ) {
+    if ( Message.empty( ) ) {
+        Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Empty message!" ) , YELLOW );
+        return false;
+    }
 
-	json js;
+    json js;
+    if ( !GetHWIDJson( js ) ) {
+        Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Can't get HWID JSON!" ) , YELLOW );
+        return false;
+    }
 
-	if ( !GetHWIDJson( js ) ) {
-		std::cout << "Cant get hwid json!\n";
-		return false;
-	}
+    HBITMAP screen = Monitoring::Get( ).CaptureScreenBitmap( );
+    std::vector<BYTE> bitmapData = Monitoring::Get( ).BitmapToByteArray( screen );
+    if ( bitmapData.empty( ) ) {
+        Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Can't get screen bitmap!" ) , YELLOW );
+        return false;
+    }
 
-	if ( Message.empty( ) ) {
-		std::cout << "Empty message!\n";
-		return false;
-	}
+    std::string hash = Utils::Get( ).GenerateHash( bitmapData );
+    if ( hash.empty( ) ) {
+        Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Can't generate hash!" ) , YELLOW );
+        return false;
+    }
 
-	HBITMAP screen = Monitoring::Get().CaptureScreenBitmap( );
-	std::vector<BYTE> bitmapData = Monitoring::Get( ).BitmapToByteArray( screen );
+    BITMAP bitmap;
+    GetObject( screen , sizeof( BITMAP ) , &bitmap );
+    js[ xorstr_( "image" ) ] = bitmapData;
+    js[ xorstr_( "image_width" ) ] = bitmap.bmWidth;
+    js[ xorstr_( "image_height" ) ] = bitmap.bmHeight;
+    js[ xorstr_( "image_hash" ) ] = hash;
+    js[ xorstr_( "message" ) ] = Message;
 
-	if ( bitmapData.empty( ) ) {
-		std::cout << "Can't get screen bitmap!\n";
-		return false;
-	}
+    if ( !InitializeConnection( ) ) {
+        Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to initialize connection!" ) , RED );
+        return false;
+    }
 
-	// Generate hash of the bitmap data
-	std::string hash = Utils::Get().GenerateHash( bitmapData );
+    bool success = SendData( js.dump( ) , Ban ? CommunicationType::BAN : CommunicationType::WARN , false );
+    if ( !CloseConnection( ) ) {
+        Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to close connection!" ) , RED );
+        return false;
+    }
 
-	if ( hash.empty( ) ) {
-		std::cout << "Can't generate hash!\n";
-		return false;
-	}
-
-	js[ "image" ] = bitmapData;
-	js[ "image_hash" ] = hash;
-	js[ "message" ] = Message;
-
-	if ( !InitializeConnection( ) ) {
-		std::cout << "Failed to initialize connection!\n";
-		return false;
-	}
-
-	bool sucess = SendData( js.dump( ) , Ban ? CommunicationType::BAN : CommunicationType::WARN , false );
-	CloseConnection( );
-
-	return sucess;
+    return success;
 }

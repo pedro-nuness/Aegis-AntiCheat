@@ -43,10 +43,10 @@ void Communication::reset( ) {
 	// Implementation to reset the thread
 	if ( m_thread.joinable( ) ) {
 		m_thread.join( );
-		Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "communication" ) , xorstr_( "Waiting detection thread" ) ,YELLOW );
+		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "Waiting detection thread" ) , YELLOW );
 	}
 	else
-		Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "communication" ) , xorstr_( "Detection thread stopped" ) , GREEN );
+		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "Detection thread stopped" ) , GREEN );
 
 	start( );
 }
@@ -79,7 +79,7 @@ SOCKET Communication::openConnection( const char * ipAddress ) {
 
 	// Configura o IP do servidor
 	if ( inet_pton( AF_INET , ipAddress , &serverAddr.sin_addr ) <= 0 ) {
-		Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "communication" ) , xorstr_( "can't convert ip address" ) , RED );
+		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "can't convert ip address" ) , RED );
 		closesocket( ListenSocket );
 		WSACleanup( );
 		return INVALID_SOCKET;
@@ -88,7 +88,7 @@ SOCKET Communication::openConnection( const char * ipAddress ) {
 	// Associa o socket com o endereço e porta
 	iResult = bind( ListenSocket , ( SOCKADDR * ) &serverAddr , sizeof( serverAddr ) );
 	if ( iResult == SOCKET_ERROR ) {
-		Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "communication" ) , xorstr_( "binding error" ) , RED );
+		Utils::Get( ).WarnMessage(_COMMUNICATION , xorstr_( "binding error" ) , RED );
 		closesocket( ListenSocket );
 		WSACleanup( );
 		return INVALID_SOCKET;
@@ -106,7 +106,7 @@ SOCKET Communication::listenForClient( SOCKET ListenSocket , int timeoutSeconds 
 	// Coloca o socket em modo de escuta
 	int iResult = listen( ListenSocket , SOMAXCONN );
 	if ( iResult == SOCKET_ERROR ) {
-		Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "communication" ) , xorstr_( "can't listen client" ) , WHITE );
+		Utils::Get( ).WarnMessage(_COMMUNICATION  , xorstr_( "can't listen client" ) , WHITE );
 		closesocket( ListenSocket );
 		WSACleanup( );
 		return INVALID_SOCKET;
@@ -126,18 +126,18 @@ SOCKET Communication::listenForClient( SOCKET ListenSocket , int timeoutSeconds 
 	iResult = select( 0 , &readfds , NULL , NULL , &timeout );
 	if ( iResult == SOCKET_ERROR ) {
 
-		Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "communication" ) , xorstr_( "can't get server" ) , RED );
+		Utils::Get( ).WarnMessage(_COMMUNICATION  , xorstr_( "can't get server" ) , RED );
 		return INVALID_SOCKET;
 	}
 	else if ( iResult == 0 ) {
-		Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "communication" ) , xorstr_( "connection time out" ) , RED );
+		Utils::Get( ).WarnMessage(_COMMUNICATION  , xorstr_( "connection time out" ) , RED );
 		return INVALID_SOCKET;  // Timeout ocorreu
 	}
 
 	// Aceita a conexão do cliente
 	SOCKET ClientSocket = accept( ListenSocket , NULL , NULL );
 	if ( ClientSocket == INVALID_SOCKET ) {
-		Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "communication" ) , xorstr_( "can't accept connection" ) , RED );
+		Utils::Get( ).WarnMessage(_COMMUNICATION  , xorstr_( "can't accept connection" ) , RED );
 		return INVALID_SOCKET;
 	}
 
@@ -147,7 +147,7 @@ SOCKET Communication::listenForClient( SOCKET ListenSocket , int timeoutSeconds 
 void Communication::sendMessage( SOCKET ClientSocket , const char * message ) {
 	int iResult = send( ClientSocket , message , ( int ) strlen( message ) , 0 );
 	if ( iResult == SOCKET_ERROR ) {
-		Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "communication" ) , xorstr_( "can't send message" ) , RED );
+		Utils::Get( ).WarnMessage(_COMMUNICATION  , xorstr_( "can't send message" ) , RED );
 		LogSystem::Get( ).Log( xorstr_( "[105] Can't send message!" ) );
 	}
 }
@@ -193,15 +193,15 @@ void Communication::UpdatePingTime( ) {
 }
 
 void Communication::threadFunction( ) {
-	
-	Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "communication" ) , xorstr_( "thread started sucessfully " ) , GREEN );
+
+	Utils::Get( ).WarnMessage(_COMMUNICATION  , xorstr_( "thread started sucessfully " ) , GREEN );
 
 	ListenSocket = openConnection( xorstr_( "127.0.0.10" ) );
 	if ( ListenSocket == INVALID_SOCKET ) {
 		LogSystem::Get( ).Log( xorstr_( "[801] Can't open listener connection!" ) );
 	}
 
-	Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "communication" ) , xorstr_( "waiting client connection..." ) , WHITE );
+	Utils::Get( ).WarnMessage(_COMMUNICATION  , xorstr_( "waiting client connection..." ) , WHITE );
 
 #ifdef _DEBUG
 #else
@@ -219,7 +219,7 @@ void Communication::threadFunction( ) {
 #endif
 
 	if ( Injector::Get( ).Inject( xorstr_( "winsock.dll" ) , Globals::Get( ).ProtectProcess ) == 1 ) {
-		Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "communication" ) , xorstr_( "started client sucessfully" ) , WHITE );
+		Utils::Get( ).WarnMessage(_COMMUNICATION  , xorstr_( "started client sucessfully" ) , WHITE );
 	}
 	else {
 		LogSystem::Get( ).Log( xorstr_( "[0001] Can't init client!" ) );
@@ -231,7 +231,7 @@ void Communication::threadFunction( ) {
 		LogSystem::Get( ).Log( xorstr_( "[801] Can't open client connection!" ) );
 	}
 
-	Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "communication" ) , xorstr_( "client connected sucessfully" ) , GREEN );
+	Utils::Get( ).WarnMessage(_COMMUNICATION  , xorstr_( "client connected sucessfully" ) , GREEN );
 
 	this->CommunicationHash = xorstr_( "90ed071b4c6ba84ada3b57733b60bc092c758930" );
 
@@ -279,7 +279,7 @@ void Communication::threadFunction( ) {
 			}
 			else {
 				Utils::Get( ).WarnMessage( LIGHT_WHITE , xorstr_( "PING" ) , this->CommunicationHash , GRAY );
-				this->CommunicationHash = Mem::Get( ).GenerateHash( this->CommunicationHash );		
+				this->CommunicationHash = Mem::Get( ).GenerateHash( this->CommunicationHash );
 				UpdatePingTime( );
 			}
 		}
@@ -288,7 +288,7 @@ void Communication::threadFunction( ) {
 				HANDLE hProcess = Mem::Get( ).GetProcessHandle( Globals::Get( ).ProtectProcess );
 
 				if ( hProcess != NULL ) {
-					while ( ! TerminateProcess( hProcess , 0 ) ) {
+					while ( !TerminateProcess( hProcess , 0 ) ) {
 						std::this_thread::sleep_for( std::chrono::milliseconds( 250 ) );
 					}
 				}
