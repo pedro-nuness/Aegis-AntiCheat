@@ -9,9 +9,14 @@ class Globals : public CSingleton<Globals>
 public:
 	int OriginalProcess;
 	int ProtectProcess;
-	HWND ProtectProcessHandle = NULL;
-	int SelfID; 
+	int SelfID;
+
 	bool VerifiedSession = false;
-	std::string UserID;
+
+	std::string Nickname;
+	std::string NicknameHash;
+
+	std::string CLIENT_NAME;
+	std::string DUMPER_NAME;
 };
 

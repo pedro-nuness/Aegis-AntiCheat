@@ -88,7 +88,7 @@ SOCKET Communication::openConnection( const char * ipAddress ) {
 	// Associa o socket com o endereço e porta
 	iResult = bind( ListenSocket , ( SOCKADDR * ) &serverAddr , sizeof( serverAddr ) );
 	if ( iResult == SOCKET_ERROR ) {
-		Utils::Get( ).WarnMessage(_COMMUNICATION , xorstr_( "binding error" ) , RED );
+		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "binding error" ) , RED );
 		closesocket( ListenSocket );
 		WSACleanup( );
 		return INVALID_SOCKET;
@@ -106,7 +106,7 @@ SOCKET Communication::listenForClient( SOCKET ListenSocket , int timeoutSeconds 
 	// Coloca o socket em modo de escuta
 	int iResult = listen( ListenSocket , SOMAXCONN );
 	if ( iResult == SOCKET_ERROR ) {
-		Utils::Get( ).WarnMessage(_COMMUNICATION  , xorstr_( "can't listen client" ) , WHITE );
+		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "can't listen client" ) , WHITE );
 		closesocket( ListenSocket );
 		WSACleanup( );
 		return INVALID_SOCKET;
@@ -126,18 +126,18 @@ SOCKET Communication::listenForClient( SOCKET ListenSocket , int timeoutSeconds 
 	iResult = select( 0 , &readfds , NULL , NULL , &timeout );
 	if ( iResult == SOCKET_ERROR ) {
 
-		Utils::Get( ).WarnMessage(_COMMUNICATION  , xorstr_( "can't get server" ) , RED );
+		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "can't get server" ) , RED );
 		return INVALID_SOCKET;
 	}
 	else if ( iResult == 0 ) {
-		Utils::Get( ).WarnMessage(_COMMUNICATION  , xorstr_( "connection time out" ) , RED );
+		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "connection time out" ) , RED );
 		return INVALID_SOCKET;  // Timeout ocorreu
 	}
 
 	// Aceita a conexão do cliente
 	SOCKET ClientSocket = accept( ListenSocket , NULL , NULL );
 	if ( ClientSocket == INVALID_SOCKET ) {
-		Utils::Get( ).WarnMessage(_COMMUNICATION  , xorstr_( "can't accept connection" ) , RED );
+		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "can't accept connection" ) , RED );
 		return INVALID_SOCKET;
 	}
 
@@ -147,7 +147,7 @@ SOCKET Communication::listenForClient( SOCKET ListenSocket , int timeoutSeconds 
 void Communication::sendMessage( SOCKET ClientSocket , const char * message ) {
 	int iResult = send( ClientSocket , message , ( int ) strlen( message ) , 0 );
 	if ( iResult == SOCKET_ERROR ) {
-		Utils::Get( ).WarnMessage(_COMMUNICATION  , xorstr_( "can't send message" ) , RED );
+		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "can't send message" ) , RED );
 		LogSystem::Get( ).Log( xorstr_( "[105] Can't send message!" ) );
 	}
 }
@@ -156,7 +156,6 @@ std::string Communication::receiveMessage( SOCKET ClientSocket , int time ) {
 	char recvbuf[ 512 ];
 	int iResult;
 
-	// Set a receive timeout of 5 seconds (5000 milliseconds)
 	int timeout = time * 1000; // Timeout in milliseconds
 	setsockopt( ClientSocket , SOL_SOCKET , SO_RCVTIMEO , ( const char * ) &timeout , sizeof( timeout ) );
 
@@ -175,7 +174,7 @@ std::string Communication::receiveMessage( SOCKET ClientSocket , int time ) {
 			LogSystem::Get( ).Log( xorstr_( "[902] Receive timeout" ) );
 		}
 		else {
-			LogSystem::Get( ).Log( xorstr_( "[901] Can't receive message" ) );
+			LogSystem::Get( ).Log( xorstr_( "[901] Error receiving message" ) );
 		}
 	}
 	return "";
@@ -192,16 +191,38 @@ void Communication::UpdatePingTime( ) {
 	this->LastClientPing = now;
 }
 
+void Communication::HandleMissingPing( ) {
+
+	closeconnection( ClientSocket );
+	closeconnection( ListenSocket );
+
+	if ( Mem::Get( ).IsPIDRunning( Globals::Get( ).ProtectProcess ) ) {
+		// Usando RAII para garantir que o handle seja fechado corretamente
+		HANDLE hProcess = Mem::Get( ).GetProcessHandle( Globals::Get( ).ProtectProcess );
+		auto processHandleGuard = std::unique_ptr<void , decltype( &CloseHandle )>( hProcess , CloseHandle );
+
+		if ( hProcess != NULL ) {
+			while ( !TerminateProcess( hProcess , 0 ) ) {
+				std::this_thread::sleep_for( std::chrono::milliseconds( 250 ) );
+			}
+			LogSystem::Get( ).Log( xorstr_( "[303] Can't find client answer!" ) );
+		}
+	}
+	else {
+		LogSystem::Get( ).Log( xorstr_( "[303] Can't find client answer!" ) );
+	}
+}
+
 void Communication::threadFunction( ) {
 
-	Utils::Get( ).WarnMessage(_COMMUNICATION  , xorstr_( "thread started sucessfully " ) , GREEN );
+	Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "thread started sucessfully " ) , GREEN );
 
 	ListenSocket = openConnection( xorstr_( "127.0.0.10" ) );
 	if ( ListenSocket == INVALID_SOCKET ) {
 		LogSystem::Get( ).Log( xorstr_( "[801] Can't open listener connection!" ) );
 	}
 
-	Utils::Get( ).WarnMessage(_COMMUNICATION  , xorstr_( "waiting client connection..." ) , WHITE );
+	Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "waiting client connection..." ) , WHITE );
 
 #ifdef _DEBUG
 #else
@@ -219,7 +240,7 @@ void Communication::threadFunction( ) {
 #endif
 
 	if ( Injector::Get( ).Inject( xorstr_( "winsock.dll" ) , Globals::Get( ).ProtectProcess ) == 1 ) {
-		Utils::Get( ).WarnMessage(_COMMUNICATION  , xorstr_( "started client sucessfully" ) , WHITE );
+		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "started client sucessfully" ) , WHITE );
 	}
 	else {
 		LogSystem::Get( ).Log( xorstr_( "[0001] Can't init client!" ) );
@@ -231,7 +252,7 @@ void Communication::threadFunction( ) {
 		LogSystem::Get( ).Log( xorstr_( "[801] Can't open client connection!" ) );
 	}
 
-	Utils::Get( ).WarnMessage(_COMMUNICATION  , xorstr_( "client connected sucessfully" ) , GREEN );
+	Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "client connected sucessfully" ) , GREEN );
 
 	this->CommunicationHash = xorstr_( "90ed071b4c6ba84ada3b57733b60bc092c758930" );
 
@@ -261,20 +282,21 @@ void Communication::threadFunction( ) {
 	StringCrypt::Get( ).CleanString( DecryptedMessage );
 	std::this_thread::sleep_for( std::chrono::seconds( 2 ) );
 
-
 	Globals::Get( ).VerifiedSession = true;
 
 	this->LastClientPing = now;
 
 	while ( m_running ) {
-
 		m_healthy = true;
 
 		// Recebe mensagem do cliente
-		std::string Message = receiveMessage( ClientSocket , 10 );
+		std::string message = receiveMessage( ClientSocket , 10 );
 
-		if ( !Message.empty( ) ) {
-			if ( Message != this->CommunicationHash ) {
+		if ( !message.empty( ) ) {
+			if ( message != this->CommunicationHash ) {
+				closeconnection( ClientSocket );
+				closeconnection( ListenSocket );
+
 				LogSystem::Get( ).Log( xorstr_( "[802] client hash mismatch!\n" ) );
 			}
 			else {
@@ -284,26 +306,17 @@ void Communication::threadFunction( ) {
 			}
 		}
 		else if ( !PingInTime( ) ) {
-			if ( Mem::Get( ).IsPIDRunning( Globals::Get( ).ProtectProcess ) ) {
-				HANDLE hProcess = Mem::Get( ).GetProcessHandle( Globals::Get( ).ProtectProcess );
-
-				if ( hProcess != NULL ) {
-					while ( !TerminateProcess( hProcess , 0 ) ) {
-						std::this_thread::sleep_for( std::chrono::milliseconds( 250 ) );
-					}
-				}
-
-				LogSystem::Get( ).Log( xorstr_( "[303] Can`t find client answer!" ) );
-			}
-			else
-				exit( 0 );
+			HandleMissingPing( );
 		}
 
+		// Envia mensagem para o cliente
 		sendMessage( ClientSocket , NewMessage.c_str( ) );
 		NewMessage = Mem::Get( ).GenerateHash( NewMessage );
 
+		// Envia PING para o servidor
 		client::Get( ).SendPingToServer( );
 
+		// Aguarda por 5 segundos antes do próximo loop
 		std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
 	}
 

@@ -21,6 +21,7 @@ class Communication : public ThreadMonitor {
 	std::chrono::steady_clock::time_point LastClientPing;
 	bool PingInTime( );
 	void UpdatePingTime( );
+	void HandleMissingPing( );
 
 	void threadFunction( );
 

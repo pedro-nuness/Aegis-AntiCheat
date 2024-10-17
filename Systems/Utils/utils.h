@@ -30,7 +30,9 @@ enum MODULE_SENDER{
 	_DETECTION,
 	_MONITOR,
 	_COMMUNICATION,
-	_SERVER
+	_SERVER,
+	_CHECKER,
+	_HWID
 };
 
 class Utils : public CSingleton<Utils>
@@ -47,6 +49,7 @@ public:
 	
 	bool encryptMessage( const std::string & plaintext , std::string & ciphertext , const std::string & key , const std::string & iv );
 	std::string GenerateHash( const std::vector<BYTE> & input );
+	std::string GenerateStringHash( const std::string & input );
 
 	std::string GetRandomWord( int size );
 	std::string GetRandomLetter( );

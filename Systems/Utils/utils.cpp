@@ -10,6 +10,8 @@
 
 #include <sstream>
 
+#include "../../Globals/Globals.h"
+
 #pragma comment(lib, "libssl.lib")
 #pragma comment(lib, "libcrypto.lib")
 
@@ -18,6 +20,23 @@
 
 
 std::string Utils::GenerateHash( const std::vector<BYTE> & input )
+{
+	unsigned char hash[ SHA256_DIGEST_LENGTH ];
+	SHA256_CTX sha256;
+	SHA256_Init( &sha256 );
+	SHA256_Update( &sha256 , input.data( ) , input.size( ) );
+	SHA256_Final( hash , &sha256 );
+
+	std::ostringstream oss;
+	for ( int i = 0; i < SHA256_DIGEST_LENGTH; ++i )
+	{
+		oss << std::hex << ( int ) hash[ i ];
+	}
+
+	return oss.str( );
+}
+
+std::string Utils::GenerateStringHash( const std::string & input )
 {
 	unsigned char hash[ SHA256_DIGEST_LENGTH ];
 	SHA256_CTX sha256;
@@ -87,7 +106,13 @@ void Utils::WarnMessage( COLORS color , std::string custom_text , std::string Me
 }
 
 
+
+
 void Utils::WarnMessage( MODULE_SENDER sender , std::string Message , COLORS _col ) {
+
+#if false
+	return;
+#else
 	std::string custom_text = xorstr_( "undefined" );
 	COLORS custom_col = RED;
 
@@ -112,11 +137,19 @@ void Utils::WarnMessage( MODULE_SENDER sender , std::string Message , COLORS _co
 		custom_text = xorstr_( "server communication" );
 		custom_col = DARK_BLUE;
 		break;
+	case _CHECKER:
+		custom_text = xorstr_( "checker" );
+		custom_col = PURPLE;
+		break;
+	case _HWID:
+		custom_text = xorstr_( "hwid" );
+		custom_col = LIGHTER_BLUE;
+		break;
 	}
 	
-
 	Warn( custom_col , custom_text );
 	ColoredText( xorstr_( " " ) + Message + xorstr_( "\n" ) , _col );
+#endif
 }
 
 

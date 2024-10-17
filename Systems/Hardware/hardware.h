@@ -6,9 +6,10 @@
 class hardware : public CSingleton<hardware>
 {
 public:
-	std::string GetMotherboardSerialNumber( );
-	std::string GetDiskSerialNumber( );
+	bool GetMotherboardSerialNumber( std::string * buffer);
+	bool GetDiskSerialNumber( std::string * buffer );
 	std::vector<std::string> getMacAddress( );
 	std::string GetIp( int port );
+	bool GetLoggedUsers( std::vector<std::string> * Buffer);
 };
 

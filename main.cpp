@@ -27,7 +27,6 @@ int main( int argc , char * argv[ ] ) {
 
 	Globals::Get( ).SelfID = ::_getpid( );
 
-	
 
 #ifdef _DEBUG
 	::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );

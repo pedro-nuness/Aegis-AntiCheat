@@ -54,7 +54,7 @@ std::string StringCrypt::EncryptString( std::string str ) {
 }
 
 bool StringCrypt::CleanString( std::string * sPtr ) {
-	std::fill( sPtr->begin( ) , sPtr->end( ) , 0 );
+	std::fill( sPtr->begin( ) , sPtr->end( ) , '\0' );
 	delete sPtr;
 	return true;
 }
@@ -98,7 +98,7 @@ void StringCrypt::SaveEncryptedStringsToFile( std::string  filename , CryptedStr
 	for ( const auto & cChar : cStr.EncryptedString ) {
 		file << xorstr_( "  Key: " ) << cChar._Key << xorstr_( " Letter: " ) << static_cast< int >( cChar.Letter ) << "\n";
 	}
-	file << "\n"; // Adiciona uma linha em branco entre cada string criptografada
+	file << xorstr_("\n"); // Adiciona uma linha em branco entre cada string criptografada
 
 	file.close( );
 }

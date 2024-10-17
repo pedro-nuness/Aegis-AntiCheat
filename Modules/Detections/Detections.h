@@ -47,11 +47,15 @@ class Detections : public ThreadMonitor {
 
 	DETECTION_STATUS _status = NOTHING_DETECTED;
 
+
+
 public:
 	Detections( DWORD _MomProcess , DWORD _ProtectProcess ) {
 		this->MomProcess = _MomProcess;
 		this->ProtectProcess = _ProtectProcess;
 	}
+
+	void AddExternalDetection( Detection dec, std::string SENDER );
 
 	~Detections( );
 

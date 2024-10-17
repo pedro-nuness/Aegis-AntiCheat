@@ -574,9 +574,6 @@ BOOL CALLBACK Mem::EnumWindowsProc( HWND hwnd , LPARAM lParam ) {
 	DWORD processId;
 	GetWindowThreadProcessId( hwnd , &processId );
 
-	if ( processId == Globals::Get( ).ProtectProcess ) { 
-		Globals::Get( ).ProtectProcessHandle = hwnd;
-	}
 
 	Windows->push_back( { hwnd, processId } );
 	return TRUE;

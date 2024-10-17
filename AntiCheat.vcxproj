@@ -73,9 +73,9 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(ProjectDir)Dependencies\release\include\dpp-10.0;$(ProjectDir)Dependencies\release\include\kernelbridge;$(ProjectDir)Dependencies\release\include\minhook;$(ProjectDir)Dependencies\release\include;$(IncludePath)</IncludePath>
-    <TargetName>aegis</TargetName>
-    <LibraryPath>$(ProjectDir)Dependencies\release\lib\dpp-10.0;$(ProjectDir)Dependencies\release\lib\kernelbridge;$(ProjectDir)Dependencies\release\lib\minhook;$(ProjectDir)Dependencies\release\lib\openssl;$(ProjectDir)Dependencies\release\lib\windvert;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(ProjectDir)Dependencies\release\include;$(IncludePath)</IncludePath>
+    <TargetName>$(ProjectName)\aegis</TargetName>
+    <LibraryPath>$(ProjectDir)Dependencies\release\lib\openssl;$(ProjectDir)Dependencies\release\lib\windvert;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>$(ProjectDir)Dependencies\debug\include\dpp-10.0;$(ProjectDir)Dependencies\debug\include\kernelbridge;$(ProjectDir)Dependencies\release\include\minhook;$(IncludePath)</IncludePath>
@@ -141,7 +141,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
-      <AdditionalDependencies>dpp.lib;User-Bridge.lib;MinHook.x64.lib;libssl.lib;libcrypto.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libssl.lib;libcrypto.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

@@ -15,11 +15,6 @@
 
 
 
-#include "WdkTypes.h"
-#include "CtlTypes.h"
-
-
-#include <dpp/colors.h>
 #include <TlHelp32.h>
 
 
@@ -206,6 +201,11 @@ bool Detections::IsDebuggerPresentCustom( ) {
 
 Detections::~Detections( ) {
 	stop( );
+}
+
+void Detections::AddExternalDetection( Detection detect, std::string SENDER ) {
+	Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "received external detection from " ) + SENDER, YELLOW );
+	this->cDetections.emplace_back( detect );
 }
 
 void Detections::start( ) {
