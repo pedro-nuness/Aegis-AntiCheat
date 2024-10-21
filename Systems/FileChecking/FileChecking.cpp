@@ -21,6 +21,15 @@ bool FileChecking::isGameValid( std::string GameName ) {
 	return true;
 }
 
+std::string removeNonAlphanumeric( const std::string & input ) {
+	std::string result = input;
+	// Remove caracteres que não sejam alfanuméricos
+	result.erase( std::remove_if( result.begin( ) , result.end( ) ,
+		[ ] ( unsigned char c ) { return !std::isalnum( c ); } ) , result.end( ) );
+	return result;
+}
+
+
 bool FileChecking::GetNickname( ) {
 	File nick_file( xorstr_( "nickname.ini" ) );
 	if ( !nick_file.Exists( ) ) {
@@ -29,6 +38,9 @@ bool FileChecking::GetNickname( ) {
 	}
 
 	std::string nickname = nick_file.Read( );
+	nickname = removeNonAlphanumeric( nickname );
+
+	auto Find = nickname.find( "\n" );
 
 	if ( nickname.empty( ) ) {
 		Utils::Get( ).WarnMessage( _CHECKER , xorstr_( "nickname is empty" ) , RED );

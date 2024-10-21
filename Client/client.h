@@ -1,7 +1,10 @@
 #pragma once
+#include "receiver.h"
 #include <Windows.h>
+#include <string>
 #include "../Systems/Utils/xorstr.h"
 #include "../Systems/Utils/singleton.h"
+
 
 
 enum CommunicationType {
@@ -12,9 +15,10 @@ enum CommunicationType {
 };
 
 class client : public CSingleton<client>{
-	std::string key = xorstr_("0123456789abcdef0123456789abcdef"); // 32 bytes para AES-256
-	std::string iv = xorstr_( "abcdef9876543210");  // 16 bytes para AES
-	std::string ipaddres = xorstr_( "26.239.241.101");
+
+	//std::string key = xorstr_("0123456789abcdef0123456789abcdef"); // 32 bytes para AES-256
+	//std::string iv = xorstr_( "abcdef9876543210");  // 16 bytes para AES
+	std::string ipaddres = xorstr_( "26.114.178.232");
 	int Port = 12345;
 
 	SOCKET CurrentSocket;

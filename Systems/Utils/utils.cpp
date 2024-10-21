@@ -4,6 +4,7 @@
 #include <Windows.h>
 #include <random>
 #include "xorstr.h"
+#include <mutex>
 
 #include <openssl/sha.h>
 #include <openssl/evp.h>
@@ -100,16 +101,56 @@ bool Utils::ExistsFile( const std::string & name )
 	}
 }
 
+std::mutex PrintMutex;
+
 void Utils::WarnMessage( COLORS color , std::string custom_text , std::string Message , COLORS _col ) {
+	std::lock_guard<std::mutex> lock( PrintMutex );
 	Warn( color , custom_text );
 	ColoredText( xorstr_( " " ) + Message + xorstr_( "\n" ) , _col );
 }
 
 
+// Função para descriptografar a mensagem usando AES-256-CBC
+bool Utils::decryptMessage( const std::string & ciphertext , std::string & plaintext , const std::string & key , const std::string & iv ) {
+	EVP_CIPHER_CTX * ctx = EVP_CIPHER_CTX_new( );
+	if ( !ctx ) {
+		std::cerr << "Failed to create context for decryption." << std::endl;
+		return false;
+	}
+
+	if ( 1 != EVP_DecryptInit_ex( ctx , EVP_aes_256_cbc( ) , NULL , ( unsigned char * ) key.data( ) , ( unsigned char * ) iv.data( ) ) ) {
+		std::cerr << "Decryption initialization failed." << std::endl;
+		EVP_CIPHER_CTX_free( ctx );
+		return false;
+	}
+
+	int len;
+	int plaintext_len;
+	unsigned char outbuf[ 1024 ];
+
+	if ( 1 != EVP_DecryptUpdate( ctx , outbuf , &len , ( unsigned char * ) ciphertext.data( ) , ciphertext.length( ) ) ) {
+		std::cerr << "Decryption failed." << std::endl;
+		EVP_CIPHER_CTX_free( ctx );
+		return false;
+	}
+	plaintext_len = len;
+
+	if ( 1 != EVP_DecryptFinal_ex( ctx , outbuf + len , &len ) ) {
+		std::cerr << "Final decryption step failed." << std::endl;
+		EVP_CIPHER_CTX_free( ctx );
+		return false;
+	}
+	plaintext_len += len;
+
+	plaintext.assign( ( char * ) outbuf , plaintext_len );
+
+	EVP_CIPHER_CTX_free( ctx );
+	return true;
+	}
 
 
 void Utils::WarnMessage( MODULE_SENDER sender , std::string Message , COLORS _col ) {
-
+	std::lock_guard<std::mutex> lock( PrintMutex );
 #if false
 	return;
 #else

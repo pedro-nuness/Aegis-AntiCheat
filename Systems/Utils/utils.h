@@ -48,6 +48,7 @@ public:
 	bool isNumber( const std::string & str );
 	
 	bool encryptMessage( const std::string & plaintext , std::string & ciphertext , const std::string & key , const std::string & iv );
+	bool decryptMessage( const std::string & ciphertext , std::string & plaintext , const std::string & key , const std::string & iv );
 	std::string GenerateHash( const std::vector<BYTE> & input );
 	std::string GenerateStringHash( const std::string & input );
 

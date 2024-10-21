@@ -146,6 +146,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Client\client.cpp" />
+    <ClCompile Include="Client\receiver.cpp" />
     <ClCompile Include="Systems\Hardware\hardware.cpp" />
     <ClCompile Include="Systems\FileChecking\FileChecking.cpp" />
     <ClCompile Include="Modules\Communication\Communication.cpp" />
@@ -167,6 +168,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Client\client.h" />
+    <ClInclude Include="Client\receiver.h" />
     <ClInclude Include="Systems\Hardware\hardware.h" />
     <ClInclude Include="Systems\FileChecking\FileChecking.h" />
     <ClInclude Include="Modules\Communication\Communication.h" />

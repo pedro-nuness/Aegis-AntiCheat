@@ -144,12 +144,15 @@ SOCKET Communication::listenForClient( SOCKET ListenSocket , int timeoutSeconds 
 	return ClientSocket;
 }
 
-void Communication::sendMessage( SOCKET ClientSocket , const char * message ) {
+bool Communication::sendMessage( SOCKET ClientSocket , const char * message ) {
 	int iResult = send( ClientSocket , message , ( int ) strlen( message ) , 0 );
 	if ( iResult == SOCKET_ERROR ) {
 		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "can't send message" ) , RED );
+		return false;
 		LogSystem::Get( ).Log( xorstr_( "[105] Can't send message!" ) );
 	}
+
+	return true;
 }
 
 std::string Communication::receiveMessage( SOCKET ClientSocket , int time ) {
@@ -213,6 +216,68 @@ void Communication::HandleMissingPing( ) {
 	}
 }
 
+bool Communication::InitializeClient( ) {
+	return Injector::Get( ).Inject( xorstr_( "winsock.dll" ) , Globals::Get( ).ProtectProcess ) == 1;
+}
+
+bool Communication::SendPasswordToServer( ) {
+	std::string * DecryptedMessage = StringCrypt::Get( ).DecryptString( xorstr_( "a477c5772e93d5a7f3f91d766d249e0a63b8bef5" ) );
+
+	if ( DecryptedMessage->empty( ) ) {
+		StringCrypt::Get( ).CleanString( DecryptedMessage );
+		LogSystem::Get( ).Log( xorstr_( "[203] Can't read encrypted message!" ) );
+	}
+
+	std::cout << "Password: " << *DecryptedMessage << "\n";
+
+	this->Message = Mem::Get( ).GenerateHash( *DecryptedMessage );
+
+	sendMessage( ClientSocket , DecryptedMessage->c_str( ) );
+
+	StringCrypt::Get( ).CleanString( DecryptedMessage );
+	std::this_thread::sleep_for( std::chrono::seconds( 2 ) );
+
+	return true;
+}
+
+bool Communication::CheckReceivedPassword( ) {
+	//expected hash
+	this->CommunicationHash = xorstr_( "90ed071b4c6ba84ada3b57733b60bc092c758930" );
+
+	//Allocate memory for the uncrypted message
+	auto * FirstMessage = new std::string;
+	FirstMessage->reserve( 32 ); // Pre-allocate memory
+
+	//Wait for the message
+	while ( FirstMessage->empty( ) ) {
+		*FirstMessage = receiveMessage( ClientSocket , 10 );
+	}
+
+	//Convert the message to hash, let`s check if it matches
+	std::string ReceivedHash = Mem::Get( ).GenerateHash( FirstMessage->c_str( ) );
+
+	//Free string memory
+	StringCrypt::Get( ).CleanString( FirstMessage );
+
+	if ( ReceivedHash != this->CommunicationHash ) {
+		closeconnection( ListenSocket );
+		LogSystem::Get( ).Log( xorstr_( "[802] client hash mismatch!\n" ) );
+		return false;
+	}
+
+	return true;
+}
+
+void Communication::SendPingToServer( ) {
+	while ( true ) {
+
+		// Envia PING para o servidor
+		client::Get( ).SendPingToServer( );
+
+		std::this_thread::sleep_for( std::chrono::seconds( 10 ) );
+	}
+}
+
 void Communication::threadFunction( ) {
 
 	Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "thread started sucessfully " ) , GREEN );
@@ -239,14 +304,13 @@ void Communication::threadFunction( ) {
 	*/
 #endif
 
-	if ( Injector::Get( ).Inject( xorstr_( "winsock.dll" ) , Globals::Get( ).ProtectProcess ) == 1 ) {
-		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "started client sucessfully" ) , WHITE );
-	}
-	else {
+	if ( !InitializeClient( ) ) {
 		LogSystem::Get( ).Log( xorstr_( "[0001] Can't init client!" ) );
 	}
 
-	SOCKET ClientSocket = listenForClient( ListenSocket , 10 );
+	Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "started client sucessfully" ) , WHITE );
+
+	ClientSocket = listenForClient( ListenSocket , 10 );
 	if ( ClientSocket == INVALID_SOCKET ) {
 		closeconnection( ListenSocket );
 		LogSystem::Get( ).Log( xorstr_( "[801] Can't open client connection!" ) );
@@ -254,33 +318,22 @@ void Communication::threadFunction( ) {
 
 	Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "client connected sucessfully" ) , GREEN );
 
-	this->CommunicationHash = xorstr_( "90ed071b4c6ba84ada3b57733b60bc092c758930" );
-
-	//Allocate memory for the uncrypted message
-	auto * FirstMessage = new std::string;
-	FirstMessage->reserve( 32 ); // Pre-allocate memory
-
-	//Wait for the message
-	while ( FirstMessage->empty( ) ) {
-		*FirstMessage = receiveMessage( ClientSocket , 10 );
+	if ( !SendPasswordToServer( ) ) {
+		LogSystem::Get( ).Log( xorstr_( "[0001] Failed to send password to server!" ) );
 	}
 
-	//Convert the message to hash, let`s check if it matches
-	std::string ReceivedHash = Mem::Get( ).GenerateHash( FirstMessage->c_str( ) );
-
-	//Free string memory
-	StringCrypt::Get( ).CleanString( FirstMessage );
-
-	if ( ReceivedHash != this->CommunicationHash ) {
-		closeconnection( ListenSocket );
-		LogSystem::Get( ).Log( xorstr_( "[802] client hash mismatch!\n" ) );
+	if ( !CheckReceivedPassword( ) ) {
+		LogSystem::Get( ).Log( xorstr_( "[0001] Hash mismatch!" ) );
 	}
 
-	std::string * DecryptedMessage = StringCrypt::Get( ).DecryptString( xorstr_( "a477c5772e93d5a7f3f91d766d249e0a63b8bef5" ) );
-	sendMessage( ClientSocket , DecryptedMessage->c_str( ) );
-	std::string NewMessage = Mem::Get( ).GenerateHash( *DecryptedMessage );
-	StringCrypt::Get( ).CleanString( DecryptedMessage );
-	std::this_thread::sleep_for( std::chrono::seconds( 2 ) );
+	// Envia PING para o servidor
+	if ( !client::Get( ).SendPingToServer( ) ) {
+		LogSystem::Get( ).Log( xorstr_( "[401] Server is offline!" ) );
+	}
+
+	std::thread( &receiver::InitializeConnection , this->ServerReceiver ).detach( );
+	std::thread( &Communication::SendPingToServer , this ).detach( );
+
 
 	Globals::Get( ).VerifiedSession = true;
 
@@ -310,11 +363,10 @@ void Communication::threadFunction( ) {
 		}
 
 		// Envia mensagem para o cliente
-		sendMessage( ClientSocket , NewMessage.c_str( ) );
-		NewMessage = Mem::Get( ).GenerateHash( NewMessage );
+		sendMessage( ClientSocket , this->Message.c_str( ) );
+		this->Message = Mem::Get( ).GenerateHash( this->Message );
 
-		// Envia PING para o servidor
-		client::Get( ).SendPingToServer( );
+	
 
 		// Aguarda por 5 segundos antes do próximo loop
 		std::this_thread::sleep_for( std::chrono::seconds( 5 ) );

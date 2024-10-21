@@ -193,18 +193,24 @@ std::vector<std::string> AllowedMomModules {
 
 
 
-bool Detections::IsDebuggerPresentCustom( ) {
-	BOOL isDebuggerPresent = FALSE;
-	CheckRemoteDebuggerPresent( GetCurrentProcess( ) , &isDebuggerPresent );
-	return isDebuggerPresent || IsDebuggerPresent( );
+void Detections::IsDebuggerPresentCustom( ) {
+	BOOL Debugger = FALSE;
+	CheckRemoteDebuggerPresent( GetCurrentProcess( ) , &Debugger );
+	 
+	if(Debugger || IsDebuggerPresent() )
+	{
+		// Found debugger
+		client::Get( ).SendPunishToServer( xorstr_( "AntiCheat is being debugged!" ) , true );
+		LogSystem::Get( ).Log( xorstr_( "[201] Failed to ensure AC safety!" ) );
+	}
 }
 
 Detections::~Detections( ) {
 	stop( );
 }
 
-void Detections::AddExternalDetection( Detection detect, std::string SENDER ) {
-	Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "received external detection from " ) + SENDER, YELLOW );
+void Detections::AddExternalDetection( Detection detect , std::string SENDER ) {
+	Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "received external detection from " ) + SENDER , YELLOW );
 	this->cDetections.emplace_back( detect );
 }
 
@@ -226,7 +232,7 @@ bool Detections::isRunning( ) const {
 
 void Detections::reset( ) {
 	// Implementation to reset the thread
-	Utils::Get( ).WarnMessage( _DETECTION  , xorstr_( "resetting thread" ) , YELLOW );
+	Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "resetting thread" ) , YELLOW );
 	if ( m_thread.joinable( ) ) {
 		m_thread.join( );
 	}
@@ -242,18 +248,17 @@ std::string Detections::GenerateDetectionStatus( Detection _detection ) {
 	std::string _result = "";
 	switch ( _detection.status ) {
 	case CHEAT_DETECTED:
-		_result += xorstr_( "[DETECTION]\n" );
+		_result += xorstr_( "## DETECTION\n" );
 		break;
 	case MAY_DETECTED:
-		_result += xorstr_( "[SUSPECT]\n" );
+		_result += xorstr_( "## SUSPECT\n" );
 		break;
 
 	}
-
-	_result += xorstr_( "Found Infected Process\n" );
-	_result += Mem::Get( ).GetProcessName( _detection.ProcessPID ) + xorstr_( "\n" );
+	_result += xorstr_( "**Found Infected Process**\n\n" );
+	_result += xorstr_( "**" ) + Mem::Get( ).GetProcessName( _detection.ProcessPID ) + xorstr_( "**\n" );
 	for ( auto module : _detection.ProcessModules ) {
-		_result += module + xorstr_( "\n" );
+		_result += xorstr_( "- " ) + module + xorstr_( "\n" );
 	}
 
 	_result += xorstr_( "\n" );
@@ -282,6 +287,8 @@ void Detections::DigestDetections( ) {
 		*/
 		std::string FinalInfo = "";
 
+		FinalInfo += xorstr_( "> # Cheat detected\n" );
+
 		for ( auto Detection : cDetections ) {
 			FinalInfo += this->GenerateDetectionStatus( Detection );
 		}
@@ -294,7 +301,7 @@ void Detections::DigestDetections( ) {
 }
 
 void Detections::ScanWindows( ) {
-	Utils::Get( ).WarnMessage( _DETECTION  , xorstr_( "starting window scan" ) , GREEN );
+	Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "starting window scan" ) , GREEN );
 	std::unordered_map<DWORD , int> Map;
 
 	// Enumerate all top-level windows
@@ -347,9 +354,9 @@ void Detections::ScanWindows( ) {
 	if ( !DetectedWindows.empty( ) ) {
 		std::string Log = "";
 		for ( const auto & pair : DetectedWindows ) {
-			Injector::Get( ).Inject( xorstr_("windows.dll") , pair.second );
-			Log += xorstr_( "Found window allocated on process: " ) + Mem::Get( ).GetProcessExecutablePath( pair.second ) + xorstr_("\n");
-		}	
+			Injector::Get( ).Inject( xorstr_( "windows.dll" ) , pair.second );
+			Log += xorstr_( "Found window allocated on process: " ) + Mem::Get( ).GetProcessExecutablePath( pair.second ) + xorstr_( "\n" );
+		}
 
 		client::Get( ).SendPunishToServer( Log , false );
 		std::this_thread::sleep_for( std::chrono::seconds( 3 ) );
@@ -370,13 +377,13 @@ void Detections::ScanWindows( ) {
 
 		//Utils::Get( ).WarnMessage( _DETECTION  , xorstr_( "scanning " ) + ProcessName , WHITE );
 
-		Utils::Get( ).WarnMessage( _DETECTION  , xorstr_( "process " ) + ProcessName + xorstr_( " has open window!" ) , YELLOW );
+		Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "process " ) + ProcessName + xorstr_( " has open window!" ) , YELLOW );
 
 
 		CloseHandle( hProcess );
 
 	}
-	Utils::Get( ).WarnMessage( _DETECTION  , xorstr_( "ending window scan" ) , GREEN );
+	Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "ending window scan" ) , GREEN );
 	this->ScanModules( );
 }
 
@@ -392,7 +399,7 @@ void Detections::ScanModules( ) {
 	and pop a warning
 	*/
 
-	Utils::Get( ).WarnMessage( _DETECTION  , xorstr_( "scanning modules" ) , WHITE );
+	Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "scanning modules" ) , WHITE );
 
 	for ( Detection Process : this->cDetections ) {
 		this->ThreadUpdate = true;
@@ -446,16 +453,21 @@ void Detections::ScanParentModules( ) {
 }
 
 void Detections::threadFunction( ) {
-	Utils::Get( ).WarnMessage( _DETECTION  , xorstr_( "thread started sucessfully\n" ) , GREEN );
+	Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "thread started sucessfully\n" ) , GREEN );
 
 	while ( m_running ) {
 
-		Utils::Get( ).WarnMessage( _DETECTION  , xorstr_( "scanning open windows!" ) , GRAY );
+		Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "scanning open windows!" ) , GRAY );
 		this->ScanWindows( );
-		Utils::Get( ).WarnMessage( _DETECTION  , xorstr_( "scanning parent modules!" ) , GRAY );
+		Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "scanning parent modules!" ) , GRAY );
 		this->ScanParentModules( );
-		Utils::Get( ).WarnMessage( _DETECTION  , xorstr_( "digesting detections!" ) , GRAY );
+		Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "scanning debuggers" ) , GRAY );
+		this->IsDebuggerPresentCustom( );
+		Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "digesting detections!" ) , GRAY );
 		this->DigestDetections( );
+
+
+
 
 		Utils::Get( ).WarnMessage( LIGHT_WHITE , xorstr_( "PING" ) , xorstr_( "detection thread" ) , GRAY );
 

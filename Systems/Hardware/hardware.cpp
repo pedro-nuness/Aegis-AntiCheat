@@ -22,6 +22,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <regex>
 
 // Bibliotecas adicionais (caso necessário)
 #pragma comment(lib, "Ws2_32.lib")
@@ -281,6 +282,32 @@ std::string checkRegistryForSteamPath( ) {
 }
 
 
+std::vector<std::string> extractUserIds( const std::string & rawInput ) {
+    std::string processed = rawInput;
+
+    // Remove quebras de linha e tabulações
+    processed = std::regex_replace( processed , std::regex( xorstr_("[\\r\\n]+") ) , " " );
+    processed = std::regex_replace( processed , std::regex( xorstr_( "[\\t]+" ) ) , " " );
+
+    // Remove múltiplos espaços em branco
+    processed = std::regex_replace( processed , std::regex( xorstr_(" +") ) , " " );
+
+    // Extrai os IDs de usuário
+    std::vector<std::string> userIds;
+    std::regex userIdRegex( "\"([0-9]+)\"\\s*\\{" );
+    std::smatch matches;
+
+    while ( std::regex_search( processed , matches , userIdRegex ) ) {
+        userIds.push_back( matches[ 1 ] ); // Adiciona o ID ao vetor
+        processed = matches.suffix( ).str( ); // Continua a buscar após o ID encontrado
+    }
+
+    // Constrói o JSON a partir dos IDs extraídos
+    nlohmann::json jsonOutput;
+   
+    return userIds; // Retorna o JSON como string
+}
+
 bool hardware::GetLoggedUsers( std::vector<std::string> * Buffer ) {
 
     std::string SteamPath = checkRegistryForSteamPath( );
@@ -296,32 +323,15 @@ bool hardware::GetLoggedUsers( std::vector<std::string> * Buffer ) {
         return false;
     }
 
-    // Load the JSON data from a file or string
-    std::ifstream inputFile( LoginUsers ); // Assuming you saved the corrected JSON in this file
-    json JS;
-
-    if ( inputFile.is_open( ) ) {
-        inputFile >> JS;
-        inputFile.close( );
-    }
-    else {
-        std::cerr << "Unable to open file." << std::endl;
+    std::string LoginUsersFileContent = LoginUsersFile.Read( );
+    if ( LoginUsersFileContent.empty( ) )
+    {
+        Utils::Get( ).WarnMessage( _CHECKER , xorstr_( "loggin users empty!" ) , RED );
         return false;
     }
 
-
-    // Iterate through the users
-    for ( auto & [id , user] : JS[ "users" ].items( ) ) {
-        std::cout << "User ID: " << id << std::endl;
-        std::cout << "Account Name: " << user[ "AccountName" ] << std::endl;
-        std::cout << "Persona Name: " << user[ "PersonaName" ] << std::endl;
-        std::cout << "Remember Password: " << user[ "RememberPassword" ] << std::endl;
-        std::cout << "Wants Offline Mode: " << user[ "WantsOfflineMode" ] << std::endl;
-        std::cout << "Skip Offline Mode Warning: " << user[ "SkipOfflineModeWarning" ] << std::endl;
-        std::cout << "Allow Auto Login: " << user[ "AllowAutoLogin" ] << std::endl;
-        std::cout << "Most Recent: " << user[ "MostRecent" ] << std::endl;
-        std::cout << "Timestamp: " << user[ "Timestamp" ] << std::endl;
-        std::cout << "-----------------------------------" << std::endl;   
+    if ( Buffer != nullptr ) {
+        *Buffer = extractUserIds( LoginUsersFileContent );
     }
 
     return true;

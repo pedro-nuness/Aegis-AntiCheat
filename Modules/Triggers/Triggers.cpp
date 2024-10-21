@@ -355,9 +355,9 @@ void Triggers::CheckBlackListedWindows( ) {
 }
 
 std::string Triggers::GenerateWarningStatus( std::vector<Trigger> Triggers ) {
-	std::string STR = xorstr_( "[WARNING] Found Malicious process!\n\n" );
+	std::string STR = xorstr_( "> WARNING\n**Found Malicious process!**\n\n" );
 	for ( auto T : Triggers ) {
-		STR += T.Trigger + xorstr_( "\n\n" );
+		STR += xorstr_("- ") + T.Trigger + xorstr_( "\n" );
 	}
 	return STR;
 }

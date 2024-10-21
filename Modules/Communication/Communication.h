@@ -3,8 +3,11 @@
 #include <string>
 #include <thread>
 #include <chrono>
+#include "../../Client/receiver.h"
 
 #include "../ThreadMonitor/ThreadMonitor.h"
+
+
 
 
 class Communication : public ThreadMonitor {
@@ -25,6 +28,14 @@ class Communication : public ThreadMonitor {
 
 	void threadFunction( );
 
+	void SendPingToServer( );
+
+	bool InitializeClient( );
+	bool SendPasswordToServer( );
+	bool CheckReceivedPassword( );
+
+	std::string Message = "";
+
 	std::thread m_thread;
 	std::atomic<bool> m_running;
 	std::atomic<bool> m_healthy;
@@ -32,8 +43,10 @@ class Communication : public ThreadMonitor {
 	SOCKET openConnection( const char * ipAdress );
 	void closeconnection( SOCKET socket );
 	SOCKET listenForClient( SOCKET socket , int timeoutSeconds );
-	void sendMessage( SOCKET ClientSocket , const char * message );
+	bool sendMessage( SOCKET ClientSocket , const char * message );
 	std::string receiveMessage( SOCKET ClientSocket, int time);
+
+	receiver ServerReceiver;
 
 	SOCKET ListenSocket;
 	SOCKET ClientSocket;
@@ -43,6 +56,8 @@ public:
 		: ProcessPID( Pid ) , GamePID( GamePid ) , m_running( false ) {}
 
 	~Communication( );
+
+	int GetListenerPort( ) { return this->ServerReceiver.GetPort( ); }
 	
 	void start( );
 	void stop( );

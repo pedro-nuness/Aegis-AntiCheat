@@ -9,6 +9,7 @@
 #include <fstream>
 #include <comdef.h>
 #include <Wbemidl.h>
+#include <thread>
 
 #include "../Systems/Utils/utils.h"
 #include "../Systems/Monitoring/Monitoring.h"
@@ -25,6 +26,10 @@ using json = nlohmann::json;
 
 client::client( ) {}
 client::~client( ) {}
+
+
+#define key xorstr_("0123456789abcdef0123456789abcdef")
+#define iv xorstr_("abcdef9876543210")
 
 bool client::InitializeConnection( ) {
 	WSADATA wsaData;
@@ -114,6 +119,9 @@ bool client::SendData( std::string data , CommunicationType type , bool encrypt 
 		return false;
 	}
 
+	//pause, so the server can process it
+	std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+
 	int totalSent = 0;
 	while ( totalSent < messageSize ) {
 		int sent = send( this->CurrentSocket , encryptedMessage.c_str( ) + totalSent , messageSize - totalSent , 0 );
@@ -131,33 +139,28 @@ bool client::SendData( std::string data , CommunicationType type , bool encrypt 
 }
 
 bool GetHWIDJson( json & js ) {
+
 	std::vector<std::string> MacAddress = hardware::Get( ).getMacAddress( );
 	if ( MacAddress.empty( ) ) {
 		return false;
 	}
-
 	js[ xorstr_( "mac" ) ] = MacAddress;
 
 
 	std::string DiskID = "";
-
 	if ( !hardware::Get( ).GetDiskSerialNumber( &DiskID ) ) {
 		return false;
 	}
-
 	if ( DiskID.empty( ) )
 		return false;
-
 	js[ xorstr_( "disk" ) ] = DiskID;
 
-	std::string MotherboardID = "";
 
+	std::string MotherboardID = "";
 	if ( !hardware::Get( ).GetMotherboardSerialNumber( &MotherboardID ) )
 		return false;
-
 	if ( MotherboardID.empty( ) )
 		return false;
-
 	js[ xorstr_( "mb" ) ] = MotherboardID;
 
 
@@ -180,23 +183,19 @@ bool GetHWIDJson( json & js ) {
 	if ( Utils::Get( ).GenerateStringHash( Nickname ) != Globals::Get( ).NicknameHash ) {
 		js[ xorstr_( "warn_message" ) ] = xorstr_( "Nickname hash corrupted, user may have changed its user!" );
 	}
-
 	js[ xorstr_("nickname") ] = Nickname;
 
 	std::vector<std::string> LoggedUsers;
-	
 	if ( !hardware::Get( ).GetLoggedUsers( &LoggedUsers ) ) {
 		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "failed to get logged users!" ) , RED );
 		return false;
 	}
-
 	if ( LoggedUsers.empty( ) ) {
 		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "logged users empty!" ) , RED );
 		return false;
 	}
 
-	
-
+	js[ xorstr_( "steamid" ) ] = LoggedUsers;
 
 	return true;
 }
@@ -280,6 +279,8 @@ bool client::SendPunishToServer( std::string Message , bool Ban ) {
 		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to initialize connection!" ) , RED );
 		return false;
 	}
+
+	
 
 	bool success = SendData( js.dump( ) , Ban ? CommunicationType::BAN : CommunicationType::WARN , false );
 	if ( !CloseConnection( ) ) {

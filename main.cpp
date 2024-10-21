@@ -21,12 +21,10 @@
 #include "Globals/Globals.h"
 
 int main( int argc , char * argv[ ] ) {
-	if ( !Mem::Get( ).RestrictProcessAccess( ) ){
+	if ( !Mem::Get( ).RestrictProcessAccess( ) ) {
 		LogSystem::Get( ).Log( xorstr_( "[9] Failed to protect process" ) );
 	}
-
 	Globals::Get( ).SelfID = ::_getpid( );
-
 
 #ifdef _DEBUG
 	::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
@@ -36,7 +34,7 @@ int main( int argc , char * argv[ ] ) {
 
 	::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
 
-	if ( argc < 3 ) {
+	/*if ( argc < 3 ) {
 		LogSystem::Get( ).Log( xorstr_( "[401] Initialization failed" ) );
 		return 0;
 	}
@@ -44,10 +42,13 @@ int main( int argc , char * argv[ ] ) {
 	if ( !Utils::Get( ).isNumber( argv[ 1 ] ) || !Utils::Get( ).isNumber( argv[ 2 ] ) ) {
 		LogSystem::Get( ).Log( xorstr_( "[401] Invalid Input" ) );
 		return 0;
-	}
+	}*/
 
-	Globals::Get( ).OriginalProcess = stoi( ( std::string ) argv[ 1 ] );
-	Globals::Get( ).ProtectProcess = stoi( ( std::string ) argv[ 2 ] );
+	/*Globals::Get( ).OriginalProcess = stoi( ( std::string ) argv[ 1 ] );
+	Globals::Get( ).ProtectProcess = stoi( ( std::string ) argv[ 2 ] );*/
+
+	Globals::Get( ).OriginalProcess = Mem::Get().GetProcessID("explorer.exe");
+	Globals::Get( ).ProtectProcess = Mem::Get( ).GetProcessID( "notepad.exe" );
 
 	FileChecking::Get( ).ValidateFiles( );
 
@@ -61,7 +62,7 @@ int main( int argc , char * argv[ ] ) {
 		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
 	}
 
-	std::vector<std::pair<ThreadMonitor * , int>> threads = { 
+	std::vector<std::pair<ThreadMonitor * , int>> threads = {
 		std::make_pair( &TriggerEvent, TRIGGERS ) ,
 		std::make_pair( &DetectionEvent, DETECTIONS ),
 		std::make_pair( &CommunicationEvent, COMMUNICATION ) };
