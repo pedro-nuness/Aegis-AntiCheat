@@ -48,8 +48,8 @@ int main( int argc , char * argv[ ] ) {
 	Globals::Get( ).ProtectProcess = stoi( ( std::string ) argv[ 2 ] );
 
 
-	/*Globals::Get( ).OriginalProcess = Mem::Get( ).GetProcessID( "explorer.exe" );
-	Globals::Get( ).ProtectProcess = Mem::Get( ).GetProcessID( "notepad.exe" );*/
+	//Globals::Get( ).OriginalProcess = Mem::Get( ).GetProcessID( "explorer.exe" );
+	//Globals::Get( ).ProtectProcess = Mem::Get( ).GetProcessID( "notepad.exe" );
 
 	FileChecking::Get( ).ValidateFiles( );
 

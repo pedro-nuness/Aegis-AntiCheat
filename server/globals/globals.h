@@ -59,7 +59,8 @@ public:
 	std::unordered_set<std::string> blockedDisks;
 	std::unordered_set<std::string> blockedMacs;
 	std::unordered_set<std::string> blockedSteamID;
-	
+
+	bool ServerOpen = false;
 	bool AcessingMap = false;
 	bool ValidatingConnections = false;
 	bool LoggedIn = false;

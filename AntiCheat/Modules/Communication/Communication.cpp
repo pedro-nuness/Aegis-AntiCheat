@@ -3,8 +3,9 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
-
 #include "Communication.h"
+
+#include <algorithm>
 
 #include "../../Globals/Globals.h"
 #include "../../Systems/Memory/memory.h"
@@ -21,6 +22,11 @@
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
+
+#define SALT xorstr_("pjA5w1hoyzKCFEnk19hwtB8K11rCkWU1")
+#define communication_key xorstr_("bfdgsam8ujf80942unv08wdnb08adu98") // 32 bytes para AES-256
+#define communication_iv xorstr_("nviuofdsanbv890j") // 16 bytes para AES
+
 
 Communication::~Communication( ) {
 	stop( );
@@ -59,7 +65,7 @@ void Communication::requestupdate( ) {
 	this->m_healthy = false;
 }
 
-SOCKET Communication::openConnection( const char * ipAddress, int port ) {
+SOCKET Communication::openConnection( const char * ipAddress , int port ) {
 	WSADATA wsaData;
 	int iResult;
 
@@ -147,44 +153,147 @@ SOCKET Communication::listenForClient( SOCKET ListenSocket , int timeoutSeconds 
 	return ClientSocket;
 }
 
-bool Communication::sendMessage( SOCKET ClientSocket , const char * message ) {
-	int iResult = send( ClientSocket , message , ( int ) strlen( message ) , 0 );
-	if ( iResult == SOCKET_ERROR ) {
-		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "can't send message" ) , RED );
+bool Communication::sendMessage( SOCKET ClientSocket , std::string message ) {
+
+
+	if ( this->ClientSocket == INVALID_SOCKET ) {
+		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Invalid socket." ) , RED );
 		return false;
-		LogSystem::Get( ).Log( xorstr_( "[105] Can't send message!" ) );
 	}
+
+	std::string encryptedMessage;
+
+	if ( !Utils::Get( ).encryptMessage( message , encryptedMessage , communication_key , communication_iv ) ) {
+		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to encrypt the message." ) , RED );
+		return false;
+	}
+
+	long int messageSize = encryptedMessage.size( );
+	std::string messageSizeStr = std::to_string( messageSize );
+	int SizeBackup = messageSizeStr.size( );
+	//message_size bufer = char * 35 - 1 ( end of the strin \0 )
+	messageSizeStr.insert( 0 , 34 - SizeBackup , '0' );  // Insere 'quantidade_zeros' zeros no início
+	// 0000001348
+	if ( send( this->ClientSocket , messageSizeStr.c_str( ) , messageSizeStr.size( ) , 0 ) == SOCKET_ERROR ) {
+		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to send message size." ) , RED );
+		return false;
+	}
+
+	//pause, so the server can process it
+	std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+
+	int totalSent = 0;
+	while ( totalSent < messageSize ) {
+		int sent = send( this->ClientSocket , encryptedMessage.c_str( ) + totalSent , messageSize - totalSent , 0 );
+		if ( sent == SOCKET_ERROR ) {
+			Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to send encrypted message." ) , RED );
+			closesocket( this->ClientSocket );
+			WSACleanup( );
+			return false;
+		}
+		totalSent += sent;
+	}
+
 
 	return true;
 }
 
+bool isNumeric( const std::string & str );
+
 std::string Communication::receiveMessage( SOCKET ClientSocket , int time ) {
-	char recvbuf[ 512 ];
-	int iResult;
+	//buffer size
+	char sizeBuffer[ 35 ];
+	int received = recv( ClientSocket , sizeBuffer , sizeof( sizeBuffer ) - 1 , 0 );
+	if ( received <= 0 ) {
+		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "Failed to receive message size." ) , COLORS::RED );
+		closesocket( ClientSocket );
+		return xorstr_( "" );
+	}
+	sizeBuffer[ received ] = '\0';
+	std::string sizeString( sizeBuffer );
 
-	int timeout = time * 1000; // Timeout in milliseconds
-	setsockopt( ClientSocket , SOL_SOCKET , SO_RCVTIMEO , ( const char * ) &timeout , sizeof( timeout ) );
 
-	iResult = recv( ClientSocket , recvbuf , 512 , 0 );
-	if ( iResult > 0 ) {
-		recvbuf[ iResult ] = '\0'; // Ensure null-termination of the received string
-		std::string response = std::string( recvbuf );
-		RtlZeroMemory( recvbuf , sizeof( recvbuf ) );
-		return response;
+	if ( !isNumeric( sizeString ) ) {
+		closesocket( ClientSocket );
+		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "Received invalid size: " ) + sizeString , COLORS::RED );
+
+
+		return xorstr_( "" );
 	}
-	else if ( iResult == 0 ) {
-		LogSystem::Get( ).Log( xorstr_( "[900] Connection closed" ) );
+
+	int messageSize;
+	try {
+		messageSize = std::stoi( sizeString );
 	}
-	else {
-		if ( WSAGetLastError( ) == WSAETIMEDOUT ) {
-			LogSystem::Get( ).Log( xorstr_( "[902] Receive timeout" ) );
+	catch ( const std::invalid_argument & ) {
+		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "Invalid message size" ) , COLORS::RED );
+		closesocket( ClientSocket );
+		return xorstr_( "" );
+	}
+	catch ( const std::out_of_range & ) {
+		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "Message size out of range" ) , COLORS::RED );
+		closesocket( ClientSocket );
+		return xorstr_( "" );
+	}
+
+	const int MAX_MESSAGE_SIZE = 50 * 1024 * 1024; // Limite de 50 MB
+	if ( messageSize <= 0 || messageSize > MAX_MESSAGE_SIZE ) {
+		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "Invalid message size." ) , COLORS::RED );
+		closesocket( ClientSocket );
+		return xorstr_( "" );
+	}
+
+	char * buffer = new( std::nothrow ) char[ messageSize ];
+	if ( !buffer ) {
+		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "Failed to allocate memory for message." ) , COLORS::RED );
+		closesocket( ClientSocket );
+		return xorstr_( "" );
+	}
+
+	bool FailedReceive = false;
+	int totalReceived = 0;
+	while ( totalReceived < messageSize ) {
+		received = recv( ClientSocket , buffer + totalReceived , messageSize - totalReceived , 0 );
+		if ( received <= 0 ) {
+			Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "Failed to receive encrypted message." ) , COLORS::RED );
+			delete[ ] buffer;
+			closesocket( ClientSocket );
+			FailedReceive = true;
+			break;
 		}
-		else {
-			LogSystem::Get( ).Log( xorstr_( "[901] Error receiving message" ) );
-		}
+		totalReceived += received;
 	}
-	return "";
+
+	if ( FailedReceive ) {
+		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "Failed to receive message" ) , COLORS::RED );
+		return xorstr_( "" );
+	}
+
+	if ( totalReceived < messageSize ) {
+		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "Received Missing message" ) , COLORS::RED );
+		delete[ ] buffer;
+		closesocket( ClientSocket );
+		return xorstr_( "" );
+	}
+
+	std::string encryptedMessage( buffer , messageSize );
+	delete[ ] buffer;
+
+	if ( encryptedMessage.empty( ) ) {
+		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "Empty message received." ) , COLORS::RED );
+		closesocket( ClientSocket );
+		return xorstr_( "" );
+	}
+
+	if ( !Utils::Get( ).decryptMessage( encryptedMessage , encryptedMessage , communication_key , communication_iv ) ) {
+		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "Failed to decrypt the message." ) , COLORS::RED );
+		closesocket( ClientSocket );
+		return xorstr_( "" );
+	}
+
+	return encryptedMessage;
 }
+
 
 #define now std::chrono::high_resolution_clock::now()
 
@@ -224,20 +333,16 @@ bool Communication::InitializeClient( ) {
 }
 
 bool Communication::SendPasswordToServer( ) {
-	std::string * DecryptedMessage = StringCrypt::Get( ).DecryptString( xorstr_( "a477c5772e93d5a7f3f91d766d249e0a63b8bef5" ) );
 
-	if ( DecryptedMessage->empty( ) ) {
-		StringCrypt::Get( ).CleanString( DecryptedMessage );
-		LogSystem::Get( ).Log( xorstr_( "[203] Can't read encrypted message!" ) );
+	{
+		std::string Password = Utils::Get( ).GenerateRandomKey( 256 );
+		sendMessage( ClientSocket , Password.c_str( ) );
+
+
+		//expected response
+		this->ExpectedMessage = Mem::Get( ).GenerateHash( Password + SALT );
 	}
 
-	std::cout << "Password: " << *DecryptedMessage << "\n";
-
-	this->Message = Mem::Get( ).GenerateHash( *DecryptedMessage );
-
-	sendMessage( ClientSocket , DecryptedMessage->c_str( ) );
-
-	StringCrypt::Get( ).CleanString( DecryptedMessage );
 	std::this_thread::sleep_for( std::chrono::seconds( 2 ) );
 
 	return true;
@@ -245,27 +350,23 @@ bool Communication::SendPasswordToServer( ) {
 
 bool Communication::CheckReceivedPassword( ) {
 	//expected hash
-	this->CommunicationHash = xorstr_( "90ed071b4c6ba84ada3b57733b60bc092c758930" );
 
 	//Allocate memory for the uncrypted message
-	auto * FirstMessage = new std::string;
-	FirstMessage->reserve( 32 ); // Pre-allocate memory
+	{
+	
+		std::string ReceivedPassword;
+		//Wait for the message
+		ReceivedPassword = receiveMessage( ClientSocket , 10 );
 
-	//Wait for the message
-	while ( FirstMessage->empty( ) ) {
-		*FirstMessage = receiveMessage( ClientSocket , 10 );
-	}
-
-	//Convert the message to hash, let`s check if it matches
-	std::string ReceivedHash = Mem::Get( ).GenerateHash( FirstMessage->c_str( ) );
-
-	//Free string memory
-	StringCrypt::Get( ).CleanString( FirstMessage );
-
-	if ( ReceivedHash != this->CommunicationHash ) {
-		closeconnection( ListenSocket );
-		LogSystem::Get( ).Log( xorstr_( "[802] client hash mismatch!\n" ) );
-		return false;
+		if ( ReceivedPassword != this->ExpectedMessage ) {
+			closeconnection( ListenSocket );
+			std::cout << ReceivedPassword << ", " << CommunicationHash << std::endl;
+			std::this_thread::sleep_for( std::chrono::seconds( 10 ) );
+			LogSystem::Get( ).Log( xorstr_( "[802] client hash mismatch!\n" ) );
+			return false;
+		}
+		else {
+		}
 	}
 
 	return true;
@@ -282,7 +383,7 @@ void Communication::SendPingToServer( ) {
 }
 
 void Communication::OpenRequestServer( ) {
-	
+
 	SOCKET ListenSock = openConnection( xorstr_( "127.0.0.10" ) , 4444 );
 	if ( ListenSock == INVALID_SOCKET ) {
 		LogSystem::Get( ).Log( xorstr_( "[601] Can't open listener connection!" ) );
@@ -297,7 +398,7 @@ void Communication::OpenRequestServer( ) {
 			LogSystem::Get( ).Log( xorstr_( "[601] Can't open client connection!" ) );
 		}
 
-		std::string MessageReceived = receiveMessage( ClientSock, 10 );
+		std::string MessageReceived = receiveMessage( ClientSock , 10 );
 		if ( MessageReceived.empty( ) ) {
 			Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "received empty message from client" ) , YELLOW );
 			continue;
@@ -320,10 +421,10 @@ void Communication::threadFunction( ) {
 
 	// Envia PING para o servidor
 	if ( !client::Get( ).SendPingToServer( ) ) {
-		LogSystem::Get( ).LogWithMessageBox( xorstr_( "[401] Server is offline!" ), xorstr_("Server is offline!" ) );
+		LogSystem::Get( ).LogWithMessageBox( xorstr_( "[401] Server is offline!" ) , xorstr_( "Server is offline!" ) );
 	}
 
-	ListenSocket = openConnection( xorstr_( "127.0.0.10" ), 8080);
+	ListenSocket = openConnection( xorstr_( "127.0.0.10" ) , 8080 );
 	if ( ListenSocket == INVALID_SOCKET ) {
 		LogSystem::Get( ).Log( xorstr_( "[801] Can't open listener connection!" ) );
 	}
@@ -343,6 +444,7 @@ void Communication::threadFunction( ) {
 	}
 
 	Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "client connected sucessfully" ) , GREEN );
+	std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
 
 	if ( !SendPasswordToServer( ) ) {
 		LogSystem::Get( ).Log( xorstr_( "[0001] Failed to send password to server!" ) );
@@ -355,7 +457,6 @@ void Communication::threadFunction( ) {
 	std::thread( &receiver::InitializeConnection , this->ServerReceiver ).detach( );
 	std::thread( &Communication::SendPingToServer , this ).detach( );
 
-
 	Globals::Get( ).VerifiedSession = true;
 
 	this->LastClientPing = now;
@@ -363,29 +464,31 @@ void Communication::threadFunction( ) {
 	while ( m_running ) {
 		m_healthy = true;
 
+		this->ExpectedMessage = Mem::Get( ).GenerateHash( this->ExpectedMessage + SALT );
+		// Envia mensagem para o cliente
+		sendMessage( ClientSocket , this->ExpectedMessage );
+
+
+		//Expected response
+		this->ExpectedMessage = Mem::Get( ).GenerateHash( this->ExpectedMessage + SALT);
 		// Recebe mensagem do cliente
 		std::string message = receiveMessage( ClientSocket , 20 );
 
 		if ( !message.empty( ) ) {
-			if ( message != this->CommunicationHash ) {
+			if ( message != this->ExpectedMessage ) {
 				closeconnection( ClientSocket );
 				closeconnection( ListenSocket );
 
 				LogSystem::Get( ).Log( xorstr_( "[802] client hash mismatch!\n" ) );
 			}
 			else {
-				Utils::Get( ).WarnMessage( LIGHT_WHITE , xorstr_( "PING" ) , this->CommunicationHash , GRAY );
-				this->CommunicationHash = Mem::Get( ).GenerateHash( this->CommunicationHash );
+				Utils::Get( ).WarnMessage( LIGHT_WHITE , xorstr_( "PING" ) , this->ExpectedMessage , GRAY );
 				UpdatePingTime( );
 			}
 		}
 		else if ( !PingInTime( ) ) {
 			HandleMissingPing( );
 		}
-
-		// Envia mensagem para o cliente
-		sendMessage( ClientSocket , this->Message.c_str( ) );
-		this->Message = Mem::Get( ).GenerateHash( this->Message );
 
 		// Aguarda por 5 segundos antes do próximo loop
 		std::this_thread::sleep_for( std::chrono::seconds( 5 ) );

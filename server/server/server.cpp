@@ -77,7 +77,6 @@ public:
 
 std::vector<WHookRequest> WebhookList;
 
-
 Server::Server( ) {
 }
 
@@ -493,7 +492,7 @@ bool Server::receiveping( const std::string & encryptedMessage ) {
 		}
 		else {
 			globals::Get( ).ConnectionMap[ ( Ip ) ].Ping( );
-			utils::Get( ).WarnMessage( _SERVER , xorstr_( "IP " ) + ( Ip ) +xorstr_( " pinged." ) , GRAY );
+			//utils::Get( ).WarnMessage( _SERVER , xorstr_( "IP " ) + ( Ip ) +xorstr_( " pinged." ) , GRAY );
 		}
 	}
 
@@ -627,44 +626,44 @@ bool Server::receivepunish( const std::string & encryptedMessage , bool ban ) {
 	int height = js[ xorstr_( "image_height" ) ];
 	int width = js[ xorstr_( "image_width" ) ];
 
-	utils::Get( ).WarnMessage( _SERVER , xorstr_( "Reconstructing image!" ) , YELLOW );
+	//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Reconstructing image!" ) , YELLOW );
 
 	// Recriar a imagem
 	HBITMAP reconstructedBitmap = image::Get( ).ByteArrayToBitmap( Image , width , height );
-	utils::Get( ).WarnMessage( _SERVER , xorstr_( "Reconstructed bitmap successfully!" ) , GREEN );
+	//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Reconstructed bitmap successfully!" ) , GREEN );
 
 	// Criar nome da pasta
 	std::string Nickname = js[ xorstr_( "nickname" ) ];
 	std::vector<std::string> SteamIDs = js[ xorstr_( "steamid" ) ];
 	std::string FolderName = memory::Get( ).GetProcessPath( ::_getpid( ) ) + "\\" + Nickname + xorstr_( "-" ) + SteamIDs[ 0 ];
 
-	utils::Get( ).WarnMessage( _SERVER , xorstr_( "Folder name: " ) + FolderName , WHITE );
+	//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Folder name: " ) + FolderName , WHITE );
 
 	// Criar diretório se não existir
 	if ( !fs::exists( FolderName.c_str( ) ) ) {
-		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Creating directory " ) + FolderName , YELLOW );
+		//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Creating directory " ) + FolderName , YELLOW );
 		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
 		fs::create_directory( FolderName.c_str( ) );
 	}
 	else {
-		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Directory " ) + FolderName + xorstr_( " already exists!" ) , GRAY );
+		//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Directory " ) + FolderName + xorstr_( " already exists!" ) , GRAY );
 	}
 
 	// Salvar a imagem
 	std::string Filename = FolderName + "\\" + utils::Get( ).GetRandomWord( 20 ) + xorstr_( ".jpg" );
 	image::Get( ).SaveBitmapToFile( reconstructedBitmap , Filename );
-	utils::Get( ).WarnMessage( _SERVER , xorstr_( "Saved image successfully!" ) , GREEN );
+	//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Saved image successfully!" ) , GREEN );
 
 	// Liberar o recurso HBITMAP
 	DeleteObject( reconstructedBitmap );
-	utils::Get( ).WarnMessage( _SERVER , xorstr_( "Deleted image object successfully!" ) , GREEN );
+	//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Deleted image object successfully!" ) , GREEN );
 
 	json MessageJson;
 
 
 	// Adicionar o hwid à mensagem
 	std::string Message = AppendHWIDToString( js[ xorstr_( "message" ) ] , Ip );
-	utils::Get( ).WarnMessage( _SERVER , xorstr_( "Appended hwid to message!" ) , GREEN );
+	//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Appended hwid to message!" ) , GREEN );
 	//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Sending message to webhook: \n" ) + Message + xorstr_( "\n\n" ) , WHITE );
 
 	std::lock_guard<std::mutex> lock( connectionMutex );
@@ -679,7 +678,7 @@ bool Server::receivepunish( const std::string & encryptedMessage , bool ban ) {
 		WebhookList.emplace_back( WHookRequest( WHOOKTYPE::WARN_ , Message , Filename , Ip , 0 ) );
 	}
 
-	utils::Get( ).WarnMessage( _SERVER , xorstr_( "Sent to webhook request list!" ) , GREEN );
+	utils::Get( ).WarnMessage( _SERVER , xorstr_( "Sent ban to webhook request list!" ) , GREEN );
 
 	return true;
 }
@@ -816,6 +815,7 @@ void Server::threadfunction( ) {
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
 
+
 	if ( getaddrinfo( hostName , nullptr , &hints , &res ) != 0 ) {
 		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to get address info." ) , COLORS::RED );
 		closesocket( listenSock );
@@ -861,7 +861,9 @@ void Server::threadfunction( ) {
 	char ipStr[ INET_ADDRSTRLEN ];
 	inet_ntop( AF_INET , &serverAddr.sin_addr , ipStr , sizeof( ipStr ) );
 	globals::Get( ).SelfIP = ipStr;
-	utils::Get( ).WarnMessage( _SERVER , xorstr_( "Server listening on " ) + std::string( ipStr ) + xorstr_( " on port " ) + std::to_string( serverPort ) , COLORS::GREEN );
+	utils::Get( ).WarnMessage( _SERVER , xorstr_( "Server listening on " ) + std::string( ipStr ) + xorstr_( ":" ) + std::to_string( serverPort ) , COLORS::GREEN );
+
+	globals::Get( ).ServerOpen = true;
 
 	std::thread( &Server::validateconnections , this ).detach( );
 	std::thread( &Server::ProcessMessages , this ).detach( );

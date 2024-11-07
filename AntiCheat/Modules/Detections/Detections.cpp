@@ -192,8 +192,8 @@ std::vector<std::string> AllowedMomModules {
 void Detections::IsDebuggerPresentCustom( ) {
 	BOOL Debugger = FALSE;
 	CheckRemoteDebuggerPresent( GetCurrentProcess( ) , &Debugger );
-	 
-	if(Debugger || IsDebuggerPresent() )
+
+	if ( Debugger || IsDebuggerPresent( ) )
 	{
 		// Found debugger
 		client::Get( ).SendPunishToServer( xorstr_( "AntiCheat is being debugged!" ) , true );
@@ -308,9 +308,6 @@ void Detections::ScanWindows( ) {
 
 
 	for ( const auto & window : Windows ) {
-		if ( window.processId == ( DWORD ) this->MomProcess || window.processId == ( DWORD ) this->ProtectProcess || window.processId == ( DWORD ) Globals::Get( ).SelfID ) {
-			continue;
-		}
 
 		this->ThreadUpdate = true;
 
@@ -328,22 +325,18 @@ void Detections::ScanWindows( ) {
 				if ( !overlayRect.left && !overlayRect.right && !overlayRect.bottom && !overlayRect.top )
 					continue;
 
-				// Compare overlay window and target window rectangles
-				// The overlay matches the target window's size and position
-
+				//emplace_item on map
 				Map[ window.processId ] = true;
-
-				//Backup
-				DWORD windowAffinity = NULL;
-				if ( !GetWindowDisplayAffinity( window.hwnd , &windowAffinity ) ) {
-					continue;
-				}
-
-				if ( windowAffinity != WDA_NONE ) {
-					Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "got window affinity of id " ) + std::to_string( window.processId ) , GREEN );
-					DetectedWindows[ window.hwnd ] = window.processId;
-				}
 			}
+		}
+
+		DWORD windowAffinity = NULL;
+		if ( !GetWindowDisplayAffinity( window.hwnd , &windowAffinity ) ) {
+			continue;
+		}
+		if ( windowAffinity != WDA_NONE ) {
+			Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "got window affinity of id " ) + std::to_string( window.processId ) , GREEN );
+			DetectedWindows[ window.hwnd ] = window.processId;
 		}
 	}
 
@@ -359,25 +352,22 @@ void Detections::ScanWindows( ) {
 		LogSystem::Get( ).Log( xorstr_( "Unsafe!" ) );
 	}
 
-
 	for ( const auto & pair : Map ) {
 		this->ThreadUpdate = true;
 
 		HANDLE hProcess = OpenProcess( PROCESS_VM_READ | PROCESS_QUERY_INFORMATION , FALSE , pair.first );
-
-		if ( hProcess == NULL ) {
+		if ( hProcess == NULL )
 			continue;
-		}
 
 		std::string ProcessName = Mem::Get( ).GetProcessName( pair.first );
+		if ( ProcessName == xorstr_( "explorer.exe" ) )
+			continue;
+	
 
 		//Utils::Get( ).WarnMessage( _DETECTION  , xorstr_( "scanning " ) + ProcessName , WHITE );
 
 		Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "process " ) + ProcessName + xorstr_( " has open window!" ) , YELLOW );
-
-
 		CloseHandle( hProcess );
-
 	}
 	Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "ending window scan" ) , GREEN );
 	this->ScanModules( );
@@ -461,9 +451,6 @@ void Detections::threadFunction( ) {
 		this->IsDebuggerPresentCustom( );
 		Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "digesting detections!" ) , GRAY );
 		this->DigestDetections( );
-
-
-
 
 		Utils::Get( ).WarnMessage( LIGHT_WHITE , xorstr_( "PING" ) , xorstr_( "detection thread" ) , GRAY );
 

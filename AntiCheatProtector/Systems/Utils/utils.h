@@ -32,7 +32,8 @@ public:
 	void WarnMessage( COLORS color , std::string custom_text, std::string Message, COLORS _col );
 	int RandomNumber( int min , int max );
 	bool isNumber( const std::string & str );
-	
+	bool encryptMessage( const std::string & plaintext , std::string & ciphertext , const std::string & key , const std::string & iv );
+	bool decryptMessage( const std::string & ciphertext , std::string & plaintext , const std::string & key , const std::string & iv );
 
 	std::string GetRandomWord( int size );
 	std::string GetRandomLetter( );

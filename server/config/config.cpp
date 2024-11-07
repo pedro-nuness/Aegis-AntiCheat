@@ -37,7 +37,8 @@ void config::LoadConfig( ) {
 		{ xorstr_( "ApiKey" ), "" },
 		{ xorstr_( "Username" ), "" },
 		{ xorstr_( "DiscordChannel" ), 0 },
-		{ xorstr_( "BotToken" ), "" }
+		{ xorstr_( "BotToken" ), "" },
+		{ xorstr_( "ServerPort" ), 0 }
 	};
 
 	// Verifica se o arquivo de configuração existe
@@ -71,7 +72,8 @@ void config::LoadConfig( ) {
 		{ xorstr_( "ApiKey" ), is_string },
 		{ xorstr_( "DiscordChannel" ), is_number },
 		{ xorstr_( "BotToken" ), is_string },
-		{ xorstr_( "Username" ), is_string }
+		{ xorstr_( "Username" ), is_string },
+		{ xorstr_( "ServerPort" ), is_number }
 	};
 
 	// Loop para validar os campos obrigatórios
@@ -88,4 +90,5 @@ void config::LoadConfig( ) {
 	this->BotToken = Config[ xorstr_( "BotToken" ) ];
 	this->DiscordChannel = Config[ xorstr_( "DiscordChannel" ) ];
 	this->Username = Config[ xorstr_( "Username" ) ];
+	this->CapturePort = Config[ xorstr_( "ServerPort" ) ];
 }

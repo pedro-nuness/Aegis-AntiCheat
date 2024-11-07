@@ -15,7 +15,6 @@ class Detections:  public ThreadMonitor
 
 	void CheckHandles( );
 	void CheckThreads( );
-	bool ScanProcessID( int pid );
 	bool ScanCurrentThreads( );
 
 	bool InjectProcess( DWORD processId );  

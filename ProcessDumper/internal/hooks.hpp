@@ -56,9 +56,14 @@ DWORD GetPID( LPCSTR ProcessName ) {
 
 std::mutex CallerMutex;
 
-bool CallChecker = true;
+
 
 bool CheckTarget( HANDLE hProcess , std::string Caller ) {
+	static bool CallChecker = true;
+
+	if ( !CallChecker )
+		return true;
+
 	DWORD DayzPID = GetPID( "DayZ_x64.exe" );
 	if ( DayzPID ) {
 		DWORD CurrentPID = GetProcessId( hProcess );
@@ -82,7 +87,7 @@ bool CheckTarget( HANDLE hProcess , std::string Caller ) {
 				JS[ xorstr_( "message" ) ] = Caller + xorstr_( " to Game!\n" ) + exePath;
 
 				if ( NewMessage.SendMessageToServer( JS.dump( ) ) ) {
-					exit( 0 );
+					CallChecker = false;
 				}
 			}
 		}
@@ -97,8 +102,7 @@ typedef BOOL( WINAPI * tWriteProcessMemory )( HANDLE  hProcess , LPVOID  lpBaseA
 tWriteProcessMemory pWriteProcessMemory = nullptr; // original function pointer after hook
 bool WINAPI hookedWriteProcessMemory( HANDLE  hProcess , LPVOID  lpBaseAddress , LPCVOID lpBuffer , SIZE_T  nSize , SIZE_T * lpNumberOfBytesWritten ) {
 
-	if ( CallChecker )
-		CheckTarget( hProcess , xorstr_( "WriteProcessMemory" ) );
+	CheckTarget( hProcess , xorstr_( "WriteProcessMemory" ) );
 
 	//std::cout xorstr_( " [WriteProcessMemory-Dumped] called to id:" ) << GetProcessId(hProcess) << std::endl;
 

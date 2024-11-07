@@ -73,17 +73,11 @@ bool client::CloseConnection( ) {
 			Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to close socket. Error code: " ) + std::to_string( errorCode ) , RED );
 			Result = false;
 		}
-		else {
-			Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Socket closed successfully." ) , GREEN );
-		}
-
+	
 		if ( WSACleanup( ) == SOCKET_ERROR ) {
 			int errorCode = WSAGetLastError( );
 			Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to cleanup Winsock. Error code: " ) + std::to_string( errorCode ) , RED );
 			Result = false;
-		}
-		else {
-			Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Winsock cleaned up successfully." ) , GREEN );
 		}
 	}
 
@@ -110,10 +104,13 @@ bool client::SendData( std::string data , CommunicationType type , bool encrypt 
 	encryptedMessage = xorstr_( "aegis" ) + std::to_string( static_cast< int >( type ) ) + encryptedMessage;
 	long int messageSize = encryptedMessage.size( );
 
-	Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Sending message..." ) , BLUE );
-	Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Message size: " ) + std::to_string( messageSize ) , LIGHT_BLUE );
 
 	std::string messageSizeStr = xorstr_( "aegis" ) + std::to_string( messageSize );
+	int SizeBackup = messageSizeStr.size( );
+	//message_size bufer = char * 35 - 1 ( end of the strin \0 )
+	//skip 5, prefix
+	messageSizeStr.insert( 5 , 34 - SizeBackup , '0' );  // Insere 'quantidade_zeros' zeros no início
+	// aegis0000001348
 	if ( send( this->CurrentSocket , messageSizeStr.c_str( ) , messageSizeStr.size( ) , 0 ) == SOCKET_ERROR ) {
 		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to send message size." ) , RED );
 		return false;

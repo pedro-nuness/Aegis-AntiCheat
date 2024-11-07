@@ -201,7 +201,8 @@ bool Mem::ProcessIsOnSystemFolder( int pid ) {
 	std::string Path = GetProcessExecutablePath( pid );
 
 	return Utils::Get( ).CheckStrings( Path , xorstr_( "\\System32\\" ) ) ||
-		Utils::Get( ).CheckStrings( Path , xorstr_( "\\SysWOW64\\" ) );
+		Utils::Get( ).CheckStrings( Path , xorstr_( "\\SysWOW64\\" ) ) ||
+		Utils::Get( ).CheckStrings( Path , xorstr_( "\\system32\\" ) );
 }
 
 bool Mem::VerifySignature( HANDLE hProcess ) {

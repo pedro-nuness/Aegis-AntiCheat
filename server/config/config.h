@@ -10,6 +10,7 @@ class config : public CSingleton<config>
 
 	std::string BotToken = "";
 	int PingTolerance = 0;
+	int CapturePort = 0;
 	
 
 public:
@@ -28,6 +29,8 @@ public:
 	std::string GetBotToken( ) {
 		return this->BotToken;
 	}
+
+	int GetCapturePort( ) { return this->CapturePort; }
 
 	int GetPingTolerance( ) {
 		return this->PingTolerance;

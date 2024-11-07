@@ -42,7 +42,7 @@ enum class ApiAnswer {
 };
 
 
-bool Api::Login( std::string Username , std::string Password ) {
+bool Api::Login( ) {
 	const std::string Apikey = config::Get( ).GetApiKey( );
 	const std::string json_data = R"({"username": "admin", "password": "password"})";
 

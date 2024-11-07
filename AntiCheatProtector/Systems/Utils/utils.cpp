@@ -6,6 +6,11 @@
 #include "xorstr.h"
 
 
+#include <openssl/evp.h>
+#include <openssl/sha.h>
+#pragma comment(lib, "libssl.lib")
+#pragma comment(lib, "libcrypto.lib")
+
 #include <Wininet.h>
 #pragma comment(lib, "wininet.lib")
 
@@ -102,6 +107,80 @@ void Utils::WarnMessage( COLORS color , std::string custom_text , std::string Me
 	ColoredText( xorstr_( " " ) + Message + xorstr_("\n" ) , _col );
 }
 
+
+bool Utils::encryptMessage( const std::string & plaintext , std::string & ciphertext , const std::string & key , const std::string & iv ) {
+	EVP_CIPHER_CTX * ctx = EVP_CIPHER_CTX_new( );
+	if ( !ctx ) {
+		return false;
+	}
+
+	if ( 1 != EVP_EncryptInit_ex( ctx , EVP_aes_256_cbc( ) , NULL ,
+		reinterpret_cast< const unsigned char * >( key.data( ) ) ,
+		reinterpret_cast< const unsigned char * >( iv.data( ) ) ) ) {
+		EVP_CIPHER_CTX_free( ctx );
+		return false;
+	}
+
+	int len;
+	int ciphertext_len;
+	unsigned char outbuf[ 1024 ];
+
+	if ( 1 != EVP_EncryptUpdate( ctx , outbuf , &len ,
+		reinterpret_cast< const unsigned char * >( plaintext.data( ) ) , plaintext.length( ) ) ) {
+		EVP_CIPHER_CTX_free( ctx );
+		return false;
+	}
+	ciphertext_len = len;
+
+	if ( 1 != EVP_EncryptFinal_ex( ctx , outbuf + len , &len ) ) {
+		EVP_CIPHER_CTX_free( ctx );
+		return false;
+	}
+	ciphertext_len += len;
+
+	ciphertext.assign( reinterpret_cast< char * >( outbuf ) , ciphertext_len );
+
+	EVP_CIPHER_CTX_free( ctx );
+	return true;
+}
+
+// Função para descriptografar a mensagem usando AES-256-CBC
+bool Utils::decryptMessage( const std::string & ciphertext , std::string & plaintext , const std::string & key , const std::string & iv ) {
+	EVP_CIPHER_CTX * ctx = EVP_CIPHER_CTX_new( );
+	if ( !ctx ) {
+		std::cerr << xorstr_( "Failed to create context for decryption." ) << std::endl;
+		return false;
+	}
+
+	if ( 1 != EVP_DecryptInit_ex( ctx , EVP_aes_256_cbc( ) , NULL , ( unsigned char * ) key.data( ) , ( unsigned char * ) iv.data( ) ) ) {
+		std::cerr << xorstr_( "Decryption initialization failed." ) << std::endl;
+		EVP_CIPHER_CTX_free( ctx );
+		return false;
+	}
+
+	int len;
+	int plaintext_len;
+	unsigned char outbuf[ 1024 ];
+
+	if ( 1 != EVP_DecryptUpdate( ctx , outbuf , &len , ( unsigned char * ) ciphertext.data( ) , ciphertext.length( ) ) ) {
+		std::cerr << xorstr_( "Decryption failed." ) << std::endl;
+		EVP_CIPHER_CTX_free( ctx );
+		return false;
+	}
+	plaintext_len = len;
+
+	if ( 1 != EVP_DecryptFinal_ex( ctx , outbuf + len , &len ) ) {
+		std::cerr << xorstr_( "Final decryption step failed." ) << std::endl;
+		EVP_CIPHER_CTX_free( ctx );
+		return false;
+	}
+	plaintext_len += len;
+
+	plaintext.assign( ( char * ) outbuf , plaintext_len );
+
+	EVP_CIPHER_CTX_free( ctx );
+	return true;
+}
 
 
 int Utils::RandomNumber( int min , int max )

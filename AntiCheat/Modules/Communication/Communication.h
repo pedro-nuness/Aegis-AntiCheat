@@ -36,7 +36,7 @@ class Communication : public ThreadMonitor {
 	bool SendPasswordToServer( );
 	bool CheckReceivedPassword( );
 
-	std::string Message = "";
+	std::string ExpectedMessage = "";
 
 	std::thread m_thread;
 	std::atomic<bool> m_running;
@@ -45,8 +45,10 @@ class Communication : public ThreadMonitor {
 	SOCKET openConnection( const char * ipAdress, int port );
 	void closeconnection( SOCKET socket );
 	SOCKET listenForClient( SOCKET socket , int timeoutSeconds );
-	bool sendMessage( SOCKET ClientSocket , const char * message );
+	bool sendMessage( SOCKET ClientSocket , std::string message  );
 	std::string receiveMessage( SOCKET ClientSocket, int time);
+
+
 
 	receiver ServerReceiver;
 

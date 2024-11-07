@@ -7,6 +7,9 @@
 #include <tlhelp32.h>
 #include <psapi.h>
 #include <unordered_map>
+#include <dbghelp.h>
+
+#pragma comment(lib, "dbghelp.lib")
 
 #include "../../Systems/Utils/utils.h"
 #include  "../../Systems/Memory/memory.h"
@@ -40,7 +43,6 @@ bool Detections::isRunning( ) const {
 
 void Detections::reset( ) {
 	// Implementation to reset the thread
-	// Implementation to reset the thread
 	std::cout << "[detections] resetting thread!\n";
 	if ( m_thread.joinable( ) ) {
 		m_thread.join( );
@@ -53,13 +55,61 @@ void Detections::requestupdate( ) {
 	this->m_healthy = false;
 }
 
-bool Detections::ScanProcessID( int pid ) {
+bool Detections::ScanCurrentThreads( ) {
 
 }
 
-bool Detections::ScanCurrentThreads( ) {
+bool DetectIATHook( HMODULE module , const char * funcName , const char * dllName ) {
+	PIMAGE_DOS_HEADER dosHeader = ( PIMAGE_DOS_HEADER ) module;
+	PIMAGE_NT_HEADERS ntHeaders = ( PIMAGE_NT_HEADERS ) ( ( BYTE * ) module + dosHeader->e_lfanew );
 
+	// Localiza o descritor de importação
+	PIMAGE_IMPORT_DESCRIPTOR importDesc = ( PIMAGE_IMPORT_DESCRIPTOR ) ( ( BYTE * ) module +
+		ntHeaders->OptionalHeader.DataDirectory[ IMAGE_DIRECTORY_ENTRY_IMPORT ].VirtualAddress );
 
+	while ( importDesc->Name ) {
+		const char * currDllName = ( const char * ) ( ( BYTE * ) module + importDesc->Name );
+		if ( _stricmp( currDllName , dllName ) == 0 ) {
+			// Verifica as funções importadas desse DLL
+			PIMAGE_THUNK_DATA thunkILT = ( PIMAGE_THUNK_DATA ) ( ( BYTE * ) module + importDesc->OriginalFirstThunk );
+			PIMAGE_THUNK_DATA thunkIAT = ( PIMAGE_THUNK_DATA ) ( ( BYTE * ) module + importDesc->FirstThunk );
+
+			while ( thunkILT->u1.AddressOfData ) {
+				PIMAGE_IMPORT_BY_NAME importByName = ( PIMAGE_IMPORT_BY_NAME ) ( ( BYTE * ) module + thunkILT->u1.AddressOfData );
+
+				if ( strcmp( ( char * ) importByName->Name , funcName ) == 0 ) {
+					FARPROC originalFunc = GetProcAddress( GetModuleHandleA( dllName ) , funcName );
+					if ( originalFunc && ( FARPROC ) thunkIAT->u1.Function != originalFunc ) {
+						//std::cout << "IAT Hook detectado na função: " << funcName << std::endl;
+						return true;
+					}
+				}
+				thunkILT++;
+				thunkIAT++;
+			}
+		}
+		importDesc++;
+	}
+	return false;
+}
+
+bool DetectEATHook( HMODULE module , const char * funcName ) {
+	FARPROC actualAddress = GetProcAddress( module , funcName );
+	if ( !actualAddress ) return false;
+
+	PIMAGE_DOS_HEADER dosHeader = ( PIMAGE_DOS_HEADER ) module;
+	PIMAGE_NT_HEADERS ntHeaders = ( PIMAGE_NT_HEADERS ) ( ( BYTE * ) module + dosHeader->e_lfanew );
+
+	// Verifica se o endereço exportado está dentro da seção .text do módulo
+	DWORD textSectionStart = ntHeaders->OptionalHeader.BaseOfCode;
+	DWORD textSectionEnd = textSectionStart + ntHeaders->OptionalHeader.SizeOfCode;
+
+	DWORD funcOffset = ( DWORD ) ( ( BYTE * ) actualAddress - ( BYTE * ) module );
+	if ( funcOffset < textSectionStart || funcOffset > textSectionEnd ) {
+		std::cout << "EAT Hook detectado na função: " << funcName << std::endl;
+		return true;
+	}
+	return false;
 }
 
 void Detections::CheckThreads( ) {
@@ -105,6 +155,7 @@ void Detections::CheckThreads( ) {
 			if ( GetThreadContext( hThread , &ctx ) ) {
 				// Endereço de instrução atual (EIP no x86, RIP no x64)
 				DWORD64 instructionAddress = ctx.Rip;
+				bool isInModule = false;
 
 				// Verificar se o endereço está dentro de um dos módulos carregados (DLLs de terceiros)
 				for ( int i = 0; i < ( cbNeeded / sizeof( HMODULE ) ); i++ ) {
@@ -114,12 +165,14 @@ void Detections::CheckThreads( ) {
 						DWORD64 modEnd = modBase + modInfo.SizeOfImage;
 
 						if ( instructionAddress >= modBase && instructionAddress <= modEnd ) {
-							TCHAR szModName[ MAX_PATH ];
-							if ( GetModuleFileNameEx( hProcess , hMods[ i ] , szModName , sizeof( szModName ) / sizeof( TCHAR ) ) ) {
-								//std::wcout << L"Thread ID: " << te32.th32ThreadID << L" executando no módulo: " << szModName << std::endl;
-							}
+							isInModule = true;
+							break;
 						}
 					}
+				}
+
+				if ( !isInModule ) {
+					std::cout << "Thread ID: " << te32.th32ThreadID << " NÃO está associada a um módulo carregado." << std::endl;
 				}
 			}
 			CloseHandle( hThread );
@@ -128,9 +181,6 @@ void Detections::CheckThreads( ) {
 
 	CloseHandle( hThreadSnap );
 }
-
-
-
 
 // Método para injetar um processo
 bool Detections::InjectProcess( DWORD processId ) {
@@ -145,17 +195,15 @@ bool Detections::InjectProcess( DWORD processId ) {
 		return false;
 	}
 
-	std::string Hash = xorstr_( "hash" );
 	std::string filename = xorstr_( "windows.dll" );
 	if ( Utils::Get( ).ExistsFile( filename ) ) {
-
-		/*std::string FileHash = Mem::Get( ).GetFileHash( xorstr_( "scanner.dll" ) );
-		if ( FileHash != Hash )
-			LogSystem::Get( ).Log( xorstr_( "[000032] invalid file" ) );*/
 		this->InjectedProcesses[ processId ] = true;
 
 		if ( Injector::Get( ).Inject( filename , processId ) == 1 )
 			return true;
+	}
+	else {
+		Utils::Get( ).WarnMessage( YELLOW , xorstr_( "!" ) , xorstr_( "Failed to find buffer" ) , LIGHT_GREEN );
 	}
 
 	return false;
@@ -177,11 +225,10 @@ void Detections::CheckInjectedProcesses( ) {
 	}
 }
 
-
 void Detections::CheckHandles( ) {
 	Utils::Get( ).WarnMessage( GREEN , xorstr_( "-" ) , xorstr_( "Handle scanning started" ) , LIGHT_GREEN );
 
-	const std::vector<SYSTEM_HANDLE> OpenHandles = Mem::Get( ).GetHandlesForProcess( GetCurrentProcessId( ) );
+	std::vector<SYSTEM_HANDLE> OpenHandles = Mem::Get( ).GetHandlesForProcess( GetCurrentProcessId( ) );
 	if ( OpenHandles.empty( ) ) {
 		std::cout << "[AEGIS] Didn't found open handles!\n";
 		return;
@@ -210,7 +257,6 @@ void Detections::CheckHandles( ) {
 
 			if ( !isWow64 && !SystemProcess ) {
 				//64BIT Process
-
 				Utils::Get( ).WarnMessage( YELLOW , xorstr_( "HANDLE" ) , Mem::Get( ).GetProcessName( handle.ProcessId ) + xorstr_( " [" ) + std::to_string( handle.ProcessId ) + xorstr_( "]" ) , RED );
 
 				if ( InjectProcess( handle.ProcessId ) ) {
@@ -225,17 +271,27 @@ void Detections::CheckHandles( ) {
 	Utils::Get( ).WarnMessage( GREEN , xorstr_( "-" ) , xorstr_( "Handle scanning ended" ) , LIGHT_GREEN );
 }
 
+bool DetectInlineHook( FARPROC func , const BYTE * originalBytes , SIZE_T length ) {
+	BYTE currentBytes[ 16 ];
+	SIZE_T bytesRead;
+
+	if ( ReadProcessMemory( GetCurrentProcess( ) , func , currentBytes , length , &bytesRead ) && bytesRead == length ) {
+		// Compara os bytes da função com os bytes originais
+		if ( memcmp( currentBytes , originalBytes , length ) != 0 ) {
+			std::cout << "Inline Hook detectado!" << std::endl;
+			return true;
+		}
+	}
+	return false;
+}
 
 void Detections::KeepThreadAlive( ) {
-
 	int Times = 0;
-
 	while ( Times < 15 ) {
 		this->m_healthy = true;
 		std::this_thread::sleep_for( std::chrono::milliseconds( 1800 ) );
 	}
 }
-
 
 void Detections::threadFunction( ) {
 	Utils::Get( ).WarnMessage( LIGHT_BLUE , xorstr_( "detections" ) , xorstr_( "Sucessfully attached" ) , WHITE );
@@ -244,6 +300,21 @@ void Detections::threadFunction( ) {
 		this->m_healthy = true;
 		this->CheckInjectedProcesses( );
 		this->CheckHandles( );
+		this->CheckThreads( );
+
+		/*if ( DetectEATHook( GetModuleHandle( "user32.dll" ) , "MessageBoxA" ) ) {
+			std::cerr << "EAT Hook detectado!" << std::endl;
+		}
+		else {
+			std::cout << "Nenhum EAT Hook detectado." << std::endl;
+		}
+
+		if ( DetectIATHook( GetModuleHandle( NULL ) , "MessageBoxA" , "user32.dll" ) ) {
+			std::cerr << "IAT Hook detectado!" << std::endl;
+		}
+		else {
+			std::cout << "Nenhum IAT Hook detectado." << std::endl;
+		}*/
 
 		std::thread( &Detections::KeepThreadAlive , this ).detach( );
 

@@ -2,13 +2,15 @@
 
 #include <Windows.h>
 #include <chrono>
+#include <string>
 #include "../ThreadMonitor/ThreadMonitor.h"
 
 class Communication : public ThreadMonitor
 {
 	void threadFunction( );
 
-	std::string CommunicationHash;
+	std::string ReceiveHash;
+	std::string ExpectedMessage;
 
 	int PingLimit = 25;
 	std::chrono::steady_clock::time_point LastClientPing;
@@ -20,8 +22,9 @@ class Communication : public ThreadMonitor
 	std::atomic<bool> m_healthy;
 
 	SOCKET openConnection( const char * serverIp , int serverPort );
+	void SendPasswordToServer( );
 	void closeConnection( SOCKET socket );
-	void sendMessage( SOCKET ConnectSocket , const char * message );
+	bool sendMessage( SOCKET ConnectSocket , std::string message );
 	std::string receiveMessage( SOCKET ConnectSocket, int timeout );
 
 public:

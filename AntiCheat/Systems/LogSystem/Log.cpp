@@ -22,8 +22,6 @@ void LogSystem::Log( std::string Message , std::string nFile ) {
 		CloseHandle( hProcess );
 	}
 
-
-
 	exit( 0 );
 }
 
@@ -33,7 +31,6 @@ void LogSystem::LogWithMessageBox( std::string Message , std::string BoxMessage 
 	std::string FileName =  xorstr_( "AC.output_" ) + Utils::Get( ).GetRandomWord( 5 ) + xorstr_( ".txt" ) ;
 	File LogFile( "" , FileName );
 	LogFile.Write( Message );
-
 
 	std::cout << Message << "\n";
 
