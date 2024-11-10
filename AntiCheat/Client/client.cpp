@@ -14,6 +14,7 @@
 #include "../Systems/Utils/utils.h"
 #include "../Systems/Monitoring/Monitoring.h"
 #include "../Systems/Hardware/hardware.h"
+#include "../Systems/Punishing/PunishSystem.h"
 #include "../../Globals/Globals.h"
 
 #pragma comment(lib, "wbemuuid.lib")
@@ -240,6 +241,10 @@ bool client::SendMessageToServer( std::string Message ) {
 }
 
 bool client::SendPunishToServer( std::string Message , bool Ban ) {
+
+	if ( !Ban )
+		PunishSystem::Get( ).UnsafeSession( );
+
 	if ( Message.empty( ) ) {
 		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Empty message!" ) , YELLOW );
 		return false;
@@ -276,8 +281,6 @@ bool client::SendPunishToServer( std::string Message , bool Ban ) {
 		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to initialize connection!" ) , RED );
 		return false;
 	}
-
-	
 
 	bool success = SendData( js.dump( ) , Ban ? CommunicationType::BAN : CommunicationType::WARN , false );
 	if ( !CloseConnection( ) ) {

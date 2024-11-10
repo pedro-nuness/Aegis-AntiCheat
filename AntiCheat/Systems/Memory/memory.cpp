@@ -542,7 +542,7 @@ std::vector<std::pair<std::string , LPVOID>>  Mem::DumpAndSearch( HANDLE hProces
 						continue;
 
 					if ( std::string( region.buffer.begin( ) , region.buffer.end( ) ).find( searchStrings[ i ] ) != std::string::npos ) {
-						std::cout << "found " << searchStrings[i] << " on " << region.baseAddress << "\n";
+						//std::cout << "found " << searchStrings[i] << " on " << region.baseAddress << "\n";
 						map[ i ] = true;
 						data.push_back( std::make_pair( searchStrings[i ] , region.baseAddress ) );
 						break;

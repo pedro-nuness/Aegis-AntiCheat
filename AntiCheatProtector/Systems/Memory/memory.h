@@ -55,6 +55,7 @@ public:
     HANDLE GetProcessHandle( DWORD PID );
     std::vector<std::string> EnumAllWindows( );
     bool IsSystemProcess( HANDLE Process );
+    bool VerifyFileSignature( const std::string & filePath );
     std::vector<std::string> EnumAllProcesses( );
     static char asciitolower( char in );
     bool ReadFileToMemory( const std::string & file_path , std::vector<uint8_t> * out_buffer );

@@ -32,37 +32,19 @@ Communication::~Communication( ) {
 	stop( );
 }
 
-void Communication::start( ) {
-	m_running = true;
-	m_thread = std::thread( &Communication::threadFunction , this );
-}
-
-void Communication::stop( ) {
-	m_running = false;
-	if ( m_thread.joinable( ) ) {
-		m_thread.join( );
-	}
-}
 
 bool Communication::isRunning( ) const {
-	return m_running && m_healthy;
-}
-
-void Communication::reset( ) {
-	// Implementation to reset the thread
-	// Implementation to reset the thread
-	if ( m_thread.joinable( ) ) {
-		m_thread.join( );
-		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "Waiting detection thread" ) , YELLOW );
+	if ( this->ThreadObject->IsThreadSuspended( this->ThreadObject->GetHandle( ) ) ) {
+		client::Get( ).SendPunishToServer( xorstr_( "Communication thread was found suspended, abormal execution" ) , true );
+		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
 	}
-	else
-		Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "Detection thread stopped" ) , GREEN );
 
-	start( );
-}
+	if ( !this->ThreadObject->IsThreadRunning( this->ThreadObject->GetHandle( ) ) && !this->ThreadObject->IsShutdownSignalled( ) ) {
+		client::Get( ).SendPunishToServer( xorstr_( "Communication thread was found terminated, abormal execution" ) , true );
+		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
+	}
 
-void Communication::requestupdate( ) {
-	this->m_healthy = false;
+	return true;
 }
 
 SOCKET Communication::openConnection( const char * ipAddress , int port ) {
@@ -353,7 +335,7 @@ bool Communication::CheckReceivedPassword( ) {
 
 	//Allocate memory for the uncrypted message
 	{
-	
+
 		std::string ReceivedPassword;
 		//Wait for the message
 		ReceivedPassword = receiveMessage( ClientSocket , 10 );
@@ -374,6 +356,9 @@ bool Communication::CheckReceivedPassword( ) {
 
 void Communication::SendPingToServer( ) {
 	while ( true ) {
+		if ( this->IsShutdownSignalled( ) ) {
+			return;
+		}
 
 		// Envia PING para o servidor
 		client::Get( ).SendPingToServer( );
@@ -415,85 +400,97 @@ void Communication::OpenRequestServer( ) {
 	}
 }
 
-void Communication::threadFunction( ) {
+void Communication::threadFunction() {
 
-	Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "thread started sucessfully " ) , GREEN );
+	Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );
 
 	// Envia PING para o servidor
 	if ( !client::Get( ).SendPingToServer( ) ) {
 		LogSystem::Get( ).LogWithMessageBox( xorstr_( "[401] Server is offline!" ) , xorstr_( "Server is offline!" ) );
 	}
 
-	ListenSocket = openConnection( xorstr_( "127.0.0.10" ) , 8080 );
-	if ( ListenSocket == INVALID_SOCKET ) {
+	this->ListenSocket = this->openConnection( xorstr_( "127.0.0.10" ) , 8080 );
+	if ( this->ListenSocket == INVALID_SOCKET ) {
 		LogSystem::Get( ).Log( xorstr_( "[801] Can't open listener connection!" ) );
 	}
 
 	Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "waiting client connection..." ) , WHITE );
 
-	if ( !InitializeClient( ) ) {
+	if ( !this->InitializeClient( ) ) {
 		LogSystem::Get( ).Log( xorstr_( "[0001] Can't init client!" ) );
 	}
 
 	Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "started client sucessfully" ) , WHITE );
 
-	ClientSocket = listenForClient( ListenSocket , 10 );
-	if ( ClientSocket == INVALID_SOCKET ) {
-		closeconnection( ListenSocket );
+	this->ClientSocket = this->listenForClient( this->ListenSocket , 10 );
+	if ( this->ClientSocket == INVALID_SOCKET ) {
+		this->closeconnection( this->ListenSocket );
 		LogSystem::Get( ).Log( xorstr_( "[801] Can't open client connection!" ) );
 	}
 
 	Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "client connected sucessfully" ) , GREEN );
 	std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
 
-	if ( !SendPasswordToServer( ) ) {
+	if ( !this->SendPasswordToServer( ) ) {
 		LogSystem::Get( ).Log( xorstr_( "[0001] Failed to send password to server!" ) );
 	}
 
-	if ( !CheckReceivedPassword( ) ) {
+	if ( !this->CheckReceivedPassword( ) ) {
 		LogSystem::Get( ).Log( xorstr_( "[0001] Hash mismatch!" ) );
 	}
 
-	std::thread( &receiver::InitializeConnection , this->ServerReceiver ).detach( );
-	std::thread( &Communication::SendPingToServer , this ).detach( );
+	std::thread ReceiverThread( &receiver::InitializeConnection , this->ServerReceiver );
+	std::thread PingThread( &Communication::SendPingToServer , this );
+
+	PingThread.detach( );
+	ReceiverThread.detach( );
 
 	Globals::Get( ).VerifiedSession = true;
 
 	this->LastClientPing = now;
 
-	while ( m_running ) {
-		m_healthy = true;
+	bool RunningThread = true;
+
+	while ( RunningThread ) {
+
+		if ( this->ThreadObject->IsShutdownSignalled( ) ) {
+			Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "shutdown thread signalled" ) , YELLOW );
+			this->ServerReceiver.SignalShutdown( true );
+			this->SignalShutdown( true );
+			break;
+		}
+
 
 		this->ExpectedMessage = Mem::Get( ).GenerateHash( this->ExpectedMessage + SALT );
 		// Envia mensagem para o cliente
-		sendMessage( ClientSocket , this->ExpectedMessage );
+		this->sendMessage( this->ClientSocket , this->ExpectedMessage );
 
 
 		//Expected response
-		this->ExpectedMessage = Mem::Get( ).GenerateHash( this->ExpectedMessage + SALT);
+		this->ExpectedMessage = Mem::Get( ).GenerateHash( this->ExpectedMessage + SALT );
 		// Recebe mensagem do cliente
-		std::string message = receiveMessage( ClientSocket , 20 );
+		std::string message = this->receiveMessage( this->ClientSocket , 20 );
 
 		if ( !message.empty( ) ) {
 			if ( message != this->ExpectedMessage ) {
-				closeconnection( ClientSocket );
-				closeconnection( ListenSocket );
+				this->closeconnection( this->ClientSocket );
+				this->closeconnection( this->ListenSocket );
 
 				LogSystem::Get( ).Log( xorstr_( "[802] client hash mismatch!\n" ) );
 			}
 			else {
-				Utils::Get( ).WarnMessage( LIGHT_WHITE , xorstr_( "PING" ) , this->ExpectedMessage , GRAY );
-				UpdatePingTime( );
+				Utils::Get( ).WarnMessage( _COMMUNICATION , this->ExpectedMessage , GRAY );
+				this->UpdatePingTime( );
 			}
 		}
-		else if ( !PingInTime( ) ) {
-			HandleMissingPing( );
+		else if ( !this->PingInTime( ) ) {
+			this->HandleMissingPing( );
 		}
 
 		// Aguarda por 5 segundos antes do próximo loop
-		std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
+		std::this_thread::sleep_for( std::chrono::seconds( this->getThreadSleepTime( ) ) );
 	}
 
-	closeconnection( ClientSocket );
-	closeconnection( ListenSocket );
+	this->closeconnection( this->ClientSocket );
+	this->closeconnection( this->ListenSocket );
 }

@@ -7,7 +7,7 @@
 
 class Communication : public ThreadMonitor
 {
-	void threadFunction( );
+	
 
 	std::string ReceiveHash;
 	std::string ExpectedMessage;
@@ -27,10 +27,14 @@ class Communication : public ThreadMonitor
 	bool sendMessage( SOCKET ConnectSocket , std::string message );
 	std::string receiveMessage( SOCKET ConnectSocket, int timeout );
 
+	void threadFunction( ) override;
+
 public:
 
 	Communication( );
 	~Communication( );
+
+	
 
 	void start( );
 	void stop( );

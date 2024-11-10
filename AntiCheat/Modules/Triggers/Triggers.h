@@ -2,7 +2,8 @@
 #include <Windows.h>
 #include <string>
 #include <vector>
-#include "../ThreadMonitor/ThreadMonitor.h"
+#include "../../Process/Thread.hpp"
+#include "../ThreadHolder/ThreadHolder.h"
 
 enum STATUS {
 	DETECTED,
@@ -18,10 +19,7 @@ struct Trigger {
 	STATUS Status;
 };
 
-class Triggers : public ThreadMonitor {
-
-
-	
+class Triggers : public ThreadHolder {
 
 	DWORD MomProcess , ProtectProcess;
 	std::vector<std::string> BlackListedProcesses;
@@ -30,6 +28,7 @@ class Triggers : public ThreadMonitor {
 
 	void SetupFiles( );
 	void CleanFiles( );
+
 
 	std::vector< Trigger> FoundTriggers;
 	std::vector< Trigger> LastTriggers;
@@ -44,7 +43,7 @@ class Triggers : public ThreadMonitor {
 
 	void CheckBlackListedProcesses( );
 	void CheckBlackListedWindows( );
-	void threadFunction( );
+	void threadFunction( ) override;
 
 	std::thread m_thread;
 	std::atomic<bool> m_running;
@@ -56,13 +55,8 @@ public:
 		this->ProtectProcess = _ProtectProcess;
 	}
 
-	void start( );
-	void stop( );
-
 	~Triggers( );
 
 	bool isRunning( ) const override;
-	void reset( ) override;
-	void requestupdate( ) override;
 };
 

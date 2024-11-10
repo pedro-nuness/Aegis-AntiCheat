@@ -8,8 +8,9 @@
 
 #include "Modules/Triggers/Triggers.h"
 #include "Modules/Communication/Communication.h"
-#include "Modules/ThreadMonitor/MonitorThread.h"
+#include "Modules/ThreadGuard/ThreadGuard.h"
 #include "Modules/Detections/Detections.h"
+#include "Modules/AntiDebugger/AntiDebugger.h"
 
 #include "Systems/LogSystem/Log.h"
 #include "Systems/Utils/utils.h"
@@ -21,20 +22,25 @@
 #include "Globals/Globals.h"
 
 int main( int argc , char * argv[ ] ) {
+	system( "pause" );
 	if ( !Mem::Get( ).RestrictProcessAccess( ) ) {
 		LogSystem::Get( ).Log( xorstr_( "[9] Failed to protect process" ) );
 	}
+
+	Detections DetectionEvent;
+	//Deploy DLL Attach verification
+
 	Globals::Get( ).SelfID = ::_getpid( );
 
-#ifdef _DEBUG
 	::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
+
+#ifdef _DEBUG
+	
 #else
-	::ShowWindow( ::GetConsoleWindow( ) , SW_HIDE );
 #endif // !DEBUG
 
-	::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
 
-	if ( argc < 3 ) {
+	/*if ( argc < 3 ) {
 		LogSystem::Get( ).Log( xorstr_( "[401] Initialization failed" ) );
 		return 0;
 	}
@@ -45,47 +51,52 @@ int main( int argc , char * argv[ ] ) {
 	}
 
 	Globals::Get( ).OriginalProcess = stoi( ( std::string ) argv[ 1 ] );
-	Globals::Get( ).ProtectProcess = stoi( ( std::string ) argv[ 2 ] );
+	Globals::Get( ).ProtectProcess = stoi( ( std::string ) argv[ 2 ] );*/
 
 
-	//Globals::Get( ).OriginalProcess = Mem::Get( ).GetProcessID( "explorer.exe" );
-	//Globals::Get( ).ProtectProcess = Mem::Get( ).GetProcessID( "notepad.exe" );
+	Globals::Get( ).OriginalProcess = Mem::Get( ).GetProcessID( "explorer.exe" );
+	Globals::Get( ).ProtectProcess = Mem::Get( ).GetProcessID( "notepad.exe" );
 
 	FileChecking::Get( ).ValidateFiles( );
 
-	Triggers TriggerEvent( Globals::Get( ).OriginalProcess , Globals::Get( ).ProtectProcess );
-	Detections DetectionEvent( Globals::Get( ).OriginalProcess , Globals::Get( ).ProtectProcess );
 	Communication CommunicationEvent( Globals::Get( ).OriginalProcess , Globals::Get( ).ProtectProcess );
-
 	CommunicationEvent.start( );
 
 	while ( !Globals::Get( ).VerifiedSession ) {
 		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
 	}
 
-	std::vector<std::pair<ThreadMonitor * , int>> threads = {
+	Triggers TriggerEvent( Globals::Get( ).OriginalProcess , Globals::Get( ).ProtectProcess );
+	DetectionEvent.SetupPid( Globals::Get( ).OriginalProcess , Globals::Get( ).ProtectProcess );
+	AntiDebugger AntiDbg;
+
+	std::vector<std::pair<ThreadHolder * , int>> threads = {
 		std::make_pair( &TriggerEvent, TRIGGERS ) ,
 		std::make_pair( &DetectionEvent, DETECTIONS ),
-		std::make_pair( &CommunicationEvent, COMMUNICATION ) };
+		std::make_pair( &AntiDbg, ANTIDEBUGGER ),
+		std::make_pair( &CommunicationEvent, COMMUNICATION )
+	};
 
 	DetectionEvent.start( );
 	TriggerEvent.start( );
+	AntiDbg.start( );
 
-	MonitorThread monitor( threads );
+
+	ThreadGuard monitor( threads );
+	Globals::Get( ).GuardMonitorPointer = &monitor;
 	monitor.start( );
 
 	std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
 
 	while ( true ) {
-		Utils::Get( ).WarnMessage( LIGHT_WHITE , xorstr_( "PING" ) , xorstr_( "main" ) , GRAY );
+		Utils::Get( ).WarnMessage( _MAIN , xorstr_( "ping" ) , GRAY );
 
 		if ( !monitor.isRunning( ) ) {
-			Utils::Get( ).WarnMessage( BLUE , xorstr_( "main" ) , xorstr_( "thread monitor is not running" ) , RED );
-			monitor.reset( );
-		}
-		else
-			monitor.requestupdate( );
+			Utils::Get( ).WarnMessage( _MAIN , xorstr_( "thread monitor is not running" ) , RED );
 
-		std::this_thread::sleep_for( std::chrono::minutes( 1 ) );
+		}
+		std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
 	}
+
+	return 1;
 }

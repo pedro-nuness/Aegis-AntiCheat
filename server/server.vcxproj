@@ -20,44 +20,34 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
+    <ProjectGuid>{F60EABAE-FF03-409C-B68C-A5AE1D767555}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{cf6cc613-b847-4d74-82ce-d0d904d26d32}</ProjectGuid>
-    <RootNamespace>server</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>server</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
-    <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>Static</UseOfMfc>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
-    <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>Unicode</CharacterSet>
     <UseOfMfc>Static</UseOfMfc>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.props" />
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
@@ -74,75 +64,71 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>true</LinkIncremental>
     <IncludePath>$(ProjectDir)dependencies\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir)dependencies\lib\x64\Release;$(LibraryPath)</LibraryPath>
-    <TargetName>$(ProjectName)\$(ProjectName)</TargetName>
+    <TargetName>$(ProjectName)/$(ProjectName)</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level3</WarningLevel>
-      <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-    </Link>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
-      <FunctionLevelLinking>true</FunctionLevelLinking>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
-      <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ConformanceMode>true</ConformanceMode>
-    </ClCompile>
-    <Link>
-      <SubSystem>Console</SubSystem>
-      <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <OptimizeReferences>true</OptimizeReferences>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
+      <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level3</WarningLevel>
-      <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <WarningLevel>Level3</WarningLevel>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
+      <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level3</WarningLevel>
-      <FunctionLevelLinking>true</FunctionLevelLinking>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
-      <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CRT_SECURE_NO_WARNINGS;_CONSOLE;_SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING;_SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>
-      </AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Gdi32.lib;Normaliz.lib;Ws2_32.lib;Wldap32.lib;Crypt32.lib;advapi32.lib;libcurl.lib;windvert\WinDivert.lib;openssl\libcrypto.lib;openssl\libssl.lib;dpp-10.0\dpp.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
+      <AdditionalDependencies>GDI32.lib;Normaliz.lib;Ws2_32.lib;Wldap32.lib;Crypt32.lib;advapi32.lib;curl/libcurl.lib;dpp/dpp.lib;openssl/libssl.lib;openssl/libcrypto.lib;windvert/WinDivert.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="api\api.cpp" />
     <ClCompile Include="config\config.cpp" />
+    <ClCompile Include="dependencies\include\openssl\applink.c" />
     <ClCompile Include="globals\globals.cpp" />
     <ClCompile Include="image\image.cpp" />
     <ClCompile Include="log\log.cpp" />
@@ -150,7 +136,7 @@
     <ClCompile Include="memory\memory.cpp" />
     <ClCompile Include="sender\sender.cpp" />
     <ClCompile Include="server\server.cpp" />
-    <ClCompile Include="utils\File\File.cpp" />
+    <ClCompile Include="utils\file\File.cpp" />
     <ClCompile Include="utils\utils.cpp" />
     <ClCompile Include="webhook\webhook.cpp" />
   </ItemGroup>
@@ -158,20 +144,489 @@
     <ClInclude Include="api\api.h" />
     <ClInclude Include="auth\skStr.h" />
     <ClInclude Include="config\config.h" />
+    <ClInclude Include="dependencies\include\aws\core\AmazonSerializableWebServiceRequest.h" />
+    <ClInclude Include="dependencies\include\aws\core\AmazonStreamingWebServiceRequest.h" />
+    <ClInclude Include="dependencies\include\aws\core\AmazonWebServiceRequest.h" />
+    <ClInclude Include="dependencies\include\aws\core\AmazonWebServiceResult.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\AWSAuthSigner.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\AWSAuthSignerProvider.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\AWSBearerToken.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\AWSCredentials.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\AWSCredentialsProvider.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\AWSCredentialsProviderChain.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\bearer-token-provider\AWSBearerTokenProviderBase.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\bearer-token-provider\AWSBearerTokenProviderChainBase.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\bearer-token-provider\DefaultBearerTokenProviderChain.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\bearer-token-provider\SSOBearerTokenProvider.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\bearer-token-provider\StaticBearerTokenProvider.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\GeneralHTTPCredentialsProvider.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\signer-provider\AWSAuthSignerProviderBase.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\signer-provider\BearerTokenAuthSignerProvider.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\signer-provider\DefaultAuthSignerProvider.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\signer\AWSAuthBearerSigner.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\signer\AWSAuthEventStreamV4Signer.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\signer\AWSAuthSignerBase.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\signer\AWSAuthSignerCommon.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\signer\AWSAuthSignerHelper.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\signer\AWSAuthV4Signer.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\signer\AWSNullSigner.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\SSOCredentialsProvider.h" />
+    <ClInclude Include="dependencies\include\aws\core\auth\STSCredentialsProvider.h" />
+    <ClInclude Include="dependencies\include\aws\core\Aws.h" />
+    <ClInclude Include="dependencies\include\aws\core\client\AdaptiveRetryStrategy.h" />
+    <ClInclude Include="dependencies\include\aws\core\client\AsyncCallerContext.h" />
+    <ClInclude Include="dependencies\include\aws\core\client\AWSAsyncOperationTemplate.h" />
+    <ClInclude Include="dependencies\include\aws\core\client\AWSClient.h" />
+    <ClInclude Include="dependencies\include\aws\core\client\AWSClientAsyncCRTP.h" />
+    <ClInclude Include="dependencies\include\aws\core\client\AWSError.h" />
+    <ClInclude Include="dependencies\include\aws\core\client\AWSErrorMarshaller.h" />
+    <ClInclude Include="dependencies\include\aws\core\client\AWSJsonClient.h" />
+    <ClInclude Include="dependencies\include\aws\core\client\AWSUrlPresigner.h" />
+    <ClInclude Include="dependencies\include\aws\core\client\AWSXmlClient.h" />
+    <ClInclude Include="dependencies\include\aws\core\client\ClientConfiguration.h" />
+    <ClInclude Include="dependencies\include\aws\core\client\CoreErrors.h" />
+    <ClInclude Include="dependencies\include\aws\core\client\DefaultRetryStrategy.h" />
+    <ClInclude Include="dependencies\include\aws\core\client\GenericClientConfiguration.h" />
+    <ClInclude Include="dependencies\include\aws\core\client\RequestCompression.h" />
+    <ClInclude Include="dependencies\include\aws\core\client\RetryStrategy.h" />
+    <ClInclude Include="dependencies\include\aws\core\client\SpecifiedRetryableErrorsRetryStrategy.h" />
+    <ClInclude Include="dependencies\include\aws\core\config\AWSConfigFileProfileConfigLoader.h" />
+    <ClInclude Include="dependencies\include\aws\core\config\AWSProfileConfig.h" />
+    <ClInclude Include="dependencies\include\aws\core\config\AWSProfileConfigLoader.h" />
+    <ClInclude Include="dependencies\include\aws\core\config\AWSProfileConfigLoaderBase.h" />
+    <ClInclude Include="dependencies\include\aws\core\config\ConfigAndCredentialsCacheManager.h" />
+    <ClInclude Include="dependencies\include\aws\core\config\defaults\ClientConfigurationDefaults.h" />
+    <ClInclude Include="dependencies\include\aws\core\config\EC2InstanceProfileConfigLoader.h" />
+    <ClInclude Include="dependencies\include\aws\core\Core_EXPORTS.h" />
+    <ClInclude Include="dependencies\include\aws\core\endpoint\AWSEndpoint.h" />
+    <ClInclude Include="dependencies\include\aws\core\endpoint\AWSPartitions.h" />
+    <ClInclude Include="dependencies\include\aws\core\endpoint\BuiltInParameters.h" />
+    <ClInclude Include="dependencies\include\aws\core\endpoint\ClientContextParameters.h" />
+    <ClInclude Include="dependencies\include\aws\core\endpoint\DefaultEndpointProvider.h" />
+    <ClInclude Include="dependencies\include\aws\core\endpoint\EndpointParameter.h" />
+    <ClInclude Include="dependencies\include\aws\core\endpoint\EndpointProviderBase.h" />
+    <ClInclude Include="dependencies\include\aws\core\endpoint\internal\AWSEndpointAttribute.h" />
+    <ClInclude Include="dependencies\include\aws\core\external\cjson\cJSON.h" />
+    <ClInclude Include="dependencies\include\aws\core\external\CommonCryptorSPI.h" />
+    <ClInclude Include="dependencies\include\aws\core\external\tinyxml2\tinyxml2.h" />
+    <ClInclude Include="dependencies\include\aws\core\Globals.h" />
+    <ClInclude Include="dependencies\include\aws\core\http\crt\CRTHttpClient.h" />
+    <ClInclude Include="dependencies\include\aws\core\http\curl\CurlHandleContainer.h" />
+    <ClInclude Include="dependencies\include\aws\core\http\curl\CurlHttpClient.h" />
+    <ClInclude Include="dependencies\include\aws\core\http\HttpClient.h" />
+    <ClInclude Include="dependencies\include\aws\core\http\HttpClientFactory.h" />
+    <ClInclude Include="dependencies\include\aws\core\http\HttpRequest.h" />
+    <ClInclude Include="dependencies\include\aws\core\http\HttpResponse.h" />
+    <ClInclude Include="dependencies\include\aws\core\http\HttpTypes.h" />
+    <ClInclude Include="dependencies\include\aws\core\http\Scheme.h" />
+    <ClInclude Include="dependencies\include\aws\core\http\standard\StandardHttpRequest.h" />
+    <ClInclude Include="dependencies\include\aws\core\http\standard\StandardHttpResponse.h" />
+    <ClInclude Include="dependencies\include\aws\core\http\URI.h" />
+    <ClInclude Include="dependencies\include\aws\core\http\Version.h" />
+    <ClInclude Include="dependencies\include\aws\core\http\windows\IXmlHttpRequest2HttpClient.h" />
+    <ClInclude Include="dependencies\include\aws\core\http\windows\WinConnectionPoolMgr.h" />
+    <ClInclude Include="dependencies\include\aws\core\http\windows\WinHttpConnectionPoolMgr.h" />
+    <ClInclude Include="dependencies\include\aws\core\http\windows\WinHttpSyncHttpClient.h" />
+    <ClInclude Include="dependencies\include\aws\core\http\windows\WinINetConnectionPoolMgr.h" />
+    <ClInclude Include="dependencies\include\aws\core\http\windows\WinINetSyncHttpClient.h" />
+    <ClInclude Include="dependencies\include\aws\core\http\windows\WinSyncHttpClient.h" />
+    <ClInclude Include="dependencies\include\aws\core\internal\AWSHttpResourceClient.h" />
+    <ClInclude Include="dependencies\include\aws\core\monitoring\CoreMetrics.h" />
+    <ClInclude Include="dependencies\include\aws\core\monitoring\DefaultMonitoring.h" />
+    <ClInclude Include="dependencies\include\aws\core\monitoring\HttpClientMetrics.h" />
+    <ClInclude Include="dependencies\include\aws\core\monitoring\MonitoringFactory.h" />
+    <ClInclude Include="dependencies\include\aws\core\monitoring\MonitoringInterface.h" />
+    <ClInclude Include="dependencies\include\aws\core\monitoring\MonitoringManager.h" />
+    <ClInclude Include="dependencies\include\aws\core\net\Net.h" />
+    <ClInclude Include="dependencies\include\aws\core\net\SimpleUDP.h" />
+    <ClInclude Include="dependencies\include\aws\core\NoResult.h" />
+    <ClInclude Include="dependencies\include\aws\core\platform\Android.h" />
+    <ClInclude Include="dependencies\include\aws\core\platform\Environment.h" />
+    <ClInclude Include="dependencies\include\aws\core\platform\FileSystem.h" />
+    <ClInclude Include="dependencies\include\aws\core\platform\OSVersionInfo.h" />
+    <ClInclude Include="dependencies\include\aws\core\platform\Platform.h" />
+    <ClInclude Include="dependencies\include\aws\core\platform\refs\IXmlHttpRequest2Ref.h" />
+    <ClInclude Include="dependencies\include\aws\core\platform\Security.h" />
+    <ClInclude Include="dependencies\include\aws\core\platform\Time.h" />
+    <ClInclude Include="dependencies\include\aws\core\Region.h" />
+    <ClInclude Include="dependencies\include\aws\core\SDKConfig.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\ARN.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\Array.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\base64\Base64.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\Cache.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\component-registry\ComponentRegistry.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\ConcurrentCache.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\crypto\Cipher.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\crypto\ContentCryptoMaterial.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\crypto\ContentCryptoScheme.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\crypto\CRC32.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\crypto\crt\CRTHash.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\crypto\crt\CRTHMAC.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\crypto\crt\CRTSecureRandom.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\crypto\crt\CRTSymmetricCipher.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\crypto\CryptoBuf.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\crypto\CryptoStream.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\crypto\EncryptionMaterials.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\crypto\Factories.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\crypto\Hash.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\crypto\HashResult.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\crypto\HMAC.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\crypto\KeyWrapAlgorithm.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\crypto\MD5.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\crypto\PrecalculatedHash.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\crypto\SecureRandom.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\crypto\Sha1.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\crypto\Sha256.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\crypto\Sha256HMAC.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\DateTime.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\DNS.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\Document.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\EnumParseOverflowContainer.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\event\EventDecoderStream.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\event\EventEncoderStream.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\event\EventHeader.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\event\EventMessage.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\event\EventStream.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\event\EventStreamBuf.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\event\EventStreamDecoder.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\event\EventStreamEncoder.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\event\EventStreamErrors.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\event\EventStreamHandler.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\FileSystemUtils.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\FutureOutcome.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\GetTheLights.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\HashingUtils.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\json\JsonSerializer.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\logging\android\LogcatLogSystem.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\logging\AWSLogging.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\logging\ConsoleLogSystem.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\logging\CRTLogging.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\logging\CRTLogSystem.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\logging\DefaultCRTLogSystem.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\logging\DefaultLogSystem.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\logging\ErrorMacros.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\logging\FormattedLogSystem.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\logging\LogLevel.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\logging\LogMacros.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\logging\LogSystemInterface.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\logging\NullLogSystem.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\memory\AWSMemory.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\memory\MemorySystemInterface.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\memory\stl\AWSAllocator.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\memory\stl\AWSArray.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\memory\stl\AWSDeque.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\memory\stl\AWSList.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\memory\stl\AWSMap.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\memory\stl\AWSMultiMap.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\memory\stl\AWSQueue.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\memory\stl\AWSSet.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\memory\stl\AWSStack.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\memory\stl\AWSStreamFwd.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\memory\stl\AWSString.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\memory\stl\AWSStringStream.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\memory\stl\AWSVector.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\memory\stl\SimpleStringStream.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\Outcome.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\RAIICounter.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\ratelimiter\DefaultRateLimiter.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\ratelimiter\RateLimiterInterface.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\ResourceManager.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\stream\ConcurrentStreamBuf.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\stream\PreallocatedStreamBuf.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\stream\ResponseStream.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\stream\SimpleStreamBuf.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\stream\StreamBufProtectedWriter.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\StringUtils.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\threading\DefaultExecutor.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\threading\Executor.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\threading\PooledThreadExecutor.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\threading\ReaderWriterLock.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\threading\SameThreadExecutor.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\threading\Semaphore.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\threading\ThreadTask.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\UnreferencedParam.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\UUID.h" />
+    <ClInclude Include="dependencies\include\aws\core\utils\xml\XmlSerializer.h" />
+    <ClInclude Include="dependencies\include\aws\core\Version.h" />
+    <ClInclude Include="dependencies\include\aws\core\VersionConfig.h" />
+    <ClInclude Include="dependencies\include\curl\curl.h" />
+    <ClInclude Include="dependencies\include\curl\curlver.h" />
+    <ClInclude Include="dependencies\include\curl\easy.h" />
+    <ClInclude Include="dependencies\include\curl\header.h" />
+    <ClInclude Include="dependencies\include\curl\mprintf.h" />
+    <ClInclude Include="dependencies\include\curl\multi.h" />
+    <ClInclude Include="dependencies\include\curl\options.h" />
+    <ClInclude Include="dependencies\include\curl\stdcheaders.h" />
+    <ClInclude Include="dependencies\include\curl\system.h" />
+    <ClInclude Include="dependencies\include\curl\typecheck-gcc.h" />
+    <ClInclude Include="dependencies\include\curl\urlapi.h" />
+    <ClInclude Include="dependencies\include\dpp\appcommand.h" />
+    <ClInclude Include="dependencies\include\dpp\application.h" />
+    <ClInclude Include="dependencies\include\dpp\auditlog.h" />
+    <ClInclude Include="dependencies\include\dpp\automod.h" />
+    <ClInclude Include="dependencies\include\dpp\ban.h" />
+    <ClInclude Include="dependencies\include\dpp\bignum.h" />
+    <ClInclude Include="dependencies\include\dpp\cache.h" />
+    <ClInclude Include="dependencies\include\dpp\channel.h" />
+    <ClInclude Include="dependencies\include\dpp\cluster.h" />
+    <ClInclude Include="dependencies\include\dpp\cluster_coro_calls.h" />
+    <ClInclude Include="dependencies\include\dpp\cluster_sync_calls.h" />
+    <ClInclude Include="dependencies\include\dpp\collector.h" />
+    <ClInclude Include="dependencies\include\dpp\colors.h" />
+    <ClInclude Include="dependencies\include\dpp\commandhandler.h" />
+    <ClInclude Include="dependencies\include\dpp\coro.h" />
+    <ClInclude Include="dependencies\include\dpp\coro\async.h" />
+    <ClInclude Include="dependencies\include\dpp\coro\awaitable.h" />
+    <ClInclude Include="dependencies\include\dpp\coro\coro.h" />
+    <ClInclude Include="dependencies\include\dpp\coro\coroutine.h" />
+    <ClInclude Include="dependencies\include\dpp\coro\job.h" />
+    <ClInclude Include="dependencies\include\dpp\coro\task.h" />
+    <ClInclude Include="dependencies\include\dpp\coro\when_any.h" />
+    <ClInclude Include="dependencies\include\dpp\discordclient.h" />
+    <ClInclude Include="dependencies\include\dpp\discordevents.h" />
+    <ClInclude Include="dependencies\include\dpp\discordvoiceclient.h" />
+    <ClInclude Include="dependencies\include\dpp\dispatcher.h" />
+    <ClInclude Include="dependencies\include\dpp\dns.h" />
+    <ClInclude Include="dependencies\include\dpp\dpp.h" />
+    <ClInclude Include="dependencies\include\dpp\dtemplate.h" />
+    <ClInclude Include="dependencies\include\dpp\emoji.h" />
+    <ClInclude Include="dependencies\include\dpp\entitlement.h" />
+    <ClInclude Include="dependencies\include\dpp\etf.h" />
+    <ClInclude Include="dependencies\include\dpp\event.h" />
+    <ClInclude Include="dependencies\include\dpp\event_router.h" />
+    <ClInclude Include="dependencies\include\dpp\exception.h" />
+    <ClInclude Include="dependencies\include\dpp\export.h" />
+    <ClInclude Include="dependencies\include\dpp\guild.h" />
+    <ClInclude Include="dependencies\include\dpp\httpsclient.h" />
+    <ClInclude Include="dependencies\include\dpp\integration.h" />
+    <ClInclude Include="dependencies\include\dpp\intents.h" />
+    <ClInclude Include="dependencies\include\dpp\invite.h" />
+    <ClInclude Include="dependencies\include\dpp\isa\avx.h" />
+    <ClInclude Include="dependencies\include\dpp\isa\avx2.h" />
+    <ClInclude Include="dependencies\include\dpp\isa\avx512.h" />
+    <ClInclude Include="dependencies\include\dpp\isa\fallback.h" />
+    <ClInclude Include="dependencies\include\dpp\isa\neon.h" />
+    <ClInclude Include="dependencies\include\dpp\isa_detection.h" />
+    <ClInclude Include="dependencies\include\dpp\json.h" />
+    <ClInclude Include="dependencies\include\dpp\json_fwd.h" />
+    <ClInclude Include="dependencies\include\dpp\json_interface.h" />
+    <ClInclude Include="dependencies\include\dpp\managed.h" />
+    <ClInclude Include="dependencies\include\dpp\message.h" />
+    <ClInclude Include="dependencies\include\dpp\misc-enum.h" />
+    <ClInclude Include="dependencies\include\dpp\nlohmann\json.hpp" />
+    <ClInclude Include="dependencies\include\dpp\nlohmann\json_fwd.hpp" />
+    <ClInclude Include="dependencies\include\dpp\once.h" />
+    <ClInclude Include="dependencies\include\dpp\permissions.h" />
+    <ClInclude Include="dependencies\include\dpp\presence.h" />
+    <ClInclude Include="dependencies\include\dpp\prune.h" />
+    <ClInclude Include="dependencies\include\dpp\queues.h" />
+    <ClInclude Include="dependencies\include\dpp\restrequest.h" />
+    <ClInclude Include="dependencies\include\dpp\restresults.h" />
+    <ClInclude Include="dependencies\include\dpp\role.h" />
+    <ClInclude Include="dependencies\include\dpp\scheduled_event.h" />
+    <ClInclude Include="dependencies\include\dpp\sku.h" />
+    <ClInclude Include="dependencies\include\dpp\snowflake.h" />
+    <ClInclude Include="dependencies\include\dpp\socket.h" />
+    <ClInclude Include="dependencies\include\dpp\sslclient.h" />
+    <ClInclude Include="dependencies\include\dpp\stage_instance.h" />
+    <ClInclude Include="dependencies\include\dpp\stringops.h" />
+    <ClInclude Include="dependencies\include\dpp\sync.h" />
+    <ClInclude Include="dependencies\include\dpp\sysdep.h" />
+    <ClInclude Include="dependencies\include\dpp\thread.h" />
+    <ClInclude Include="dependencies\include\dpp\timed_listener.h" />
+    <ClInclude Include="dependencies\include\dpp\timer.h" />
+    <ClInclude Include="dependencies\include\dpp\unicode_emoji.h" />
+    <ClInclude Include="dependencies\include\dpp\user.h" />
+    <ClInclude Include="dependencies\include\dpp\utility.h" />
+    <ClInclude Include="dependencies\include\dpp\version.h" />
+    <ClInclude Include="dependencies\include\dpp\voiceregion.h" />
+    <ClInclude Include="dependencies\include\dpp\voicestate.h" />
+    <ClInclude Include="dependencies\include\dpp\webhook.h" />
+    <ClInclude Include="dependencies\include\dpp\win32_safe_warnings.h" />
+    <ClInclude Include="dependencies\include\dpp\wsclient.h" />
+    <ClInclude Include="dependencies\include\nlohmann\json.hpp" />
+    <ClInclude Include="dependencies\include\nlohmann\json_fwd.hpp" />
+    <ClInclude Include="dependencies\include\openssl\aes.h" />
+    <ClInclude Include="dependencies\include\openssl\asn1.h" />
+    <ClInclude Include="dependencies\include\openssl\asn1err.h" />
+    <ClInclude Include="dependencies\include\openssl\asn1t.h" />
+    <ClInclude Include="dependencies\include\openssl\asn1_mac.h" />
+    <ClInclude Include="dependencies\include\openssl\async.h" />
+    <ClInclude Include="dependencies\include\openssl\asyncerr.h" />
+    <ClInclude Include="dependencies\include\openssl\bio.h" />
+    <ClInclude Include="dependencies\include\openssl\bioerr.h" />
+    <ClInclude Include="dependencies\include\openssl\blowfish.h" />
+    <ClInclude Include="dependencies\include\openssl\bn.h" />
+    <ClInclude Include="dependencies\include\openssl\bnerr.h" />
+    <ClInclude Include="dependencies\include\openssl\buffer.h" />
+    <ClInclude Include="dependencies\include\openssl\buffererr.h" />
+    <ClInclude Include="dependencies\include\openssl\camellia.h" />
+    <ClInclude Include="dependencies\include\openssl\cast.h" />
+    <ClInclude Include="dependencies\include\openssl\cmac.h" />
+    <ClInclude Include="dependencies\include\openssl\cms.h" />
+    <ClInclude Include="dependencies\include\openssl\cmserr.h" />
+    <ClInclude Include="dependencies\include\openssl\comp.h" />
+    <ClInclude Include="dependencies\include\openssl\comperr.h" />
+    <ClInclude Include="dependencies\include\openssl\conf.h" />
+    <ClInclude Include="dependencies\include\openssl\conferr.h" />
+    <ClInclude Include="dependencies\include\openssl\conf_api.h" />
+    <ClInclude Include="dependencies\include\openssl\crypto.h" />
+    <ClInclude Include="dependencies\include\openssl\cryptoerr.h" />
+    <ClInclude Include="dependencies\include\openssl\ct.h" />
+    <ClInclude Include="dependencies\include\openssl\cterr.h" />
+    <ClInclude Include="dependencies\include\openssl\des.h" />
+    <ClInclude Include="dependencies\include\openssl\dh.h" />
+    <ClInclude Include="dependencies\include\openssl\dherr.h" />
+    <ClInclude Include="dependencies\include\openssl\dsa.h" />
+    <ClInclude Include="dependencies\include\openssl\dsaerr.h" />
+    <ClInclude Include="dependencies\include\openssl\dtls1.h" />
+    <ClInclude Include="dependencies\include\openssl\ebcdic.h" />
+    <ClInclude Include="dependencies\include\openssl\ec.h" />
+    <ClInclude Include="dependencies\include\openssl\ecdh.h" />
+    <ClInclude Include="dependencies\include\openssl\ecdsa.h" />
+    <ClInclude Include="dependencies\include\openssl\ecerr.h" />
+    <ClInclude Include="dependencies\include\openssl\engine.h" />
+    <ClInclude Include="dependencies\include\openssl\engineerr.h" />
+    <ClInclude Include="dependencies\include\openssl\err.h" />
+    <ClInclude Include="dependencies\include\openssl\evp.h" />
+    <ClInclude Include="dependencies\include\openssl\evperr.h" />
+    <ClInclude Include="dependencies\include\openssl\e_os2.h" />
+    <ClInclude Include="dependencies\include\openssl\hmac.h" />
+    <ClInclude Include="dependencies\include\openssl\idea.h" />
+    <ClInclude Include="dependencies\include\openssl\kdf.h" />
+    <ClInclude Include="dependencies\include\openssl\kdferr.h" />
+    <ClInclude Include="dependencies\include\openssl\lhash.h" />
+    <ClInclude Include="dependencies\include\openssl\md2.h" />
+    <ClInclude Include="dependencies\include\openssl\md4.h" />
+    <ClInclude Include="dependencies\include\openssl\md5.h" />
+    <ClInclude Include="dependencies\include\openssl\mdc2.h" />
+    <ClInclude Include="dependencies\include\openssl\modes.h" />
+    <ClInclude Include="dependencies\include\openssl\objects.h" />
+    <ClInclude Include="dependencies\include\openssl\objectserr.h" />
+    <ClInclude Include="dependencies\include\openssl\obj_mac.h" />
+    <ClInclude Include="dependencies\include\openssl\ocsp.h" />
+    <ClInclude Include="dependencies\include\openssl\ocsperr.h" />
+    <ClInclude Include="dependencies\include\openssl\opensslconf.h" />
+    <ClInclude Include="dependencies\include\openssl\opensslv.h" />
+    <ClInclude Include="dependencies\include\openssl\ossl_typ.h" />
+    <ClInclude Include="dependencies\include\openssl\pem.h" />
+    <ClInclude Include="dependencies\include\openssl\pem2.h" />
+    <ClInclude Include="dependencies\include\openssl\pemerr.h" />
+    <ClInclude Include="dependencies\include\openssl\pkcs12.h" />
+    <ClInclude Include="dependencies\include\openssl\pkcs12err.h" />
+    <ClInclude Include="dependencies\include\openssl\pkcs7.h" />
+    <ClInclude Include="dependencies\include\openssl\pkcs7err.h" />
+    <ClInclude Include="dependencies\include\openssl\rand.h" />
+    <ClInclude Include="dependencies\include\openssl\randerr.h" />
+    <ClInclude Include="dependencies\include\openssl\rand_drbg.h" />
+    <ClInclude Include="dependencies\include\openssl\rc2.h" />
+    <ClInclude Include="dependencies\include\openssl\rc4.h" />
+    <ClInclude Include="dependencies\include\openssl\rc5.h" />
+    <ClInclude Include="dependencies\include\openssl\ripemd.h" />
+    <ClInclude Include="dependencies\include\openssl\rsa.h" />
+    <ClInclude Include="dependencies\include\openssl\rsaerr.h" />
+    <ClInclude Include="dependencies\include\openssl\safestack.h" />
+    <ClInclude Include="dependencies\include\openssl\seed.h" />
+    <ClInclude Include="dependencies\include\openssl\sha.h" />
+    <ClInclude Include="dependencies\include\openssl\srp.h" />
+    <ClInclude Include="dependencies\include\openssl\srtp.h" />
+    <ClInclude Include="dependencies\include\openssl\ssl.h" />
+    <ClInclude Include="dependencies\include\openssl\ssl2.h" />
+    <ClInclude Include="dependencies\include\openssl\ssl3.h" />
+    <ClInclude Include="dependencies\include\openssl\sslerr.h" />
+    <ClInclude Include="dependencies\include\openssl\stack.h" />
+    <ClInclude Include="dependencies\include\openssl\store.h" />
+    <ClInclude Include="dependencies\include\openssl\storeerr.h" />
+    <ClInclude Include="dependencies\include\openssl\symhacks.h" />
+    <ClInclude Include="dependencies\include\openssl\tls1.h" />
+    <ClInclude Include="dependencies\include\openssl\ts.h" />
+    <ClInclude Include="dependencies\include\openssl\tserr.h" />
+    <ClInclude Include="dependencies\include\openssl\txt_db.h" />
+    <ClInclude Include="dependencies\include\openssl\ui.h" />
+    <ClInclude Include="dependencies\include\openssl\uierr.h" />
+    <ClInclude Include="dependencies\include\openssl\whrlpool.h" />
+    <ClInclude Include="dependencies\include\openssl\x509.h" />
+    <ClInclude Include="dependencies\include\openssl\x509err.h" />
+    <ClInclude Include="dependencies\include\openssl\x509v3.h" />
+    <ClInclude Include="dependencies\include\openssl\x509v3err.h" />
+    <ClInclude Include="dependencies\include\openssl\x509_vfy.h" />
+    <ClInclude Include="dependencies\include\openssl\__DECC_INCLUDE_EPILOGUE.H" />
+    <ClInclude Include="dependencies\include\openssl\__DECC_INCLUDE_PROLOGUE.H" />
+    <ClInclude Include="dependencies\include\smithy\client\AwsSmithyClient.h" />
+    <ClInclude Include="dependencies\include\smithy\client\AwsSmithyClientAsyncRequestContext.h" />
+    <ClInclude Include="dependencies\include\smithy\client\AwsSmithyClientBase.h" />
+    <ClInclude Include="dependencies\include\smithy\client\common\AwsSmithyClientUtils.h" />
+    <ClInclude Include="dependencies\include\smithy\client\common\AwsSmithyRequestSigning.h" />
+    <ClInclude Include="dependencies\include\smithy\client\features\ChecksumInterceptor.h" />
+    <ClInclude Include="dependencies\include\smithy\client\features\RecursionDetection.h" />
+    <ClInclude Include="dependencies\include\smithy\client\features\RequestPayloadCompression.h" />
+    <ClInclude Include="dependencies\include\smithy\client\serializer\JsonOutcomeSerializer.h" />
+    <ClInclude Include="dependencies\include\smithy\client\serializer\XmlOutcomeSerializer.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\auth\AuthScheme.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\auth\AuthSchemeOption.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\auth\AuthSchemeResolverBase.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\auth\built-in\BearerTokenAuthScheme.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\auth\built-in\BearerTokenAuthSchemeOption.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\auth\built-in\BearerTokenAuthSchemeResolver.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\auth\built-in\SigV4aAuthScheme.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\auth\built-in\SigV4aAuthSchemeOption.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\auth\built-in\SigV4aAuthSchemeResolver.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\auth\built-in\SigV4AuthScheme.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\auth\built-in\SigV4AuthSchemeOption.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\auth\built-in\SigV4AuthSchemeResolver.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\identity\AwsBearerTokenIdentity.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\identity\AwsBearerTokenIdentityBase.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\identity\AwsCredentialIdentity.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\identity\AwsCredentialIdentityBase.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\identity\AwsIdentity.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\identity\impl\AwsBearerTokenIdentityImpl.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\identity\impl\AwsCredentialIdentityImpl.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\resolver\AwsBearerTokenIdentityResolver.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\resolver\AwsCredentialIdentityResolver.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\resolver\AwsIdentityResolverBase.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\resolver\built-in\AwsCredentialsProviderIdentityResolver.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\resolver\built-in\DefaultAwsCredentialIdentityResolver.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\resolver\built-in\SimpleAwsCredentialIdentityResolver.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\signer\AwsSignerBase.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\signer\built-in\BearerTokenSigner.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\signer\built-in\SigV4aSigner.h" />
+    <ClInclude Include="dependencies\include\smithy\identity\signer\built-in\SigV4Signer.h" />
+    <ClInclude Include="dependencies\include\smithy\interceptor\Interceptor.h" />
+    <ClInclude Include="dependencies\include\smithy\interceptor\InterceptorContext.h" />
+    <ClInclude Include="dependencies\include\smithy\Smithy_EXPORTS.h" />
+    <ClInclude Include="dependencies\include\smithy\tracing\Gauge.h" />
+    <ClInclude Include="dependencies\include\smithy\tracing\Histogram.h" />
+    <ClInclude Include="dependencies\include\smithy\tracing\impl\opentelemetry\MeterAdapters.h" />
+    <ClInclude Include="dependencies\include\smithy\tracing\impl\opentelemetry\OtelMeterProvider.h" />
+    <ClInclude Include="dependencies\include\smithy\tracing\impl\opentelemetry\OtelTelemetryProvider.h" />
+    <ClInclude Include="dependencies\include\smithy\tracing\impl\opentelemetry\OtelTracerProvider.h" />
+    <ClInclude Include="dependencies\include\smithy\tracing\impl\opentelemetry\TraceAdapters.h" />
+    <ClInclude Include="dependencies\include\smithy\tracing\Meter.h" />
+    <ClInclude Include="dependencies\include\smithy\tracing\MeterProvider.h" />
+    <ClInclude Include="dependencies\include\smithy\tracing\MonotonicCounter.h" />
+    <ClInclude Include="dependencies\include\smithy\tracing\NoopMeterProvider.h" />
+    <ClInclude Include="dependencies\include\smithy\tracing\NoopTelemetryProvider.h" />
+    <ClInclude Include="dependencies\include\smithy\tracing\NoopTracerProvider.h" />
+    <ClInclude Include="dependencies\include\smithy\tracing\TelemetryProvider.h" />
+    <ClInclude Include="dependencies\include\smithy\tracing\Tracer.h" />
+    <ClInclude Include="dependencies\include\smithy\tracing\TracerProvider.h" />
+    <ClInclude Include="dependencies\include\smithy\tracing\TraceSpan.h" />
+    <ClInclude Include="dependencies\include\smithy\tracing\TracingUtils.h" />
+    <ClInclude Include="dependencies\include\smithy\tracing\UpDownCounter.h" />
+    <ClInclude Include="dependencies\include\windivert.h" />
     <ClInclude Include="globals\globals.h" />
     <ClInclude Include="image\image.h" />
     <ClInclude Include="log\log.h" />
     <ClInclude Include="memory\memory.h" />
     <ClInclude Include="sender\sender.h" />
     <ClInclude Include="server\server.h" />
-    <ClInclude Include="utils\File\File.h" />
-    <ClInclude Include="utils\utils.h" />
+    <ClInclude Include="utils\file\File.h" />
     <ClInclude Include="utils\singleton.h" />
+    <ClInclude Include="utils\utils.h" />
     <ClInclude Include="utils\xorstr.h" />
     <ClInclude Include="webhook\webhook.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
   </ImportGroup>
 </Project>

@@ -103,12 +103,6 @@ bool Utils::ExistsFile( const std::string & name )
 
 std::mutex PrintMutex;
 
-void Utils::WarnMessage( COLORS color , std::string custom_text , std::string Message , COLORS _col ) {
-	std::lock_guard<std::mutex> lock( PrintMutex );
-	Warn( color , custom_text );
-	ColoredText( xorstr_( " " ) + Message + xorstr_( "\n" ) , _col );
-}
-
 
 // Função para descriptografar a mensagem usando AES-256-CBC
 bool Utils::decryptMessage( const std::string & ciphertext , std::string & plaintext , const std::string & key , const std::string & iv ) {
@@ -186,9 +180,21 @@ void Utils::WarnMessage( MODULE_SENDER sender , std::string Message , COLORS _co
 		custom_text = xorstr_( "checker" );
 		custom_col = PURPLE;
 		break;
+	case _ANTIDEBUGGER:
+		custom_text = xorstr_( "anti-debugger" );
+		custom_col = LIGHTER_BLUE;
+		break;
 	case _HWID:
 		custom_text = xorstr_( "hwid" );
 		custom_col = LIGHTER_BLUE;
+		break;
+	case _MAIN:
+		custom_text = xorstr_( "main" );
+		custom_col = GRAY;
+		break;
+	case _PUNISH:
+		custom_text = xorstr_( "punish" );
+		custom_col = RED;
 		break;
 	}
 	
@@ -316,6 +322,19 @@ std::string replaceAll( std::string subject , const std::string & search ,
 		pos += replace.length( );
 	}
 	return subject;
+}
+
+std::string Utils::ConvertLPCWSTRToString( LPCWSTR wideString ) {
+	if ( wideString == nullptr ) {
+		return xorstr_( "" );  // Retorna uma string vazia se o ponteiro for nulo
+	}
+
+	int bufferSize = WideCharToMultiByte( CP_UTF8 , 0 , wideString , -1 , nullptr , 0 , nullptr , nullptr );
+	std::string convertedString( bufferSize , 0 );
+
+	WideCharToMultiByte( CP_UTF8 , 0 , wideString , -1 , &convertedString[ 0 ] , bufferSize , nullptr , nullptr );
+
+	return convertedString;
 }
 
 std::string Utils::DownloadString( std::string URL ) {

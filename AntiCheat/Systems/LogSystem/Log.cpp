@@ -3,6 +3,7 @@
 #include "../Utils/utils.h"
 #include "../Utils/xorstr.h"
 
+#include "../../Modules/ThreadGuard/ThreadGuard.h"
 #include "../../Globals/Globals.h"
 #include "../Memory/memory.h"
 
@@ -25,10 +26,16 @@ void LogSystem::Log( std::string Message , std::string nFile ) {
 	exit( 0 );
 }
 
-void LogSystem::LogWithMessageBox( std::string Message , std::string BoxMessage ) {
+void DetachModules( std::string Message , std::string BoxMessage ) {
+	if ( Globals::Get( ).GuardMonitorPointer != nullptr ) {
+		//Stop threads
+		reinterpret_cast< ThreadGuard * >( Globals::Get( ).GuardMonitorPointer )->ThreadObject->SignalShutdown( true );
+		WaitForSingleObject( reinterpret_cast< ThreadGuard * >( Globals::Get( ).GuardMonitorPointer )->ThreadObject->GetHandle( ) , 5000 );
+	}
+
 	MessageBox( NULL , BoxMessage.c_str( ) , xorstr_( "Error" ) , MB_OK | MB_ICONERROR );
 
-	std::string FileName =  xorstr_( "AC.output_" ) + Utils::Get( ).GetRandomWord( 5 ) + xorstr_( ".txt" ) ;
+	std::string FileName = xorstr_( "AC.output_" ) + Utils::Get( ).GetRandomWord( 5 ) + xorstr_( ".txt" );
 	File LogFile( "" , FileName );
 	LogFile.Write( Message );
 
@@ -40,6 +47,11 @@ void LogSystem::LogWithMessageBox( std::string Message , std::string BoxMessage 
 		CloseHandle( hProcess );
 	}
 
-
 	exit( 0 );
+}
+
+
+void LogSystem::LogWithMessageBox( std::string Message , std::string BoxMessage ) {
+	
+	std::thread( DetachModules, Message , BoxMessage).detach( );
 }

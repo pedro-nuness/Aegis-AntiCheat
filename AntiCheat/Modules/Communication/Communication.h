@@ -3,14 +3,12 @@
 #include <string>
 #include <thread>
 #include <chrono>
+
+#include "../../Process/Thread.hpp"
 #include "../../Client/receiver.h"
+#include "../ThreadHolder/ThreadHolder.h"
 
-#include "../ThreadMonitor/ThreadMonitor.h"
-
-
-
-
-class Communication : public ThreadMonitor {
+class Communication : public ThreadHolder {
 
 	std::string ProcessName; 
 	DWORD ProcessPID; 
@@ -20,13 +18,18 @@ class Communication : public ThreadMonitor {
 
 	std::string CommunicationHash;
 
+	bool ShutdownServerPing = false;
+
+	void SignalShutdown( bool shut ) { this->ShutdownServerPing = shut; }
+	bool IsShutdownSignalled( ) { return this->ShutdownServerPing; }
+
 	int PingLimit = 25;
 	std::chrono::steady_clock::time_point LastClientPing;
 	bool PingInTime( );
 	void UpdatePingTime( );
 	void HandleMissingPing( );
 
-	void threadFunction( );
+	void threadFunction( ) override;
 
 	void OpenRequestServer( );
 
@@ -49,9 +52,7 @@ class Communication : public ThreadMonitor {
 	std::string receiveMessage( SOCKET ClientSocket, int time);
 
 
-
 	receiver ServerReceiver;
-
 	SOCKET ListenSocket;
 	SOCKET ClientSocket;
 public:
@@ -62,12 +63,7 @@ public:
 	~Communication( );
 
 	int GetListenerPort( ) { return this->ServerReceiver.GetPort( ); }
-	
-	void start( );
-	void stop( );
 
 	bool isRunning( ) const override;
-	void reset( ) override;
-	void requestupdate( ) override;
 };
 

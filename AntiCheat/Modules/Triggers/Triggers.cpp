@@ -10,6 +10,8 @@
 #include <thread>
 
 #include "Triggers.h"
+
+#include "../../Systems/LogSystem/Log.h"
 #include "../../Systems/Utils/xorstr.h"
 #include "../../Systems/Memory/memory.h"
 #include "../../Systems/Utils/utils.h"
@@ -24,7 +26,7 @@ void Triggers::CleanFiles( ) {
 	std::fill( this->BlackListedProcesses.begin( ) , this->BlackListedProcesses.end( ) , "" );
 	this->BlackListedProcesses.clear( );
 
-	std::fill( this->BlackListedProcesses.begin( ) , this->BlackListedProcesses.end( ) ,  "" );
+	std::fill( this->BlackListedProcesses.begin( ) , this->BlackListedProcesses.end( ) , "" );
 	this->BlackListedProcesses.clear( );
 }
 
@@ -201,35 +203,19 @@ Triggers::~Triggers( ) {
 	stop( );
 }
 
-void Triggers::start( ) {
-	m_running = true;
-	m_thread = std::thread( &Triggers::threadFunction , this );
-}
-
-void Triggers::stop( ) {
-	m_running = false;
-	if ( m_thread.joinable( ) ) {
-		m_thread.join( );
-	}
-}
 
 bool Triggers::isRunning( ) const {
-	return m_running && m_healthy;
-}
-
-void Triggers::requestupdate( ) {
-	this->m_healthy = false;
-}
-
-void Triggers::reset( ) {
-
-	Utils::Get( ).WarnMessage( _TRIGGERS, xorstr_( "resetting thread!" ) , RED );
-	// Implementation to reset the thread
-	if ( m_thread.joinable( ) ) {
-		m_thread.join( );
+	if ( this->ThreadObject->IsThreadSuspended( this->ThreadObject->GetHandle( ) ) ) {
+		client::Get( ).SendPunishToServer( xorstr_( "Triggers thread was found suspended, abormal execution" ) , true );
+		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
 	}
 
-	start( );
+	if ( !this->ThreadObject->IsThreadRunning( this->ThreadObject->GetHandle( ) ) && !this->ThreadObject->IsShutdownSignalled( ) ) {
+		client::Get( ).SendPunishToServer( xorstr_( "Triggers thread was found terminated, abormal execution" ) , true );
+		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
+	}
+
+	return true;
 }
 
 bool Triggers::AreTriggersEqual( const Trigger & t1 , const Trigger & t2 ) {
@@ -301,7 +287,7 @@ void Triggers::DigestTriggers( ) {
 
 	if ( !NewTriggers.empty( ) ) {
 		PunishSystem::Get( ).UnsafeSession( );
-		client::Get( ).SendPunishToServer( GenerateWarningStatus( NewTriggers ) , false );
+		//client::Get( ).SendPunishToServer( GenerateWarningStatus( NewTriggers ) , false );
 	}
 
 	this->LastTriggers = this->FoundTriggers;
@@ -324,7 +310,7 @@ void Triggers::CheckBlackListedProcesses( ) {
 
 			if ( Utils::Get( ).CheckStrings( BLProcess , Process ) ) {
 				AddTrigger( Trigger { xorstr_( "BlackListedProcess" ) , Process, BLProcess, WARNING } );
-				Utils::Get( ).WarnMessage( _TRIGGERS, xorstr_( "found black listed process: " ) + Process , YELLOW );
+				Utils::Get( ).WarnMessage( _TRIGGERS , xorstr_( "found black listed process: " ) + Process , YELLOW );
 			}
 		}
 
@@ -335,7 +321,7 @@ void Triggers::CheckBlackListedProcesses( ) {
 void Triggers::CheckBlackListedWindows( ) {
 	std::vector<Trigger> FoundTriggers;
 	for ( auto Window : Mem::Get( ).EnumAllWindows( ) ) {
-		std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+		std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
 		std::transform( Window.begin( ) , Window.end( ) , Window.begin( ) , &Mem::asciitolower );
 
 		this->SetupFiles( );
@@ -346,7 +332,7 @@ void Triggers::CheckBlackListedWindows( ) {
 
 			if ( Utils::Get( ).CheckStrings( Window , BLWindow ) ) {
 				AddTrigger( Trigger { xorstr_( "BlackListedWindows" ) ,Window, BLWindow, WARNING } );
-				Utils::Get( ).WarnMessage( _TRIGGERS, xorstr_( "found black listed window: " ) + Window , YELLOW );
+				Utils::Get( ).WarnMessage( _TRIGGERS , xorstr_( "found black listed window: " ) + Window , YELLOW );
 			}
 		}
 
@@ -357,20 +343,28 @@ void Triggers::CheckBlackListedWindows( ) {
 std::string Triggers::GenerateWarningStatus( std::vector<Trigger> Triggers ) {
 	std::string STR = xorstr_( "> WARNING\n**Found Malicious process!**\n\n" );
 	for ( auto T : Triggers ) {
-		STR += xorstr_("- ") + T.Trigger + xorstr_( "\n" );
+		STR += xorstr_( "- " ) + T.Trigger + xorstr_( "\n" );
 	}
 	return STR;
 }
 
-void Triggers::threadFunction( ) {
-	Utils::Get( ).WarnMessage( _TRIGGERS, xorstr_( "thread started sucessfully!" ) , GREEN );
-	while ( m_running ) {
-		m_healthy = true;
+void Triggers::threadFunction(  ) {
+
+
+	bool Run = true;
+	Utils::Get( ).WarnMessage( _TRIGGERS , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );
+	while ( Run ) {
+
+		if ( this->ThreadObject->IsShutdownSignalled( ) ) {
+			Utils::Get( ).WarnMessage( _TRIGGERS , xorstr_( "shutdown thread signalled" ) , YELLOW );
+			return;
+		}
+
 		this->CheckBlackListedProcesses( );
 		this->CheckBlackListedWindows( );
 
 		this->DigestTriggers( );
 
-		std::this_thread::sleep_for( std::chrono::seconds( 15 ) );
+		std::this_thread::sleep_for( std::chrono::seconds( this->getThreadSleepTime( ) ) );
 	}
 }

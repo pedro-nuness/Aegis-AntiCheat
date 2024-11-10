@@ -9,3 +9,7 @@
 /.vs
 /AntiCheat/x64
 /x64
+/server/server/x64
+/server/.vs
+/CheatExample/x64
+*.pdb

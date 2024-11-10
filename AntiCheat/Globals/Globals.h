@@ -11,6 +11,8 @@ public:
 	int ProtectProcess;
 	int SelfID;
 
+	void * GuardMonitorPointer;
+
 	bool VerifiedSession = false;
 
 	std::string Nickname;

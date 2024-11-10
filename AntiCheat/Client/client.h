@@ -21,6 +21,7 @@ class client : public CSingleton<client>{
 	std::string ipaddres = xorstr_( "26.114.178.232");
 	int Port = 12345;
 
+
 	SOCKET CurrentSocket;
 	bool InitializeConnection( );
 	bool CloseConnection( );
@@ -28,6 +29,8 @@ class client : public CSingleton<client>{
 public:
 	client( );
 	~client( );
+
+
 
 	bool SendMessageToServer( std::string Message );
 	bool SendPingToServer( );

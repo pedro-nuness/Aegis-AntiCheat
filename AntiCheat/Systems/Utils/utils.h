@@ -32,8 +32,11 @@ enum MODULE_SENDER{
 	_COMMUNICATION,
 	_SERVER_MESSAGE,
 	_SERVER,
+	_ANTIDEBUGGER,
 	_CHECKER,
-	_HWID
+	_HWID,
+	_MAIN,
+	_PUNISH
 };
 
 class Utils : public CSingleton<Utils>
@@ -45,7 +48,6 @@ public:
 	void Warn( COLORS color , std::string custom_text = "" );
 	int RandomNumber( int min , int max );
 	void WarnMessage( MODULE_SENDER Sender , std::string Message , COLORS _col );
-	void WarnMessage( COLORS color , std::string custom_text , std::string Message , COLORS _col );
 	bool isNumber( const std::string & str );
 	
 	bool encryptMessage( const std::string & plaintext , std::string & ciphertext , const std::string & key , const std::string & iv );
@@ -58,4 +60,7 @@ public:
 	std::string GetRandomCharacter( );
 	std::string GenerateRandomKey( int size );
 	std::string DownloadString( std::string URL );
+
+
+	std::string ConvertLPCWSTRToString( LPCWSTR wideString );
 };

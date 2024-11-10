@@ -374,13 +374,13 @@ std::string hardware::GetIp( int port ) {
 
     // Initialize Winsock
     if ( WSAStartup( MAKEWORD( 2 , 2 ) , &wsaData ) != 0 ) {
-        Utils::Get( ).WarnMessage( DARK_BLUE , xorstr_( "GetIp" ) , xorstr_( "WSAStartup failed" ) , RED );
+        Utils::Get( ).WarnMessage( _HWID , xorstr_( "WSAStartup failed" ) , RED );
         return Result;
     }
 
     // Get the hostname of the local machine
     if ( gethostname( hostname , sizeof( hostname ) ) == SOCKET_ERROR ) {
-        Utils::Get( ).WarnMessage( DARK_BLUE , xorstr_( "GetIp" ) , xorstr_( "Error getting local hostname" ) , RED );
+        Utils::Get( ).WarnMessage( _HWID , xorstr_( "Error getting local hostname" ) , RED );
         WSACleanup( );
         return Result;
     }
@@ -392,7 +392,7 @@ std::string hardware::GetIp( int port ) {
 
     // Resolve the hostname to an IP address
     if ( getaddrinfo( hostname , NULL , &hints , &res ) != 0 ) {
-        Utils::Get( ).WarnMessage( DARK_BLUE , xorstr_( "GetIp" ) , xorstr_( "Error getting local IP address" ) , RED );
+        Utils::Get( ).WarnMessage(_HWID , xorstr_( "Error getting local IP address" ) , RED );
         WSACleanup( );
         return Result;
     }

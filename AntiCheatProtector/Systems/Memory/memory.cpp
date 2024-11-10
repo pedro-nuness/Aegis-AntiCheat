@@ -175,7 +175,41 @@ std::string Mem::GetProcessExecutablePath( DWORD processID ) {
 	}
 
 	return processPath;
+
 }
+
+bool Mem::VerifyFileSignature( const std::string & filePath ) {
+	WINTRUST_FILE_INFO fileInfo = {};
+	fileInfo.cbStruct = sizeof( WINTRUST_FILE_INFO );
+	fileInfo.pcwszFilePath = std::wstring( filePath.begin( ) , filePath.end( ) ).c_str( );
+	fileInfo.hFile = nullptr;
+	fileInfo.pgKnownSubject = nullptr;
+
+	WINTRUST_DATA trustData = {};
+	trustData.cbStruct = sizeof( WINTRUST_DATA );
+	trustData.dwUIChoice = WTD_UI_NONE;
+	trustData.fdwRevocationChecks = WTD_REVOKE_NONE;
+	trustData.dwUnionChoice = WTD_CHOICE_FILE;
+	trustData.pFile = &fileInfo;
+	trustData.dwStateAction = WTD_STATEACTION_VERIFY;
+	trustData.dwProvFlags = WTD_SAFER_FLAG;
+	trustData.hWVTStateData = nullptr;
+
+	GUID policyGUID = WINTRUST_ACTION_GENERIC_VERIFY_V2;
+
+	LONG status = WinVerifyTrust( nullptr , &policyGUID , &trustData );
+
+	trustData.dwStateAction = WTD_STATEACTION_CLOSE;
+	WinVerifyTrust( nullptr , &policyGUID , &trustData );
+
+	if ( status == ERROR_SUCCESS ) {
+		return true;
+	}
+	else {
+		return false;
+	}
+}
+
 
 bool Mem::ProcessIsOnSystemFolder( int pid ) {
 	std::string Path = GetProcessExecutablePath( pid );
@@ -195,14 +229,15 @@ bool Mem::VerifySignature( HANDLE hProcess ) {
 		return false;
 	}
 
+	wchar_t wideProcessImagePath[ MAX_PATH ];
+	// Converte de multibyte (char) para wide char (wchar_t)
+	MultiByteToWideChar( CP_ACP , 0 , processImagePath , -1 , wideProcessImagePath , MAX_PATH );
+	
+
 	// Initialize the WINTRUST_FILE_INFO structure
 	WINTRUST_FILE_INFO fileInfo;
 	memset( &fileInfo , 0 , sizeof( fileInfo ) );
 	fileInfo.cbStruct = sizeof( WINTRUST_FILE_INFO );
-
-	wchar_t wideProcessImagePath[ MAX_PATH ];
-	// Converte de multibyte (char) para wide char (wchar_t)
-	MultiByteToWideChar( CP_ACP , 0 , processImagePath , -1 , wideProcessImagePath , MAX_PATH );
 	fileInfo.pcwszFilePath = wideProcessImagePath;
 
 	// Initialize the WINTRUST_DATA structure

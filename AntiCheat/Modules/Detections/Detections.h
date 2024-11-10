@@ -2,7 +2,12 @@
 #include <Windows.h>
 #include <vector>
 #include <string>
-#include "../ThreadMonitor/ThreadMonitor.h"
+
+#include "../../Obscure/ntldr.h"
+#include "../../Process/Thread.hpp"
+#include "../ThreadHolder/ThreadHolder.h"
+
+#include <mutex>
 
 enum DETECTION_STATUS {
 	NOTHING_DETECTED ,
@@ -11,59 +16,60 @@ enum DETECTION_STATUS {
 };
 
 
-struct Detection {
-	DWORD ProcessPID;
-	std::string ProcessName;
+struct DetectionStruct {
+	DetectionStruct( std::string _Log ) {
+		this->Log = _Log;
+	}
 
-	DETECTION_STATUS status;
-	std::vector<std::string> ProcessModules;
-	std::vector<std::pair<std::string , LPVOID>> data;
+	std::string Log;
 };
 
-class Detections : public ThreadMonitor {
+enum FLAG_DETECTION {
+	UNVERIFIED_DRIVER_RUNNING ,
+	UNVERIFIED_MODULE_LOADED ,
+	SUSPECT_WINDOW_OPEN ,
+	HIDE_FROM_CAPTURE_WINDOW ,
+};
 
-	
-	std::thread m_thread;
+class Detections : public ThreadHolder {
+
+	std::mutex AccessGuard;
 	std::atomic<bool> m_running;
 	std::atomic<bool> m_healthy;
-	
+
 	bool CalledScanThread = false;
 	bool ThreadUpdate = false;
 
-	DWORD MomProcess , ProtectProcess = 0;
+	DWORD MomProcess = 0 , ProtectProcess = 0;
+	std::vector<DetectionStruct> cDetections;
+	std::vector<std::string> LoadedDlls;
+	std::vector<std::string> PendingLoadedDlls;
+	std::vector<std::pair<FLAG_DETECTION , DetectionStruct>> DetectedFlags;
 
-	std::string GenerateDetectionStatus( Detection Detect );
-
-	std::vector< Detection > cDetections;
-
+	bool DoesFunctionAppearHooked( std::string moduleName , std::string functionName );
+	void CheckLoadedDrivers( );
+	void CheckLoadedDlls( );
 	void IsDebuggerPresentCustom( );
 	void ScanHandles( );
 	void ScanWindows( );
 	void ScanModules( );
-	void AddDetection( Detection d );
+	void AddDetection( FLAG_DETECTION flag , DetectionStruct Detect );
 	void DigestDetections( );
 	void ScanParentModules( );
-	void threadFunction( );
+	std::string GenerateDetectionStatus( FLAG_DETECTION flag , DetectionStruct _detection );
 
-	DETECTION_STATUS _status = NOTHING_DETECTED;
-
+	void threadFunction( ) override;
+	static VOID OnDllNotification( ULONG NotificationReason , const PLDR_DLL_NOTIFICATION_DATA NotificationData , PVOID Context );
 
 
 public:
-	Detections( DWORD _MomProcess , DWORD _ProtectProcess ) {
-		this->MomProcess = _MomProcess;
-		this->ProtectProcess = _ProtectProcess;
-	}
+	void SetupPid( DWORD _MomProcess , DWORD _ProtectProcess );
+	Detections( );
 
-	void AddExternalDetection( Detection dec, std::string SENDER );
+	Thread * GetDetectionThread( ) const { return this->ThreadObject.get( ); }
 
 	~Detections( );
 
-	void start( );
-	void stop( );
-
 	bool isRunning( ) const override;
-	void reset( ) override;
-	void requestupdate( ) override;
 };
 

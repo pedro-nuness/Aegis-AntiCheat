@@ -1,5 +1,6 @@
 #pragma once
 #include "../ThreadMonitor/ThreadMonitor.h"
+#include <string>
 #include <vector>
 #include <windows.h>
 #include <unordered_map>
@@ -12,6 +13,14 @@ class Detections:  public ThreadMonitor
 	std::thread m_thread;
 	std::atomic<bool> m_running;
 	std::atomic<bool> m_healthy;
+
+	void DetectMemoryPermissions( );
+	void DetectUnknownModules( );
+	bool CheckCriticalFunctionRedirects( std::string funcName );
+	bool DetectTrampolines( FARPROC func , const BYTE * expectedBytes , SIZE_T length );
+	void CheckDynamicModules( );
+	void MonitorExternalProcesses( );
+	void RunDetections( );
 
 	void CheckHandles( );
 	void CheckThreads( );
