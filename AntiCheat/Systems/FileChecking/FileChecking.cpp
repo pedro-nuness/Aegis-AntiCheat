@@ -33,7 +33,7 @@ std::string removeNonAlphanumeric( const std::string & input ) {
 bool FileChecking::GetNickname( ) {
 	File nick_file( xorstr_( "nickname.ini" ) );
 	if ( !nick_file.Exists( ) ) {
-		Utils::Get( ).WarnMessage( _CHECKER , xorstr_( "can't find nickname file!" ) , RED );
+		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "can't find nickname file!" ) , RED );
 		return false;
 	}
 
@@ -43,14 +43,14 @@ bool FileChecking::GetNickname( ) {
 	auto Find = nickname.find( "\n" );
 
 	if ( nickname.empty( ) ) {
-		Utils::Get( ).WarnMessage( _CHECKER , xorstr_( "nickname is empty" ) , RED );
+		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "nickname is empty" ) , RED );
 		return false;
 	}
 	
 	Globals::Get( ).Nickname = nickname;
 	Globals::Get( ).NicknameHash = Utils::Get( ).GenerateStringHash( nickname );
 
-	Utils::Get( ).WarnMessage( _CHECKER , xorstr_( "get nickname sucesfully: " ) + Globals::Get( ).Nickname + xorstr_( " - " ) + Globals::Get( ).NicknameHash , GREEN);
+	LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "get nickname sucesfully: " ) + Globals::Get( ).Nickname + xorstr_( " - " ) + Globals::Get( ).NicknameHash , GREEN);
 	return true;
 }
 
@@ -60,9 +60,12 @@ bool FileChecking::CheckCurrentPath( ) {
 	std::string CurrentPath = Mem::Get( ).GetProcessPath( Globals::Get( ).SelfID );
 
 	if ( CurrentPath.empty( ) ) {
-		Utils::Get( ).WarnMessage( _CHECKER , xorstr_( "failed to get path" ) , RED );
+		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "failed to get path" ) , RED );
 		return false;
 	}
+
+	if ( !fs::exists( xorstr_( "ACLogs" ) ) )
+		fs::create_directory( xorstr_( "ACLogs" ) );
 
 	try {
 		std::vector<std::string> SearchStrings {
@@ -71,14 +74,14 @@ bool FileChecking::CheckCurrentPath( ) {
 		};
 	
 		if ( fs::exists( CurrentPath ) && fs::is_directory( CurrentPath ) ) {
-			Utils::Get( ).WarnMessage( _CHECKER , xorstr_( "scanning " ) + CurrentPath , RED );
+			LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "scanning " ) + CurrentPath , RED );
 
 			//for ( const auto & entry : fs::directory_iterator( CurrentPath ) ) {
 			//	try {
 			//		std::string FileHash = Mem::Get( ).GetFileHash( entry.path( ).filename( ).string( ) );
 
 			//		if ( FileHash.empty( ) ) {
-			//			Utils::Get( ).WarnMessage( _CHECKER , xorstr_( "cant read memory of " ) + entry.path( ).filename( ).string( ) , RED );
+			//			LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "cant read memory of " ) + entry.path( ).filename( ).string( ) , RED );
 			//			LogSystem::Get( ).Log( xorstr_( "[0] Can`t read " ) + entry.path( ).filename( ).string( ) );
 			//			return false;
 			//		}
@@ -93,12 +96,12 @@ bool FileChecking::CheckCurrentPath( ) {
 
 			//		for ( const std::string & name : SearchStrings ) {
 			//			if ( Utils::Get( ).CheckStrings( entry.path( ).filename( ).string( ) , name ) ) {
-			//				Utils::Get( ).WarnMessage( _CHECKER , entry.path( ).filename( ).string( ) , YELLOW );
+			//				LogSystem::Get( ).ConsoleLog( _CHECKER , entry.path( ).filename( ).string( ) , YELLOW );
 			//			}
 			//		}
 			//	}
 			//	catch ( const std::filesystem::filesystem_error & ex ) {
-			//		Utils::Get( ).WarnMessage( _CHECKER , xorstr_( "Error processing file: " ) + entry.path( ).filename( ).string( ) , RED );
+			//		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "Error processing file: " ) + entry.path( ).filename( ).string( ) , RED );
 			//		continue;  // Se ocorrer erro em um arquivo, continua para o próximo
 			//	}
 			//}
@@ -114,13 +117,13 @@ bool FileChecking::CheckCurrentPath( ) {
 			//}
 		}
 		else {
-			Utils::Get( ).WarnMessage( _CHECKER , xorstr_( "invalid directory: " ) + CurrentPath , RED );
+			LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "invalid directory: " ) + CurrentPath , RED );
 			LogSystem::Get( ).Log( xorstr_( "[02] Invalid directory") );
 			return false;
 		}
 	}
 	catch ( const std::filesystem::filesystem_error & ex ) {
-		Utils::Get( ).WarnMessage( _CHECKER , xorstr_( "unexpected error" ) , RED );
+		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "unexpected error" ) , RED );
 		LogSystem::Get( ).Log( xorstr_( "[03] unexpected error" ) );
 	}
 

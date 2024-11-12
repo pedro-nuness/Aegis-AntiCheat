@@ -94,7 +94,7 @@ bool Preventions::RemapProgramSections( ) {
 	else
 	{
 		std::cout << xorstr_( "Imagebase was NULL @ RemapAndCheckPages!\n" );
-		//Utils::Get( ).WarnMessage( _PREVENTIONS , xorstr_( "Imagebase was NULL @ RemapAndCheckPages!" ) , RED );
+		//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Imagebase was NULL @ RemapAndCheckPages!" ) , RED );
 		return false;
 	}
 
@@ -118,11 +118,11 @@ bool Preventions::EnableProcessMitigations( bool useDEP , bool useASLR , bool us
 		if ( !SetProcessMitigationPolicy( ProcessDEPPolicy , &depPolicy , sizeof( depPolicy ) ) ) {
 			DWORD error = GetLastError( );
 			if ( error != ERROR_NOT_SUPPORTED ) {
-				Utils::Get( ).WarnMessage( _PREVENTIONS , xorstr_( "Failed to set DEP policy @ EnableProcessMitigations: " ) + std::to_string( error ) , RED );
+				LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Failed to set DEP policy @ EnableProcessMitigations: " ) + std::to_string( error ) , RED );
 				sucess = false;
 			}
 			else {
-				Utils::Get( ).WarnMessage( _PREVENTIONS , xorstr_( "DEP Policy not supported on this OS version." ) , YELLOW );
+				LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "DEP Policy not supported on this OS version." ) , YELLOW );
 			}
 		}
 	}
@@ -139,11 +139,11 @@ bool Preventions::EnableProcessMitigations( bool useDEP , bool useASLR , bool us
 		{
 			DWORD error = GetLastError( );
 			if ( error != ERROR_NOT_SUPPORTED ) {
-				Utils::Get( ).WarnMessage( _PREVENTIONS , xorstr_( "Failed to set ASLR policy @ EnableProcessMitigations:" ) + std::to_string( error ) , RED );
+				LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Failed to set ASLR policy @ EnableProcessMitigations:" ) + std::to_string( error ) , RED );
 				sucess = false;
 			}
 			else {
-				Utils::Get( ).WarnMessage( _PREVENTIONS , xorstr_( "ASLR policy not supported on this OS version." ) , YELLOW );
+				LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "ASLR policy not supported on this OS version." ) , YELLOW );
 			}
 		}
 	}
@@ -158,11 +158,11 @@ bool Preventions::EnableProcessMitigations( bool useDEP , bool useASLR , bool us
 
 			DWORD error = GetLastError( );
 			if ( error != ERROR_NOT_SUPPORTED ) {
-				Utils::Get( ).WarnMessage( _PREVENTIONS , xorstr_( "Failed to set dynamic code policy@ EnableProcessMitigations:" ) + std::to_string( error ) , RED );
+				LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Failed to set dynamic code policy@ EnableProcessMitigations:" ) + std::to_string( error ) , RED );
 				sucess = false;
 			}
 			else {
-				Utils::Get( ).WarnMessage( _PREVENTIONS , xorstr_( "Dynamic code policy not supported on this OS version." ) , YELLOW );
+				LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Dynamic code policy not supported on this OS version." ) , YELLOW );
 			}
 		}
 	}
@@ -177,11 +177,11 @@ bool Preventions::EnableProcessMitigations( bool useDEP , bool useASLR , bool us
 		{
 			DWORD error = GetLastError( );
 			if ( error != ERROR_NOT_SUPPORTED ) {
-				Utils::Get( ).WarnMessage( _PREVENTIONS , xorstr_( "Failed to set strict handle check policy @ EnableProcessMitigations:" ) + std::to_string( error ) , RED );
+				LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Failed to set strict handle check policy @ EnableProcessMitigations:" ) + std::to_string( error ) , RED );
 				sucess = false;
 			}
 			else {
-				Utils::Get( ).WarnMessage( _PREVENTIONS , xorstr_( "Strict handle check policy not supported on this OS version." ) , YELLOW );
+				LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Strict handle check policy not supported on this OS version." ) , YELLOW );
 			}
 		}
 	}
@@ -195,15 +195,14 @@ bool Preventions::EnableProcessMitigations( bool useDEP , bool useASLR , bool us
 		{
 			DWORD error = GetLastError( );
 			if ( error != ERROR_NOT_SUPPORTED ) {
-				Utils::Get( ).WarnMessage( _PREVENTIONS , xorstr_( "Failed to set system call disable policy @ EnableProcessMitigations:" ) + std::to_string( error ) , RED );
+				LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Failed to set system call disable policy @ EnableProcessMitigations:" ) + std::to_string( error ) , RED );
 				sucess = false;
 			}
 			else {
-				Utils::Get( ).WarnMessage( _PREVENTIONS , xorstr_( "System call disable policy not supported on this OS version." ) , YELLOW );
+				LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "System call disable policy not supported on this OS version." ) , YELLOW );
 			}
 		}
 	}
-	system( "pause" );
 	return sucess;
 }
 
@@ -235,7 +234,7 @@ bool Preventions::RandomizeModuleName( )
 		success = true;
 		/*UnmanagedGlobals::wCurrentModuleName = wstring( newModuleName );
 		UnmanagedGlobals::CurrentModuleName = Utility::ConvertWStringToString( UnmanagedGlobals::wCurrentModuleName );*/
-		Utils::Get( ).WarnMessage( _PREVENTIONS , xorstr_( "changed module name to " ) + *newModuleName , GREEN );
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "changed module name to " ) + *newModuleName , GREEN );
 
 		// Logger::logfw( "UltimateAnticheat.log" , Info , L"Changed module name to: %s\n" , UnmanagedGlobals::wCurrentModuleName.c_str( ) );
 	}
@@ -325,19 +324,23 @@ bool Preventions::PreventDllInjection( )
 }
 
 void Preventions::Deploy( ) {
-	if ( !Preventions::Get( ).RemapProgramSections( ) ) {
-		LogSystem::Get( ).Log( xorstr_( "[0] Failed to protect process" ) );
-	}
 	if ( !Preventions::Get( ).RestrictProcessAccess( ) ) {
 		LogSystem::Get( ).Log( xorstr_( "[1] Failed to protect process" ) );
 	}
 	if ( !Preventions::Get( ).RandomizeModuleName( ) ) {
 		LogSystem::Get( ).Log( xorstr_( "[2] Failed to protect process" ) );
 	}
-	if ( !Preventions::Get( ).EnableProcessMitigations( true , true , false , true , false ) ) {
-		LogSystem::Get( ).Log( xorstr_( "[3] Failed to protect process" ) );
-	}
+
 	if ( !Preventions::Get( ).PreventDllInjection( ) ) {
 		LogSystem::Get( ).Log( xorstr_( "[4] Failed to protect process" ) );
 	}
+
+	/*if ( !Preventions::Get( ).RemapProgramSections( ) ) {
+		LogSystem::Get( ).Log( xorstr_( "[0] Failed to protect process" ) );
+	}
+	
+	if ( !Preventions::Get( ).EnableProcessMitigations( true , true , false , true , false ) ) {
+		LogSystem::Get( ).Log( xorstr_( "[3] Failed to protect process" ) );
+	}*/
+	
 }

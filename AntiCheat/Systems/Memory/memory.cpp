@@ -255,7 +255,7 @@ void Mem::WaitModule( int PID , std::string Module )
 	{
 		if ( CheckModule( PID , Module ) )
 		{
-			Utils::Get( ).Warn( GREEN );
+			//Utils::Get( ).Warn( GREEN );
 			//std::cout << "Successfully found " << Module << "!\n\n";
 			break;
 		}

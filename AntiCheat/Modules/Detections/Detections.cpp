@@ -94,9 +94,10 @@ void Detections::CheckLoadedDrivers( ) {
 
 			if ( !Authentication::Get( ).HasSignature( Driver ) )
 			{
-				Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "Unverified Driver loaded: " ) + Driver , RED );
+				LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Unverified Driver loaded: " ) + Driver , RED );
 				AddDetection( UNVERIFIED_DRIVER_RUNNING , DetectionStruct( Driver , DETECTED ) );
 			}
+			std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
 		}
 	}
 }
@@ -116,9 +117,10 @@ void Detections::CheckLoadedDlls( ) {
 		std::string Dll = LoadedDlls.at( i );
 		if ( !Authentication::Get( ).HasSignature( Dll ) )
 		{
-			Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "Unverified dll loaded: " ) + Dll , RED );
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Unverified dll loaded: " ) + Dll , RED );
 			AddDetection( UNVERIFIED_MODULE_LOADED , DetectionStruct( Dll , DETECTED ) );
 		}
+		std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
 	}
 
 	LoadedDlls.clear( );
@@ -209,7 +211,7 @@ bool Detections::DoesFunctionAppearHooked( std::string moduleName , std::string 
 	HMODULE hMod = GetModuleHandleA( moduleName.c_str( ) );
 	if ( hMod == NULL )
 	{
-		Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "Couldn't fetch module " ) + moduleName , RED );
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Couldn't fetch module " ) + moduleName , RED );
 		return false;
 	}
 
@@ -217,7 +219,7 @@ bool Detections::DoesFunctionAppearHooked( std::string moduleName , std::string 
 
 	if ( AddressFunction == NULL )
 	{
-		Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "Couldn't fetch address of function " ) + functionName , RED );
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Couldn't fetch address of function " ) + functionName , RED );
 		return FALSE;
 	}
 
@@ -225,7 +227,7 @@ bool Detections::DoesFunctionAppearHooked( std::string moduleName , std::string 
 }
 
 void Detections::ScanWindows( ) {
-	Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "starting window scan" ) , GREEN );
+	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "starting window scan" ) , GREEN );
 	std::unordered_map<DWORD , int> Map;
 
 	// Enumerate all top-level windows
@@ -236,8 +238,6 @@ void Detections::ScanWindows( ) {
 
 
 	for ( const auto & window : Windows ) {
-
-
 		// Check for overlay characteristics
 		LONG_PTR exStyle = GetWindowLongPtr( window.hwnd , GWL_EXSTYLE );
 		if ( ( exStyle & WS_EX_LAYERED ) && ( exStyle & WS_EX_TRANSPARENT ) ) {
@@ -262,9 +262,10 @@ void Detections::ScanWindows( ) {
 			continue;
 		}
 		if ( windowAffinity != WDA_NONE ) {
-			//Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "got window affinity of id " ) + std::to_string( window.processId ) , GREEN );
+			//LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "got window affinity of id " ) + std::to_string( window.processId ) , GREEN );
 			DetectedWindows[ window.hwnd ] = window.processId;
 		}
+		std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
 	}
 
 	if ( !DetectedWindows.empty( ) ) {
@@ -289,19 +290,20 @@ void Detections::ScanWindows( ) {
 
 		if ( !Authentication::Get( ).HasSignature( ProcessPath ) ) {
 			AddDetection( SUSPECT_WINDOW_OPEN , DetectionStruct( ProcessPath , SUSPECT ) );
-			Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "process " ) + ProcessName + xorstr_( " has open window!" ) , YELLOW );
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "process " ) + ProcessName + xorstr_( " has open window!" ) , YELLOW );
 		}
 		else {
 
 
 		}
 
-		//Utils::Get( ).WarnMessage( _DETECTION  , xorstr_( "scanning " ) + ProcessName , WHITE );
+		//LogSystem::Get( ).ConsoleLog( _DETECTION  , xorstr_( "scanning " ) + ProcessName , WHITE );
 
 
 		CloseHandle( hProcess );
+		std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
 	}
-	Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "ending window scan" ) , GREEN );
+	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "ending window scan" ) , GREEN );
 	this->ScanModules( );
 }
 
@@ -317,7 +319,7 @@ void Detections::ScanModules( ) {
 	and pop a warning
 	*/
 
-	Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "scanning modules" ) , WHITE );
+	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning modules" ) , WHITE );
 }
 
 void Detections::ScanParentModules( ) {
@@ -339,13 +341,20 @@ void Detections::CheckFunctions( ) {
 }
 
 void Detections::threadFunction( ) {
-	Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );
+	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );
+	
+	while ( !Globals::Get( ).VerifiedSession ) {
+		//as fast as possible cuh
+		std::this_thread::sleep_for( std::chrono::nanoseconds( 1 ) ); // Check every 30 seconds
+	}
+
 	bool Running = true;
+
 
 	while ( Running ) {
 
 		if ( this->ThreadObject->IsShutdownSignalled( ) ) {
-			Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "shutdown thread signalled" ) , YELLOW );
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "shutting down thread" ) , RED );
 			return;
 		}
 
@@ -353,24 +362,24 @@ void Detections::threadFunction( ) {
 			LogSystem::Get( ).Log( xorstr_( "Test signing or debug mode is enabled" ) );
 		}
 
-		Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "checking functions!" ) , GRAY );
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "checking functions!" ) , GRAY );
 		this->CheckFunctions( );
-		Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "scanning loaded drivers!" ) , GRAY );
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning loaded drivers!" ) , GRAY );
 		this->CheckLoadedDrivers( );
 
-		Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "scanning loaded dlls!" ) , GRAY );
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning loaded dlls!" ) , GRAY );
 		this->CheckLoadedDlls( );
 
-		Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "scanning open windows!" ) , GRAY );
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning open windows!" ) , GRAY );
 		this->ScanWindows( );
 
-		Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "scanning parent modules!" ) , GRAY );
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning parent modules!" ) , GRAY );
 		this->ScanParentModules( );
 
-		Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "digesting detecions!" ) , GRAY );
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "digesting detecions!" ) , GRAY );
 		this->DigestDetections( );
 
-		Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "detection thread" ) , GRAY );
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "detection thread" ) , GRAY );
 
 		std::this_thread::sleep_for( std::chrono::seconds( this->getThreadSleepTime( ) ) );
 	}

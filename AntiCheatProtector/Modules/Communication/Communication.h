@@ -27,7 +27,7 @@ class Communication : public ThreadMonitor
 	bool sendMessage( SOCKET ConnectSocket , std::string message );
 	std::string receiveMessage( SOCKET ConnectSocket, int timeout );
 
-	void threadFunction( ) override;
+	void threadFunction( );
 
 public:
 

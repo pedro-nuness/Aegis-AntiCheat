@@ -36,13 +36,13 @@ client::~client( ) {}
 bool client::InitializeConnection( ) {
 	WSADATA wsaData;
 	if ( WSAStartup( MAKEWORD( 2 , 2 ) , &wsaData ) != 0 ) {
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "WSAStartup failed." ) , RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "WSAStartup failed." ) , RED );
 		return false;
 	}
 
 	SOCKET sock = socket( AF_INET , SOCK_STREAM , 0 );
 	if ( sock == INVALID_SOCKET ) {
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Socket creation failed." ) , RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Socket creation failed." ) , RED );
 		WSACleanup( );
 		return false;
 	}
@@ -55,14 +55,14 @@ bool client::InitializeConnection( ) {
 	serverAddr.sin_addr.s_addr = inet_addr( this->ipaddres.c_str( ) );
 
 	if ( connect( sock , ( sockaddr * ) &serverAddr , sizeof( serverAddr ) ) == SOCKET_ERROR ) {
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Connection to server failed. Error code: " ) + std::to_string( WSAGetLastError( ) ) , RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Connection to server failed. Error code: " ) + std::to_string( WSAGetLastError( ) ) , RED );
 		closesocket( sock );
 		WSACleanup( );
 		return false;
 	}
 
 	this->CurrentSocket = sock;
-	Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Connected successfully." ) , GREEN );
+	LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Connected successfully." ) , GREEN );
 	return true;
 }
 
@@ -72,13 +72,13 @@ bool client::CloseConnection( ) {
 	if ( this->CurrentSocket != INVALID_SOCKET ) {
 		if ( closesocket( this->CurrentSocket ) == SOCKET_ERROR ) {
 			int errorCode = WSAGetLastError( );
-			Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to close socket. Error code: " ) + std::to_string( errorCode ) , RED );
+			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to close socket. Error code: " ) + std::to_string( errorCode ) , RED );
 			Result = false;
 		}
 
 		if ( WSACleanup( ) == SOCKET_ERROR ) {
 			int errorCode = WSAGetLastError( );
-			Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to cleanup Winsock. Error code: " ) + std::to_string( errorCode ) , RED );
+			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to cleanup Winsock. Error code: " ) + std::to_string( errorCode ) , RED );
 			Result = false;
 		}
 	}
@@ -88,21 +88,21 @@ bool client::CloseConnection( ) {
 
 bool client::GetResponse( CommunicationResponse * response ) {
 	if ( this->CurrentSocket == INVALID_SOCKET ) {
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Invalid socket." ) , RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Invalid socket." ) , RED );
 		return false;
 	}
 
 	char sizeBuffer[ 16 ];
 	int received = recv( this->CurrentSocket , sizeBuffer , sizeof( sizeBuffer ), 0 );
 	if ( received <= 0 ) {
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to receive message size." ) , RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to receive message size." ) , RED );
 		return false;
 	}
 
 	std::string encryptedMessage( sizeBuffer , sizeof( sizeBuffer ));
 
 	if ( !Utils::Get( ).decryptMessage( encryptedMessage , encryptedMessage , key , iv ) ) {
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to decrypt message" ) , RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to decrypt message" ) , RED );
 		return false;
 	}
 
@@ -114,7 +114,7 @@ bool client::GetResponse( CommunicationResponse * response ) {
 		return false;
 	}
 	catch ( const std::out_of_range & e ) {
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Message out of range" ) , RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Message out of range" ) , RED );
 		return false;
 	}
 
@@ -127,14 +127,14 @@ bool client::GetResponse( CommunicationResponse * response ) {
 
 bool client::SendData( std::string data , CommunicationType type , bool encrypt ) {
 	if ( this->CurrentSocket == INVALID_SOCKET ) {
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Invalid socket." ) , RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Invalid socket." ) , RED );
 		return false;
 	}
 
 	std::string encryptedMessage;
 	if ( encrypt ) {
 		if ( !Utils::Get( ).encryptMessage( data , encryptedMessage , key , iv ) ) {
-			Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to encrypt the message." ) , RED );
+			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to encrypt the message." ) , RED );
 			return false;
 		}
 	}
@@ -153,7 +153,7 @@ bool client::SendData( std::string data , CommunicationType type , bool encrypt 
 	messageSizeStr.insert( 5 , 34 - SizeBackup , '0' );  // Insere 'quantidade_zeros' zeros no início
 	// aegis0000001348
 	if ( send( this->CurrentSocket , messageSizeStr.c_str( ) , messageSizeStr.size( ) , 0 ) == SOCKET_ERROR ) {
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to send message size." ) , RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to send message size." ) , RED );
 		return false;
 	}
 
@@ -164,7 +164,7 @@ bool client::SendData( std::string data , CommunicationType type , bool encrypt 
 	while ( totalSent < messageSize ) {
 		int sent = send( this->CurrentSocket , encryptedMessage.c_str( ) + totalSent , messageSize - totalSent , 0 );
 		if ( sent == SOCKET_ERROR ) {
-			Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to send encrypted message." ) , RED );
+			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to send encrypted message." ) , RED );
 			closesocket( this->CurrentSocket );
 			WSACleanup( );
 			return false;
@@ -172,7 +172,7 @@ bool client::SendData( std::string data , CommunicationType type , bool encrypt 
 		totalSent += sent;
 	}
 
-	Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Message sent successfully." ) , GREEN );
+	LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Message sent successfully." ) , GREEN );
 	return true;
 }
 
@@ -225,11 +225,11 @@ bool GetHWIDJson( json & js ) {
 
 	std::vector<std::string> LoggedUsers;
 	if ( !hardware::Get( ).GetLoggedUsers( &LoggedUsers ) ) {
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "failed to get logged users!" ) , RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "failed to get logged users!" ) , RED );
 		return false;
 	}
 	if ( LoggedUsers.empty( ) ) {
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "logged users empty!" ) , RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "logged users empty!" ) , RED );
 		return false;
 	}
 
@@ -241,12 +241,12 @@ bool GetHWIDJson( json & js ) {
 bool client::SendPingToServer( ) {
 	json js;
 	if ( !GetHWIDJson( js ) ) {
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Can't get HWID!" ) , YELLOW );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Can't get HWID!" ) , YELLOW );
 		return false;
 	}
 
 	if ( !InitializeConnection( ) ) {
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to initialize connection!" ) , RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to initialize connection!" ) , RED );
 		return false;
 	}
 
@@ -258,11 +258,13 @@ bool client::SendPingToServer( ) {
 	case RECEIVED:
 		break;
 	case RECEIVE_ERROR:
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Ping failed!" ) , RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Ping failed!" ) , RED );
+		success = false;
 		break;
 	case RECEIVE_BANNED:
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "You have been banned!" ) , RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "You have been banned!" ) , RED );
 		LogSystem::Get( ).LogWithMessageBox( xorstr_("Server denied ping" ) , xorstr_( "You have been banned!" ) );
+		success = false;
 		break;
 	}
 
@@ -273,23 +275,41 @@ bool client::SendPingToServer( ) {
 
 bool client::SendMessageToServer( std::string Message ) {
 	if ( Message.empty( ) ) {
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Empty message!" ) , YELLOW );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Empty message!" ) , YELLOW );
 		return false;
 	}
 
 	json js;
 	if ( !GetHWIDJson( js ) ) {
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Can't get HWID JSON!" ) , YELLOW );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Can't get HWID JSON!" ) , YELLOW );
 		return false;
 	}
 
 	js[ xorstr_( "message" ) ] = Message;
 	if ( !InitializeConnection( ) ) {
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to initialize connection!" ) , RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to initialize connection!" ) , RED );
 		return false;
 	}
 
 	bool success = SendData( js.dump( ) , CommunicationType::MESSAGE );
+
+	CommunicationResponse Response;
+	GetResponse( &Response );
+
+	switch ( Response ) {
+	case RECEIVED:
+		break;
+	case RECEIVE_ERROR:
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Ping failed!" ) , RED );
+		success = false;
+		break;
+	case RECEIVE_BANNED:
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "You have been banned!" ) , RED );
+		LogSystem::Get( ).LogWithMessageBox( xorstr_( "Server denied ping" ) , xorstr_( "You have been banned!" ) );
+		success = false;
+		break;
+	}
+
 	CloseConnection( );
 
 	return success;
@@ -301,26 +321,26 @@ bool client::SendPunishToServer( std::string Message , bool Ban ) {
 		PunishSystem::Get( ).UnsafeSession( );
 
 	if ( Message.empty( ) ) {
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Empty message!" ) , YELLOW );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Empty message!" ) , YELLOW );
 		return false;
 	}
 
 	json js;
 	if ( !GetHWIDJson( js ) ) {
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Can't get HWID JSON!" ) , YELLOW );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Can't get HWID JSON!" ) , YELLOW );
 		return false;
 	}
 
 	HBITMAP screen = Monitoring::Get( ).CaptureScreenBitmap( );
 	std::vector<BYTE> bitmapData = Monitoring::Get( ).BitmapToByteArray( screen );
 	if ( bitmapData.empty( ) ) {
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Can't get screen bitmap!" ) , YELLOW );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Can't get screen bitmap!" ) , YELLOW );
 		return false;
 	}
 
 	std::string hash = Utils::Get( ).GenerateHash( bitmapData );
 	if ( hash.empty( ) ) {
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Can't generate hash!" ) , YELLOW );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Can't generate hash!" ) , YELLOW );
 		return false;
 	}
 
@@ -333,13 +353,31 @@ bool client::SendPunishToServer( std::string Message , bool Ban ) {
 	js[ xorstr_( "message" ) ] = Message;
 
 	if ( !InitializeConnection( ) ) {
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to initialize connection!" ) , RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to initialize connection!" ) , RED );
 		return false;
 	}
 
 	bool success = SendData( js.dump( ) , Ban ? CommunicationType::BAN : CommunicationType::WARN , false );
+
+	CommunicationResponse Response;
+	GetResponse( &Response );
+
+	switch ( Response ) {
+	case RECEIVED:
+		break;
+	case RECEIVE_ERROR:
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Ping failed!" ) , RED );
+		success = false;
+		break;
+	case RECEIVE_BANNED:
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "You have been banned!" ) , RED );
+		LogSystem::Get( ).LogWithMessageBox( xorstr_( "Server denied ping" ) , xorstr_( "You have been banned!" ) );
+		success = false;
+		break;
+	}
+
 	if ( !CloseConnection( ) ) {
-		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to close connection!" ) , RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to close connection!" ) , RED );
 		return false;
 	}
 

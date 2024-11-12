@@ -21,12 +21,9 @@ public:
 	~ThreadGuard( );
 
 	int RunningThreads( ) { return this->m_threads.size( ); }
-	HANDLE  GetThread( int I) { 
-		if ( I >= m_threads.size( ) )
-			return NULL;
-		
-		return m_threads.at( I ).first->ThreadObject->GetHandle();
-	}
+	HANDLE  GetThread( int i );
+
+	bool IsThreadrunning( int i );
 
 	bool isRunning( ) const override;
 

@@ -47,6 +47,8 @@ class Communication : public ThreadHolder {
 	std::string receiveMessage( SOCKET ClientSocket, int time);
 
 
+	int ServerResponse = -1;
+
 	SOCKET ListenSocket;
 	SOCKET ClientSocket;
 public:

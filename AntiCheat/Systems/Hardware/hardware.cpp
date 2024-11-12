@@ -32,8 +32,8 @@
 
 
 #include "../Utils/xorstr.h"
-#include "../Utils/utils.h"
 #include "../../Systems/LogSystem/File/File.h"
+#include "../../Systems/LogSystem/Log.h"
 
 
 #include <nlohmann/json.hpp>
@@ -46,7 +46,7 @@ bool hardware::GetMotherboardSerialNumber( std::string * buffer ) {
     // Inicializa o COM
     hres = CoInitializeEx( 0 , COINIT_MULTITHREADED );
     if ( FAILED( hres ) ) {
-        Utils::Get( ).WarnMessage( _HWID , xorstr_( "Failed to initialize COM library" ) , RED );
+        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to initialize COM library" ) , RED );
         return false;
     }
 
@@ -59,7 +59,7 @@ bool hardware::GetMotherboardSerialNumber( std::string * buffer ) {
 
     if ( FAILED( hres ) ) {
         CoUninitialize( );
-        Utils::Get( ).WarnMessage( _HWID , xorstr_( "Failed to initialize security" ) , RED );
+        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to initialize security" ) , RED );
         return false;
     }
 
@@ -73,7 +73,7 @@ bool hardware::GetMotherboardSerialNumber( std::string * buffer ) {
 
     if ( FAILED( hres ) ) {
         CoUninitialize( );
-        Utils::Get( ).WarnMessage( _HWID , xorstr_( "Failed to create IWbemLocator object" ) , RED );
+        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to create IWbemLocator object" ) , RED );
         return false;
     }
 
@@ -87,7 +87,7 @@ bool hardware::GetMotherboardSerialNumber( std::string * buffer ) {
     if ( FAILED( hres ) ) {
         pLoc->Release( );
         CoUninitialize( );
-        Utils::Get( ).WarnMessage( _HWID , xorstr_( "Could not connect to WMI namespace" ) , RED );
+        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Could not connect to WMI namespace" ) , RED );
         return false;
     }
 
@@ -101,7 +101,7 @@ bool hardware::GetMotherboardSerialNumber( std::string * buffer ) {
         pSvc->Release( );
         pLoc->Release( );
         CoUninitialize( );
-        Utils::Get( ).WarnMessage( _HWID , xorstr_( "Could not set proxy blanket" ) , RED );
+        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Could not set proxy blanket" ) , RED );
         return false;
     }
 
@@ -118,7 +118,7 @@ bool hardware::GetMotherboardSerialNumber( std::string * buffer ) {
         pSvc->Release( );
         pLoc->Release( );
         CoUninitialize( );
-        Utils::Get( ).WarnMessage( _HWID , xorstr_( "Query for motherboard serial number failed" ) , RED );
+        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Query for motherboard serial number failed" ) , RED );
         return false;
     }
 
@@ -157,7 +157,7 @@ bool hardware::GetDiskSerialNumber( std::string * buffer ) {
     // Inicializa o COM
     hres = CoInitializeEx( 0 , COINIT_MULTITHREADED );
     if ( FAILED( hres ) ) {
-        Utils::Get( ).WarnMessage( _HWID , xorstr_( "Failed to initialize COM library" ) , RED );
+        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to initialize COM library" ) , RED );
         return false;
     }
 
@@ -170,7 +170,7 @@ bool hardware::GetDiskSerialNumber( std::string * buffer ) {
 
     if ( FAILED( hres ) ) {
         CoUninitialize( );
-        Utils::Get( ).WarnMessage( _HWID , xorstr_( "Failed to initialize security" ) , RED );
+        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to initialize security" ) , RED );
         return false;
     }
 
@@ -184,7 +184,7 @@ bool hardware::GetDiskSerialNumber( std::string * buffer ) {
 
     if ( FAILED( hres ) ) {
         CoUninitialize( );
-        Utils::Get( ).WarnMessage( _HWID , xorstr_( "Failed to create IWbemLocator object" ) , RED );
+        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to create IWbemLocator object" ) , RED );
         return false;
     }
 
@@ -198,7 +198,7 @@ bool hardware::GetDiskSerialNumber( std::string * buffer ) {
     if ( FAILED( hres ) ) {
         pLoc->Release( );
         CoUninitialize( );
-        Utils::Get( ).WarnMessage( _HWID , xorstr_( "Could not connect to WMI namespace" ) , RED );
+        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Could not connect to WMI namespace" ) , RED );
         return false;
     }
 
@@ -212,7 +212,7 @@ bool hardware::GetDiskSerialNumber( std::string * buffer ) {
         pSvc->Release( );
         pLoc->Release( );
         CoUninitialize( );
-        Utils::Get( ).WarnMessage( _HWID , xorstr_( "Could not set proxy blanket" ) , RED );
+        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Could not set proxy blanket" ) , RED );
         return false;
     }
 
@@ -229,7 +229,7 @@ bool hardware::GetDiskSerialNumber( std::string * buffer ) {
         pSvc->Release( );
         pLoc->Release( );
         CoUninitialize( );
-        Utils::Get( ).WarnMessage( _HWID , xorstr_( "Query for disk drive serial number failed" ) , RED );
+        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Query for disk drive serial number failed" ) , RED );
         return false;
     }
 
@@ -312,21 +312,21 @@ bool hardware::GetLoggedUsers( std::vector<std::string> * Buffer ) {
 
     std::string SteamPath = checkRegistryForSteamPath( );
     if ( SteamPath.empty( ) ) {
-        Utils::Get( ).WarnMessage( _CHECKER , xorstr_( "failed to get steam path" ) , RED );
+        LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "failed to get steam path" ) , RED );
         return false;
     }
 
     std::string LoginUsers = SteamPath + xorstr_( "\\config\\loginusers.vdf" );
     File LoginUsersFile( LoginUsers );
     if ( !LoginUsersFile.Exists( ) ) {
-        Utils::Get( ).WarnMessage( _CHECKER , xorstr_( "can't find loginusers" ) , RED );
+        LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "can't find loginusers" ) , RED );
         return false;
     }
 
     std::string LoginUsersFileContent = LoginUsersFile.Read( );
     if ( LoginUsersFileContent.empty( ) )
     {
-        Utils::Get( ).WarnMessage( _CHECKER , xorstr_( "loggin users empty!" ) , RED );
+        LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "loggin users empty!" ) , RED );
         return false;
     }
 
@@ -344,7 +344,7 @@ std::vector<std::string> hardware::getMacAddress( ) {
 	DWORD dwBufLen = sizeof( AdapterInfo );         // Salva o tamanho da memória de AdapterInfo
 	DWORD dwStatus = GetAdaptersInfo( AdapterInfo , &dwBufLen );
 	if ( dwStatus != ERROR_SUCCESS ) {
-        Utils::Get( ).WarnMessage( _HWID , xorstr_( "GetAdaptersInfo failed with error:" ) , RED );
+        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "GetAdaptersInfo failed with error:" ) , RED );
 		return MACS;
 	}
 
@@ -374,13 +374,13 @@ std::string hardware::GetIp( int port ) {
 
     // Initialize Winsock
     if ( WSAStartup( MAKEWORD( 2 , 2 ) , &wsaData ) != 0 ) {
-        Utils::Get( ).WarnMessage( _HWID , xorstr_( "WSAStartup failed" ) , RED );
+        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "WSAStartup failed" ) , RED );
         return Result;
     }
 
     // Get the hostname of the local machine
     if ( gethostname( hostname , sizeof( hostname ) ) == SOCKET_ERROR ) {
-        Utils::Get( ).WarnMessage( _HWID , xorstr_( "Error getting local hostname" ) , RED );
+        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Error getting local hostname" ) , RED );
         WSACleanup( );
         return Result;
     }
@@ -392,7 +392,7 @@ std::string hardware::GetIp( int port ) {
 
     // Resolve the hostname to an IP address
     if ( getaddrinfo( hostname , NULL , &hints , &res ) != 0 ) {
-        Utils::Get( ).WarnMessage(_HWID , xorstr_( "Error getting local IP address" ) , RED );
+        LogSystem::Get( ).ConsoleLog(_HWID , xorstr_( "Error getting local IP address" ) , RED );
         WSACleanup( );
         return Result;
     }

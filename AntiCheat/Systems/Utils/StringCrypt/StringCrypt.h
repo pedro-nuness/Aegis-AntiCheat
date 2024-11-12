@@ -23,7 +23,7 @@ class StringCrypt : public CSingleton<StringCrypt>
 public:
 	StringCrypt( ) { Init( ); }
 
-	std::string EncryptString( std::string STR);
+	CryptedString EncryptString( std::string STR);
 	std::string * DecryptString( std::string hash);
 	std::string * DecryptString( CryptedString string );
 	bool CleanString( std::string * sPtr );

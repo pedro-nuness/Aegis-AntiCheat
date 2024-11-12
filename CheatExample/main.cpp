@@ -17,6 +17,7 @@ DWORD WINAPI main( PVOID base )
 	std::cout << ( "[+] DLL Sucessfully attached at " ) << base << ( "\n" );
 
 	while ( true ) {
+		std::cout << "Hello from cheat!\n";
 		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
 	}
 

@@ -24,3 +24,4 @@ void ThreadHolder::stop( ) {
 		WaitForSingleObject( ThreadObject->GetHandle( ) , INFINITE );
 	}
 }
+

@@ -9,17 +9,7 @@
 
 
 void StringCrypt::Init( ) {
-	CryptedString cStr;
 
-	cStr.Hash = xorstr_("a477c5772e93d5a7f3f91d766d249e0a63b8bef5");
-	cStr.EncryptedString = {
-		{3052, -127}, {1013, -125}, {1215, -102}, {2441, -66}, {4338, 80},
-		{651, -42}, {4603, 102}, {3263, 108}, {4012, -78}, {3516, -90},
-		{3405, 45}, {207, -119}, {2524, 77}, {3842, 78}, {1918, -40},
-		{3027, 87}
-	};
-
-	Strings.emplace_back( cStr );
 }
 
 std::vector<char> StringCrypt::GeneratePlain( std::string str ) {
@@ -32,7 +22,7 @@ std::vector<char> StringCrypt::GeneratePlain( std::string str ) {
 }
 
 
-std::string StringCrypt::EncryptString( std::string str ) {
+CryptedString StringCrypt::EncryptString( std::string str ) {
 
 	std::string Hash = Mem::Get( ).GenerateHash( str );
 	CryptedString cStr;
@@ -48,9 +38,9 @@ std::string StringCrypt::EncryptString( std::string str ) {
 		cStr.EncryptedString.emplace_back( cChar );
 	}
 
-	Strings.emplace_back( cStr );
-	SaveEncryptedStringsToFile( xorstr_( "crypt.txt" ) , cStr );
-	return Result;
+	cStr.Hash = Hash;
+
+	return cStr;
 }
 
 bool StringCrypt::CleanString( std::string * sPtr ) {
@@ -59,28 +49,13 @@ bool StringCrypt::CleanString( std::string * sPtr ) {
 	return true;
 }
 
-std::string * StringCrypt::DecryptString( std::string hash ) {
-
-	for ( const auto & cStr : Strings ) {
-		if ( cStr.Hash == hash ) {
-			auto * result = new std::string;
-			result->reserve( cStr.EncryptedString.size( ) ); // Pre-allocate memory
-
-			for ( const auto & cChar : cStr.EncryptedString ) {
-				result->push_back( cChar.Letter + cChar._Key );
-			}
-			return result;
-		}
-	}
-	return nullptr;
-}
 
 std::string * StringCrypt::DecryptString( CryptedString str ) {
 	auto * result = new std::string;
 	result->reserve( str.EncryptedString.size( ) ); // Pre-allocate memory
 
 	for ( const auto & cChar : str.EncryptedString ) {
-		result += ( cChar.Letter + cChar._Key );
+		result->push_back( cChar.Letter + cChar._Key );
 	}
 
 	return result;

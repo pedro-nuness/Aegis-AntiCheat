@@ -6,6 +6,7 @@
 #include "../../Systems/Utils/xorstr.h"
 #include "../../Systems/LogSystem/Log.h"
 
+#include "../../Globals/Globals.h"
 
 AntiDebugger::AntiDebugger( ) {
 
@@ -16,18 +17,18 @@ AntiDebugger::~AntiDebugger( ) {
 
 void AntiDebugger::threadFunction( ) {
 
-	Utils::Get( ).WarnMessage( _ANTIDEBUGGER , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );
+	LogSystem::Get( ).ConsoleLog( _ANTIDEBUGGER , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );
 
 	bool running_thread = true;
 
 	while ( running_thread ) {
 
 		if ( this->ThreadObject->IsShutdownSignalled( ) ) {
-			Utils::Get( ).WarnMessage( _ANTIDEBUGGER , xorstr_( "thread signalled to shutdown!" ) , YELLOW );
+			LogSystem::Get( ).ConsoleLog( _ANTIDEBUGGER , xorstr_( "shutting down thread" ) , RED );
 			return;
 		}
 
-		Utils::Get( ).WarnMessage( _ANTIDEBUGGER , xorstr_( "antidbg ping" ) , GRAY );
+		LogSystem::Get( ).ConsoleLog( _ANTIDEBUGGER , xorstr_( "antidbg ping" ) , GRAY );
 
 		std::this_thread::sleep_for( std::chrono::seconds( this->getThreadSleepTime( ) ) );
 	}

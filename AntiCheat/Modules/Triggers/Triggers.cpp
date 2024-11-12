@@ -310,7 +310,7 @@ void Triggers::CheckBlackListedProcesses( ) {
 
 			if ( Utils::Get( ).CheckStrings( BLProcess , Process ) ) {
 				AddTrigger( Trigger { xorstr_( "BlackListedProcess" ) , Process, BLProcess, SUSPECT } );
-				Utils::Get( ).WarnMessage( _TRIGGERS , xorstr_( "found black listed process: " ) + Process , YELLOW );
+				LogSystem::Get( ).ConsoleLog( _TRIGGERS , xorstr_( "found black listed process: " ) + Process , YELLOW );
 			}
 		}
 
@@ -332,7 +332,7 @@ void Triggers::CheckBlackListedWindows( ) {
 
 			if ( Utils::Get( ).CheckStrings( Window , BLWindow ) ) {
 				AddTrigger( Trigger { xorstr_( "BlackListedWindows" ) ,Window, BLWindow, SUSPECT } );
-				Utils::Get( ).WarnMessage( _TRIGGERS , xorstr_( "found black listed window: " ) + Window , YELLOW );
+				LogSystem::Get( ).ConsoleLog( _TRIGGERS , xorstr_( "found black listed window: " ) + Window , YELLOW );
 			}
 		}
 
@@ -350,13 +350,18 @@ std::string Triggers::GenerateWarningStatus( std::vector<Trigger> Triggers ) {
 
 void Triggers::threadFunction(  ) {
 
-
 	bool Run = true;
-	Utils::Get( ).WarnMessage( _TRIGGERS , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );
+	LogSystem::Get( ).ConsoleLog( _TRIGGERS , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );
+
+	while ( !Globals::Get( ).VerifiedSession ) {
+		//as fast as possible cuh
+		std::this_thread::sleep_for( std::chrono::nanoseconds( 1 ) ); // Check every 30 seconds
+	}
+
 	while ( Run ) {
 
 		if ( this->ThreadObject->IsShutdownSignalled( ) ) {
-			Utils::Get( ).WarnMessage( _TRIGGERS , xorstr_( "shutdown thread signalled" ) , YELLOW );
+			LogSystem::Get( ).ConsoleLog( _TRIGGERS , xorstr_( "shutting down thread" ) , RED );
 			return;
 		}
 

@@ -101,7 +101,6 @@ bool Utils::ExistsFile( const std::string & name )
 	}
 }
 
-std::mutex PrintMutex;
 
 
 // Função para descriptografar a mensagem usando AES-256-CBC
@@ -143,69 +142,6 @@ bool Utils::decryptMessage( const std::string & ciphertext , std::string & plain
 	}
 
 
-void Utils::WarnMessage( MODULE_SENDER sender , std::string Message , COLORS _col ) {
-#if false
-	return;
-#else
-	std::lock_guard<std::mutex> lock( PrintMutex );
-	std::string custom_text = xorstr_( "undefined" );
-	COLORS custom_col = RED;
-
-	switch ( sender ) {
-	case _DETECTION:
-		custom_text = xorstr_( "detection" );
-		custom_col = LIGHT_RED;
-		break;
-	case _COMMUNICATION:
-		custom_text = xorstr_( "communication" );
-		custom_col = LIGHT_BLUE;
-		break;
-	case _TRIGGERS:
-		custom_text = xorstr_( "triggers" );
-		custom_col = YELLOW;
-		break;
-	case _MONITOR:
-		custom_text = xorstr_( "thread monitor" );
-		custom_col = LIGHT_GREEN;
-		break;
-	case _SERVER:
-		custom_text = xorstr_( "server communication" );
-		custom_col = DARK_BLUE;
-		break;
-	case _SERVER_MESSAGE:
-		custom_text = xorstr_( "server message" );
-		custom_col = LIGHT_YELLOW;
-		break;
-	case _CHECKER:
-		custom_text = xorstr_( "checker" );
-		custom_col = PURPLE;
-		break;
-	case _ANTIDEBUGGER:
-		custom_text = xorstr_( "anti-debugger" );
-		custom_col = LIGHTER_BLUE;
-		break;
-	case _HWID:
-		custom_text = xorstr_( "hwid" );
-		custom_col = LIGHTER_BLUE;
-		break;
-	case _MAIN:
-		custom_text = xorstr_( "main" );
-		custom_col = GRAY;
-		break;
-	case _PUNISH:
-		custom_text = xorstr_( "punish" );
-		custom_col = RED;
-		break;
-	case _PREVENTIONS:
-		custom_text = xorstr_( "preventions" );
-		custom_col = PINK;
-		break;
-	}
-	
-	Warn( custom_col , custom_text );
-	ColoredText( xorstr_( " " ) + Message + xorstr_( "\n" ) , _col );
-#endif
-}
 
 
 char * Utils::GenerateRandomString( int length ) //make sure to delete[] memory after
@@ -319,13 +255,6 @@ bool Utils::isNumber( const std::string & str ) {
 }
 
 
-void Utils::ColoredText( std::string text , COLORS color )
-{
-	HANDLE hConsole = GetStdHandle( STD_OUTPUT_HANDLE );
-	SetConsoleTextAttribute( hConsole , color );
-	std::cout << text;
-	SetConsoleTextAttribute( hConsole , WHITE );
-}
 
 bool Utils::CheckStrings( std::string bString1 , std::string bExpectedResult )
 {
@@ -336,14 +265,6 @@ bool Utils::CheckStrings( std::string bString1 , std::string bExpectedResult )
 	}
 
 	return false;
-}
-
-void Utils::Warn( COLORS color , std::string custom_text )
-{
-	std::string text = custom_text == ( "" ) ? ( "-" ) : custom_text;
-	ColoredText( xorstr_( "[" ) , WHITE );
-	ColoredText( text , color );
-	ColoredText( xorstr_( "] " ) , WHITE );
 }
 
 

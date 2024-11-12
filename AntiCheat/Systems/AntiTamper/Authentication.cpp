@@ -44,7 +44,7 @@ BOOL Authentication::VerifyEmbeddedSignature( std::string filePath )
 	trustData.dwStateAction = WTD_STATEACTION_CLOSE;
 	WinVerifyTrust( NULL , &policyGUID , &trustData );
 
-	// Utils::Get( ).WarnMessage( _DETECTION , filePath + xorstr_( "file verification returned: " ) + std::to_string( status ) , YELLOW );
+	// LogSystem::Get( ).ConsoleLog( _DETECTION , filePath + xorstr_( "file verification returned: " ) + std::to_string( status ) , YELLOW );
 
 	return status == ERROR_SUCCESS;
 }
