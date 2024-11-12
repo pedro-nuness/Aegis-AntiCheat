@@ -4,6 +4,12 @@
 #include <windows.h>
 
 
+enum DETECTION_STATUS {
+	NOTHING_DETECTED ,
+	DETECTED ,
+	SUSPECT
+};
+
 class Globals : public CSingleton<Globals>
 {
 public:

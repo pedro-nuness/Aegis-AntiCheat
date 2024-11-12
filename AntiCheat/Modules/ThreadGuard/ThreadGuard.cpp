@@ -6,7 +6,7 @@
 #include "../../Systems/LogSystem/Log.h"
 #include "../../Systems/Utils/utils.h"
 
-ThreadGuard::ThreadGuard( std::vector<std::pair<ThreadHolder * , int>> & threads ) : m_threads( threads ) , m_running( false ) {}
+ThreadGuard::ThreadGuard( std::vector<std::pair<ThreadHolder * , int>> & threads ) : m_threads( threads )  {}
 
 ThreadGuard::~ThreadGuard( ) {
 	stop( );
@@ -68,7 +68,6 @@ void ThreadGuard::threadFunction(  ) {
 			}
 			return;
 		}
-
 
 		std::lock_guard<std::mutex> lock( this->m_mutex );
 		for ( auto & thread : this->m_threads ) {

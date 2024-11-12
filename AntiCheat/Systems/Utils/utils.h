@@ -36,7 +36,8 @@ enum MODULE_SENDER{
 	_CHECKER,
 	_HWID,
 	_MAIN,
-	_PUNISH
+	_PUNISH,
+	_PREVENTIONS
 };
 
 class Utils : public CSingleton<Utils>
@@ -50,6 +51,10 @@ public:
 	void WarnMessage( MODULE_SENDER Sender , std::string Message , COLORS _col );
 	bool isNumber( const std::string & str );
 	
+	char * GenerateRandomString( int length ); //make sure to delete[] memory after
+	wchar_t * GenerateRandomWString( int length ); //make sure to delete[] memory after
+	
+
 	bool encryptMessage( const std::string & plaintext , std::string & ciphertext , const std::string & key , const std::string & iv );
 	bool decryptMessage( const std::string & ciphertext , std::string & plaintext , const std::string & key , const std::string & iv );
 	std::string GenerateHash( const std::vector<BYTE> & input );

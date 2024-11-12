@@ -122,7 +122,7 @@
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>GDI32.lib;Normaliz.lib;Ws2_32.lib;Wldap32.lib;Crypt32.lib;advapi32.lib;curl/libcurl.lib;dpp/dpp.lib;openssl/libssl.lib;openssl/libcrypto.lib;windvert/WinDivert.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>iphlpapi.lib;ws2_32.lib;wbemuuid.lib;GDI32.lib;Normaliz.lib;Ws2_32.lib;Wldap32.lib;Crypt32.lib;advapi32.lib;curl/libcurl.lib;dpp/dpp.lib;openssl/libssl.lib;openssl/libcrypto.lib;windvert/WinDivert.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -134,7 +134,6 @@
     <ClCompile Include="log\log.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="memory\memory.cpp" />
-    <ClCompile Include="sender\sender.cpp" />
     <ClCompile Include="server\server.cpp" />
     <ClCompile Include="utils\file\File.cpp" />
     <ClCompile Include="utils\utils.cpp" />
@@ -618,7 +617,6 @@
     <ClInclude Include="image\image.h" />
     <ClInclude Include="log\log.h" />
     <ClInclude Include="memory\memory.h" />
-    <ClInclude Include="sender\sender.h" />
     <ClInclude Include="server\server.h" />
     <ClInclude Include="utils\file\File.h" />
     <ClInclude Include="utils\singleton.h" />

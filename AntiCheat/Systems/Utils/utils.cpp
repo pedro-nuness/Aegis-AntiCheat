@@ -144,10 +144,10 @@ bool Utils::decryptMessage( const std::string & ciphertext , std::string & plain
 
 
 void Utils::WarnMessage( MODULE_SENDER sender , std::string Message , COLORS _col ) {
-	std::lock_guard<std::mutex> lock( PrintMutex );
 #if false
 	return;
 #else
+	std::lock_guard<std::mutex> lock( PrintMutex );
 	std::string custom_text = xorstr_( "undefined" );
 	COLORS custom_col = RED;
 
@@ -196,6 +196,10 @@ void Utils::WarnMessage( MODULE_SENDER sender , std::string Message , COLORS _co
 		custom_text = xorstr_( "punish" );
 		custom_col = RED;
 		break;
+	case _PREVENTIONS:
+		custom_text = xorstr_( "preventions" );
+		custom_col = PINK;
+		break;
 	}
 	
 	Warn( custom_col , custom_text );
@@ -203,6 +207,44 @@ void Utils::WarnMessage( MODULE_SENDER sender , std::string Message , COLORS _co
 #endif
 }
 
+
+char * Utils::GenerateRandomString( int length ) //make sure to delete[] memory after
+{
+	if ( length == 0 )
+		return NULL;
+
+	const char charset[ ] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()";
+
+	char * randomString = new char[ ( length + 1 ) * sizeof( char ) ];
+
+	srand( time( ( time_t * ) NULL ) );
+
+	for ( int i = 0; i < length; ++i )
+		randomString[ i ] = charset[ rand( ) % ( strlen( charset ) - 1 ) ];
+
+	randomString[ length ] = '\0';
+
+	return randomString;
+}
+
+wchar_t * Utils::GenerateRandomWString( int length ) //make sure to delete[] memory after
+{
+	if ( length == 0 )
+		return NULL;
+
+	const wchar_t charset[ ] = L"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()";
+
+	wchar_t * randomString = new wchar_t[ ( length + 1 ) * sizeof( wchar_t ) ];
+
+	srand( time( ( time_t * ) NULL ) );
+
+	for ( int i = 0; i < length; ++i )
+		randomString[ i ] = charset[ rand( ) % ( wcslen( charset ) - 1 ) ];
+
+	randomString[ length ] = '\0';
+
+	return randomString;
+}
 
 
 

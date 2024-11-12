@@ -11,7 +11,7 @@
 #include <iostream>         // Para debugging ou saídas de console (opcional)
 
 #include "../Utils/xorstr.h"
-#include "../Authentication/Authentication.h"
+#include "../AntiTamper/Authentication.h"
 #include "Services.h"
 #include <cfgmgr32.h>
 

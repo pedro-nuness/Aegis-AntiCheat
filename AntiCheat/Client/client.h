@@ -1,10 +1,16 @@
 #pragma once
-#include "receiver.h"
 #include <Windows.h>
 #include <string>
 #include "../Systems/Utils/xorstr.h"
 #include "../Systems/Utils/singleton.h"
 
+
+
+enum CommunicationResponse {
+	RECEIVED ,
+	RECEIVE_ERROR ,
+	RECEIVE_BANNED
+};
 
 
 enum CommunicationType {
@@ -24,6 +30,7 @@ class client : public CSingleton<client>{
 
 	SOCKET CurrentSocket;
 	bool InitializeConnection( );
+	bool GetResponse( CommunicationResponse * response );
 	bool CloseConnection( );
 	bool SendData( std::string Data , CommunicationType Type , bool encrypt = true );
 public:

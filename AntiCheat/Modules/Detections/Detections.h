@@ -7,20 +7,19 @@
 #include "../../Process/Thread.hpp"
 #include "../ThreadHolder/ThreadHolder.h"
 
+
 #include <mutex>
 
-enum DETECTION_STATUS {
-	NOTHING_DETECTED ,
-	CHEAT_DETECTED ,
-	MAY_DETECTED
-};
+enum DETECTION_STATUS;
 
 
 struct DetectionStruct {
-	DetectionStruct( std::string _Log ) {
+	DetectionStruct( std::string _Log, DETECTION_STATUS status) {
 		this->Log = _Log;
+		this->_Status = status;
 	}
 
+	DETECTION_STATUS _Status;
 	std::string Log;
 };
 
@@ -29,16 +28,12 @@ enum FLAG_DETECTION {
 	UNVERIFIED_MODULE_LOADED ,
 	SUSPECT_WINDOW_OPEN ,
 	HIDE_FROM_CAPTURE_WINDOW ,
+	FUNCTION_HOOKED
 };
 
 class Detections : public ThreadHolder {
 
 	std::mutex AccessGuard;
-	std::atomic<bool> m_running;
-	std::atomic<bool> m_healthy;
-
-	bool CalledScanThread = false;
-	bool ThreadUpdate = false;
 
 	DWORD MomProcess = 0 , ProtectProcess = 0;
 	std::vector<DetectionStruct> cDetections;
@@ -49,13 +44,13 @@ class Detections : public ThreadHolder {
 	bool DoesFunctionAppearHooked( std::string moduleName , std::string functionName );
 	void CheckLoadedDrivers( );
 	void CheckLoadedDlls( );
-	void IsDebuggerPresentCustom( );
-	void ScanHandles( );
+	void CheckFunctions( );
 	void ScanWindows( );
 	void ScanModules( );
 	void AddDetection( FLAG_DETECTION flag , DetectionStruct Detect );
 	void DigestDetections( );
 	void ScanParentModules( );
+	
 	std::string GenerateDetectionStatus( FLAG_DETECTION flag , DetectionStruct _detection );
 
 	void threadFunction( ) override;

@@ -15,6 +15,7 @@
 #include "../Systems/Monitoring/Monitoring.h"
 #include "../Systems/Hardware/hardware.h"
 #include "../Systems/Punishing/PunishSystem.h"
+#include "../Systems/LogSystem/Log.h"
 #include "../../Globals/Globals.h"
 
 #pragma comment(lib, "wbemuuid.lib")
@@ -74,7 +75,7 @@ bool client::CloseConnection( ) {
 			Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to close socket. Error code: " ) + std::to_string( errorCode ) , RED );
 			Result = false;
 		}
-	
+
 		if ( WSACleanup( ) == SOCKET_ERROR ) {
 			int errorCode = WSAGetLastError( );
 			Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to cleanup Winsock. Error code: " ) + std::to_string( errorCode ) , RED );
@@ -83,6 +84,45 @@ bool client::CloseConnection( ) {
 	}
 
 	return Result;
+}
+
+bool client::GetResponse( CommunicationResponse * response ) {
+	if ( this->CurrentSocket == INVALID_SOCKET ) {
+		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Invalid socket." ) , RED );
+		return false;
+	}
+
+	char sizeBuffer[ 16 ];
+	int received = recv( this->CurrentSocket , sizeBuffer , sizeof( sizeBuffer ), 0 );
+	if ( received <= 0 ) {
+		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to receive message size." ) , RED );
+		return false;
+	}
+
+	std::string encryptedMessage( sizeBuffer , sizeof( sizeBuffer ));
+
+	if ( !Utils::Get( ).decryptMessage( encryptedMessage , encryptedMessage , key , iv ) ) {
+		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to decrypt message" ) , RED );
+		return false;
+	}
+
+	int messageInt;
+	try {
+		messageInt = std::stoi( encryptedMessage );
+	}
+	catch ( const std::invalid_argument & e ) {
+		return false;
+	}
+	catch ( const std::out_of_range & e ) {
+		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Message out of range" ) , RED );
+		return false;
+	}
+
+	if ( response != nullptr )
+		*response = ( CommunicationResponse ) messageInt;
+
+
+	return true;
 }
 
 bool client::SendData( std::string data , CommunicationType type , bool encrypt ) {
@@ -181,7 +221,7 @@ bool GetHWIDJson( json & js ) {
 	if ( Utils::Get( ).GenerateStringHash( Nickname ) != Globals::Get( ).NicknameHash ) {
 		js[ xorstr_( "warn_message" ) ] = xorstr_( "Nickname hash corrupted, user may have changed its user!" );
 	}
-	js[ xorstr_("nickname") ] = Nickname;
+	js[ xorstr_( "nickname" ) ] = Nickname;
 
 	std::vector<std::string> LoggedUsers;
 	if ( !hardware::Get( ).GetLoggedUsers( &LoggedUsers ) ) {
@@ -211,6 +251,21 @@ bool client::SendPingToServer( ) {
 	}
 
 	bool success = SendData( js.dump( ) , CommunicationType::PING );
+	CommunicationResponse Response;
+	GetResponse( &Response );
+
+	switch ( Response ) {
+	case RECEIVED:
+		break;
+	case RECEIVE_ERROR:
+		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Ping failed!" ) , RED );
+		break;
+	case RECEIVE_BANNED:
+		Utils::Get( ).WarnMessage( _SERVER , xorstr_( "You have been banned!" ) , RED );
+		LogSystem::Get( ).LogWithMessageBox( xorstr_("Server denied ping" ) , xorstr_( "You have been banned!" ) );
+		break;
+	}
+
 	CloseConnection( );
 
 	return success;

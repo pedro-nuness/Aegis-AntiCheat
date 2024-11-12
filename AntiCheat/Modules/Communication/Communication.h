@@ -5,7 +5,6 @@
 #include <chrono>
 
 #include "../../Process/Thread.hpp"
-#include "../../Client/receiver.h"
 #include "../ThreadHolder/ThreadHolder.h"
 
 class Communication : public ThreadHolder {
@@ -41,10 +40,6 @@ class Communication : public ThreadHolder {
 
 	std::string ExpectedMessage = "";
 
-	std::thread m_thread;
-	std::atomic<bool> m_running;
-	std::atomic<bool> m_healthy;
-
 	SOCKET openConnection( const char * ipAdress, int port );
 	void closeconnection( SOCKET socket );
 	SOCKET listenForClient( SOCKET socket , int timeoutSeconds );
@@ -52,17 +47,14 @@ class Communication : public ThreadHolder {
 	std::string receiveMessage( SOCKET ClientSocket, int time);
 
 
-	receiver ServerReceiver;
 	SOCKET ListenSocket;
 	SOCKET ClientSocket;
 public:
 
 	Communication( DWORD Pid , DWORD GamePid  )
-		: ProcessPID( Pid ) , GamePID( GamePid ) , m_running( false ) {}
+		: ProcessPID( Pid ) , GamePID( GamePid )  {}
 
 	~Communication( );
-
-	int GetListenerPort( ) { return this->ServerReceiver.GetPort( ); }
 
 	bool isRunning( ) const override;
 };

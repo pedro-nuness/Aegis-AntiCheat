@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <memory.h>
 
-#include "../../Systems/Authentication/Authentication.h"
+#include "../../Systems/AntiTamper/Authentication.h"
 #include "../../Systems/Memory/memory.h"
 #include "../../Systems/Utils/xorstr.h"
 #include "../../Systems/Monitoring/Monitoring.h"
@@ -44,7 +44,7 @@ VOID CALLBACK Detections::OnDllNotification( ULONG NotificationReason , const PL
 	if ( NotificationReason == LDR_DLL_NOTIFICATION_REASON_LOADED )
 	{
 		LPCWSTR FullDllName = NotificationData->Loaded.FullDllName->pBuffer;
-		std::string DllName = Utils::Get().ConvertLPCWSTRToString( FullDllName );
+		std::string DllName = Utils::Get( ).ConvertLPCWSTRToString( FullDllName );
 		{
 			std::lock_guard<std::mutex> lock( Monitor->AccessGuard );
 			Monitor->PendingLoadedDlls.emplace_back( DllName );
@@ -95,7 +95,7 @@ void Detections::CheckLoadedDrivers( ) {
 			if ( !Authentication::Get( ).HasSignature( Driver ) )
 			{
 				Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "Unverified Driver loaded: " ) + Driver , RED );
-				AddDetection( UNVERIFIED_DRIVER_RUNNING , DetectionStruct( Driver ) );
+				AddDetection( UNVERIFIED_DRIVER_RUNNING , DetectionStruct( Driver , DETECTED ) );
 			}
 		}
 	}
@@ -117,7 +117,7 @@ void Detections::CheckLoadedDlls( ) {
 		if ( !Authentication::Get( ).HasSignature( Dll ) )
 		{
 			Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "Unverified dll loaded: " ) + Dll , RED );
-			AddDetection( UNVERIFIED_MODULE_LOADED , DetectionStruct( Dll ) );
+			AddDetection( UNVERIFIED_MODULE_LOADED , DetectionStruct( Dll , DETECTED ) );
 		}
 	}
 
@@ -170,11 +170,15 @@ void Detections::DigestDetections( ) {
 
 		FinalInfo += xorstr_( "> Cheater detected\n\n" );
 
+		bool Ban = false;
+
 		for ( auto Detection : DetectedFlags ) {
 			FinalInfo += this->GenerateDetectionStatus( Detection.first , Detection.second );
+			if ( Detection.second._Status == DETECTED )
+				Ban = true;
 		}
 
-		client::Get( ).SendPunishToServer( FinalInfo , true );
+		client::Get( ).SendPunishToServer( FinalInfo , Ban );
 		LogSystem::Get( ).Log( xorstr_( "AC Flagged unsafe!" ) );
 	}
 
@@ -195,7 +199,7 @@ static BOOL __forceinline AppearHooked( UINT64 AddressFunction ) {
 
 
 
-bool Detections::DoesFunctionAppearHooked( std::string moduleName , std::string functionName ) 
+bool Detections::DoesFunctionAppearHooked( std::string moduleName , std::string functionName )
 {
 	if ( moduleName.empty( ) || functionName.empty( ) )
 		return false;
@@ -233,7 +237,6 @@ void Detections::ScanWindows( ) {
 
 	for ( const auto & window : Windows ) {
 
-		this->ThreadUpdate = true;
 
 		// Check for overlay characteristics
 		LONG_PTR exStyle = GetWindowLongPtr( window.hwnd , GWL_EXSTYLE );
@@ -271,11 +274,10 @@ void Detections::ScanWindows( ) {
 			Log += Mem::Get( ).GetProcessExecutablePath( pair.second ) + xorstr_( "\n" );
 		}
 
-		AddDetection( HIDE_FROM_CAPTURE_WINDOW , DetectionStruct( Log ) );
+		AddDetection( HIDE_FROM_CAPTURE_WINDOW , DetectionStruct( Log , DETECTED ) );
 	}
 
 	for ( const auto & pair : Map ) {
-		this->ThreadUpdate = true;
 
 		HANDLE hProcess = OpenProcess( PROCESS_VM_READ | PROCESS_QUERY_INFORMATION , FALSE , pair.first );
 		if ( hProcess == NULL )
@@ -286,8 +288,12 @@ void Detections::ScanWindows( ) {
 
 
 		if ( !Authentication::Get( ).HasSignature( ProcessPath ) ) {
-			AddDetection( SUSPECT_WINDOW_OPEN , DetectionStruct( ProcessPath ) );
+			AddDetection( SUSPECT_WINDOW_OPEN , DetectionStruct( ProcessPath , SUSPECT ) );
 			Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "process " ) + ProcessName + xorstr_( " has open window!" ) , YELLOW );
+		}
+		else {
+
+
 		}
 
 		//Utils::Get( ).WarnMessage( _DETECTION  , xorstr_( "scanning " ) + ProcessName , WHITE );
@@ -322,7 +328,17 @@ void Detections::ScanParentModules( ) {
 	}
 }
 
-void Detections::threadFunction( ){
+void Detections::CheckFunctions( ) {
+	/*if ( this->DoesFunctionAppearHooked( xorstr_( "ws2_32.dll" ) , xorstr_( "send" ) ) ) {
+		AddDetection( FUNCTION_HOOKED , DetectionStruct( xorstr_("ws2_32.dll:send() hooked" ) , SUSPECT ) );
+	}
+
+	if ( this->DoesFunctionAppearHooked( xorstr_( "ws2_32.dll" ) , xorstr_( "recv" ) ) ) {
+		AddDetection( FUNCTION_HOOKED , DetectionStruct( xorstr_( "ws2_32.dll:recv() hooked" ) , SUSPECT ) );
+	}*/
+}
+
+void Detections::threadFunction( ) {
 	Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );
 	bool Running = true;
 
@@ -337,6 +353,8 @@ void Detections::threadFunction( ){
 			LogSystem::Get( ).Log( xorstr_( "Test signing or debug mode is enabled" ) );
 		}
 
+		Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "checking functions!" ) , GRAY );
+		this->CheckFunctions( );
 		Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "scanning loaded drivers!" ) , GRAY );
 		this->CheckLoadedDrivers( );
 
@@ -349,7 +367,7 @@ void Detections::threadFunction( ){
 		Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "scanning parent modules!" ) , GRAY );
 		this->ScanParentModules( );
 
-		Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "digesting this!" ) , GRAY );
+		Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "digesting detecions!" ) , GRAY );
 		this->DigestDetections( );
 
 		Utils::Get( ).WarnMessage( _DETECTION , xorstr_( "detection thread" ) , GRAY );

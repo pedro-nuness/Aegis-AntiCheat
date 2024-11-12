@@ -27,11 +27,16 @@ void LogSystem::Log( std::string Message , std::string nFile ) {
 }
 
 void DetachModules( std::string Message , std::string BoxMessage ) {
+	
 	if ( Globals::Get( ).GuardMonitorPointer != nullptr ) {
 		//Stop threads
-		reinterpret_cast< ThreadGuard * >( Globals::Get( ).GuardMonitorPointer )->ThreadObject->SignalShutdown( true );
-		WaitForSingleObject( reinterpret_cast< ThreadGuard * >( Globals::Get( ).GuardMonitorPointer )->ThreadObject->GetHandle( ) , 5000 );
+		ThreadGuard * Guard = reinterpret_cast< ThreadGuard * >( Globals::Get( ).GuardMonitorPointer );
+
+		Guard->ThreadObject->SignalShutdown( true );
+		WaitForSingleObject( Guard->ThreadObject->GetHandle( ) , INFINITE );
 	}
+
+	Utils::Get( ).WarnMessage( _MAIN , xorstr_( "All threads turnned off!" ) , GREEN );
 
 	MessageBox( NULL , BoxMessage.c_str( ) , xorstr_( "Error" ) , MB_OK | MB_ICONERROR );
 
@@ -53,5 +58,5 @@ void DetachModules( std::string Message , std::string BoxMessage ) {
 
 void LogSystem::LogWithMessageBox( std::string Message , std::string BoxMessage ) {
 	
-	std::thread( DetachModules, Message , BoxMessage).detach( );
+	std::thread( DetachModules, Message , BoxMessage).join();
 }

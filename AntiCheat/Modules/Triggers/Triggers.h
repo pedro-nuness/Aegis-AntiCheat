@@ -5,18 +5,13 @@
 #include "../../Process/Thread.hpp"
 #include "../ThreadHolder/ThreadHolder.h"
 
-enum STATUS {
-	DETECTED,
-	WARNING,
-	CLEAN,
-};
-
+enum DETECTION_STATUS;
 
 struct Trigger {
 	std::string Area;
 	std::string Trigger;
 	std::string ExpectedTrigger;
-	STATUS Status;
+	DETECTION_STATUS Status;
 };
 
 class Triggers : public ThreadHolder {
@@ -44,10 +39,6 @@ class Triggers : public ThreadHolder {
 	void CheckBlackListedProcesses( );
 	void CheckBlackListedWindows( );
 	void threadFunction( ) override;
-
-	std::thread m_thread;
-	std::atomic<bool> m_running;
-	std::atomic<bool> m_healthy;
 
 public:
 	Triggers ( DWORD _MomProcess , DWORD _ProtectProcess ) {

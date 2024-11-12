@@ -180,7 +180,9 @@ bool Communication::sendMessage( SOCKET ClientSocket , std::string message ) {
 	return true;
 }
 
-bool isNumeric( const std::string & str );
+bool isNumeric( const std::string & str ) {
+	return !str.empty( ) && std::all_of( str.begin( ) , str.end( ) , ::isdigit );
+}
 
 std::string Communication::receiveMessage( SOCKET ClientSocket , int time ) {
 	//buffer size
@@ -439,11 +441,8 @@ void Communication::threadFunction() {
 		LogSystem::Get( ).Log( xorstr_( "[0001] Hash mismatch!" ) );
 	}
 
-	std::thread ReceiverThread( &receiver::InitializeConnection , this->ServerReceiver );
 	std::thread PingThread( &Communication::SendPingToServer , this );
-
 	PingThread.detach( );
-	ReceiverThread.detach( );
 
 	Globals::Get( ).VerifiedSession = true;
 
@@ -455,7 +454,7 @@ void Communication::threadFunction() {
 
 		if ( this->ThreadObject->IsShutdownSignalled( ) ) {
 			Utils::Get( ).WarnMessage( _COMMUNICATION , xorstr_( "shutdown thread signalled" ) , YELLOW );
-			this->ServerReceiver.SignalShutdown( true );
+
 			this->SignalShutdown( true );
 			break;
 		}

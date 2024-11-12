@@ -309,7 +309,7 @@ void Triggers::CheckBlackListedProcesses( ) {
 			std::transform( BLProcess.begin( ) , BLProcess.end( ) , BLProcess.begin( ) , &Mem::asciitolower );
 
 			if ( Utils::Get( ).CheckStrings( BLProcess , Process ) ) {
-				AddTrigger( Trigger { xorstr_( "BlackListedProcess" ) , Process, BLProcess, WARNING } );
+				AddTrigger( Trigger { xorstr_( "BlackListedProcess" ) , Process, BLProcess, SUSPECT } );
 				Utils::Get( ).WarnMessage( _TRIGGERS , xorstr_( "found black listed process: " ) + Process , YELLOW );
 			}
 		}
@@ -331,7 +331,7 @@ void Triggers::CheckBlackListedWindows( ) {
 			std::transform( BLWindow.begin( ) , BLWindow.end( ) , BLWindow.begin( ) , &Mem::asciitolower );
 
 			if ( Utils::Get( ).CheckStrings( Window , BLWindow ) ) {
-				AddTrigger( Trigger { xorstr_( "BlackListedWindows" ) ,Window, BLWindow, WARNING } );
+				AddTrigger( Trigger { xorstr_( "BlackListedWindows" ) ,Window, BLWindow, SUSPECT } );
 				Utils::Get( ).WarnMessage( _TRIGGERS , xorstr_( "found black listed window: " ) + Window , YELLOW );
 			}
 		}

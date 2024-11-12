@@ -9,7 +9,7 @@ protected:
     static void threadFunctionWrapper( LPVOID instance );
 
 private:
-    
+    int SleepTime = 5;
 
     virtual void threadFunction( ) = 0;
 public:
@@ -25,5 +25,5 @@ public:
 
     virtual bool isRunning( ) const = 0;
 
-    virtual int getThreadSleepTime( ) const { return 5; }  // Default sleep time
+    virtual int getThreadSleepTime( ) const { return SleepTime; }  // Default sleep time
 };

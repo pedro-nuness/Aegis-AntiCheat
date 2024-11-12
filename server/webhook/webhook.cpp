@@ -9,7 +9,6 @@
 #include "../utils/utils.h"
 #include "../server/server.h"
 #include "../config/config.h"
-#include "../sender/sender.h"
 
 std::string ban_prefix = "_ban";
 std::string unban_prefix = "unban";

@@ -39,9 +39,6 @@
     <ClCompile Include="memory\memory.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sender\sender.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="server\server.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1485,9 +1482,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="memory\memory.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="sender\sender.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="server\server.h">

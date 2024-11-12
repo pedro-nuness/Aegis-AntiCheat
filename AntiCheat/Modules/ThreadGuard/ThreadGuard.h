@@ -8,29 +8,35 @@
 
 
 enum THREADS {
-    COMMUNICATION,
-    DETECTIONS,
-    TRIGGERS,
-    ANTIDEBUGGER
+	COMMUNICATION ,
+	DETECTIONS ,
+	TRIGGERS ,
+	ANTIDEBUGGER
 };
 
 class ThreadGuard : public ThreadHolder {
 public:
 
-    ThreadGuard( std::vector<std::pair<ThreadHolder *, int>> & threads );
-    ~ThreadGuard( );
+	ThreadGuard( std::vector<std::pair<ThreadHolder * , int>> & threads );
+	~ThreadGuard( );
 
-    bool isRunning( ) const override;
-  
+	int RunningThreads( ) { return this->m_threads.size( ); }
+	HANDLE  GetThread( int I) { 
+		if ( I >= m_threads.size( ) )
+			return NULL;
+		
+		return m_threads.at( I ).first->ThreadObject->GetHandle();
+	}
+
+	bool isRunning( ) const override;
+
 private:
-    void threadFunction() override;
+	void threadFunction( ) override;
 
-    std::string GetThreadName( int thread );
+	std::string GetThreadName( int thread );
 
-    std::vector<std::pair<ThreadHolder * , int>> m_threads;
-    std::thread m_thread;
-    std::atomic<bool> m_running;
-    bool healthy;
-    std::mutex m_mutex;
+	std::vector<std::pair<ThreadHolder * , int>> m_threads;
+
+	std::mutex m_mutex;
 };
 

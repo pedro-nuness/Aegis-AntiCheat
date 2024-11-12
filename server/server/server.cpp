@@ -11,6 +11,7 @@
 #include <iomanip>
 #include <stdexcept>
 #include <utility>
+#include <comdef.h>
 
 #include <dpp/colors.h>
 
@@ -33,7 +34,6 @@ namespace fs = std::filesystem;
 
 using json = nlohmann::json;
 
-#include "../sender/sender.h"
 #include "../config/config.h"
 
 
@@ -48,6 +48,8 @@ enum WHOOKTYPE {
 	BAN_ ,
 	WARN_ ,
 };
+
+
 
 struct WHookRequest {
 
@@ -281,7 +283,7 @@ bool Server::IsSteamBanned( const std::vector<std::string> & Steams ) {
 	return false;
 }
 
-bool Server::RequestBanIP( std::string IP, std::string * Buffer) {
+bool Server::RequestBanIP( std::string IP , std::string * Buffer ) {
 	std::lock_guard<std::mutex> lock( connectionMutex );
 
 	std::unordered_map<std::string , Connection> ConnectionMap = globals::Get( ).ConnectionMap;
@@ -291,7 +293,7 @@ bool Server::RequestBanIP( std::string IP, std::string * Buffer) {
 		*Buffer = xorstr_( "The ip '" ) + IP + xorstr_( "' isn't connected to the server!" );
 		return false;
 	}
-	
+
 	if ( BanPlayer( ( IP ) ) ) {
 		*Buffer = xorstr_( "The ip '" ) + IP + xorstr_( "' has been banned successfully!" );
 		return true;
@@ -304,7 +306,7 @@ bool Server::RequestBanIP( std::string IP, std::string * Buffer) {
 	return false;
 }
 
-bool Server::UnbanIP( std::string IP) {
+bool Server::UnbanIP( std::string IP ) {
 	std::lock_guard<std::mutex> lock( connectionMutex );
 
 	utils::Get( ).WarnMessage( _SERVER , xorstr_( "Trying to unban " ) + ( IP ) , GRAY );
@@ -363,6 +365,25 @@ bool Server::UnbanIP( std::string IP) {
 	}
 
 	return false;
+}
+
+bool Server::SendData( std::string data , SOCKET socket ) {
+	if ( socket == INVALID_SOCKET ) {
+		utils::Get( ).WarnMessage( _SENDER , xorstr_( "Invalid socket." ) , RED );
+		return false;
+	}
+
+	std::string encryptedMessage;
+
+	if ( !utils::Get( ).encryptMessage( data , encryptedMessage , server_key , server_iv ) ) {
+		utils::Get( ).WarnMessage( _SENDER , xorstr_( "Failed to encrypt the message." ) , RED );
+		return false;
+	}
+
+	if ( send( socket , encryptedMessage.c_str( ) , encryptedMessage.size( ) , 0 ) == SOCKET_ERROR )
+		return false;
+
+	return true;
 }
 
 bool Server::RequestUnbanIp( std::string IP , std::string * Buffer ) {
@@ -432,15 +453,12 @@ std::string Server::RequestScreenshotFromClient( std::string Ip ) {
 
 	json js;
 	js[ xorstr_( "request_type" ) ] = REQUEST_TYPE::SCREENSHOT;
-	js[ xorstr_( "message" ) ] = xorstr_("screenshot request");
-
-	sender NewMessage( Ip );
-	std::thread( &sender::SendMessageToServer , NewMessage , js.dump( ) ).detach( );
+	js[ xorstr_( "message" ) ] = xorstr_( "screenshot request" );
 
 	return xorstr_( "Sent screenshot request to " ) + Ip + xorstr_( "!" );
 }
 
-bool Server::receiveping( const std::string & encryptedMessage ) {
+CommunicationResponse Server::receiveping( const std::string & encryptedMessage ) {
 	std::string hardware = encryptedMessage;
 
 	json js;
@@ -449,11 +467,11 @@ bool Server::receiveping( const std::string & encryptedMessage ) {
 	}
 	catch ( const json::parse_error & e ) {
 		std::cout << xorstr_( "Failed to parse JSON: " ) << e.what( ) << std::endl;
-		return false;
+		return RECEIVE_ERROR;
 	}
 
 	if ( !CheckHWID( js ) ) {
-		return false;
+		return RECEIVE_ERROR;
 	}
 
 	std::vector<std::string> Mac = js[ xorstr_( "mac" ) ];
@@ -465,9 +483,7 @@ bool Server::receiveping( const std::string & encryptedMessage ) {
 
 	if ( IsDiskBanned( DiskID ) || IsBiosBanned( MotherboardID ) || IsMacBanned( Mac ) || IsSteamBanned( Steam ) ) {
 		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Banned user " ) + ( Ip ) +xorstr_( " tried to connect to server!" ) , RED );
-		sender NewMessage( Ip );
-		std::thread( &sender::SendMessageToServer , NewMessage , "You have been banned from server" ).detach( );
-		return false;
+		return RECEIVE_BANNED;
 	}
 
 	{
@@ -496,7 +512,7 @@ bool Server::receiveping( const std::string & encryptedMessage ) {
 		}
 	}
 
-	return true;
+	return RECEIVED;
 }
 
 std::string Server::AppendHWIDToString( const std::string & str , const std::string & Ip ) {
@@ -536,7 +552,7 @@ std::string Server::AppendHWIDToString( const std::string & str , const std::str
 
 	Js[ xorstr_( "hwid" ) ] = HWID;
 
-	return Js.dump();
+	return Js.dump( );
 }
 
 bool Server::BanPlayer( const std::string & Ip ) {
@@ -564,19 +580,16 @@ bool Server::BanPlayer( const std::string & Ip ) {
 
 	globals::Get( ).ConnectionMap.erase( Ip );
 
-	sender NewMessage( Ip );
-	std::thread( &sender::SendMessageToServer , NewMessage , "You have been banned from server" ).detach( );
-
 	SaveBlockedSets( );
 
 	return true;
 }
 
 
-bool Server::receivepunish( const std::string & encryptedMessage , bool ban ) {
+CommunicationResponse Server::receivepunish( const std::string & encryptedMessage , bool ban ) {
 	if ( encryptedMessage.empty( ) ) {
 		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Empty message!" ) , RED );
-		return false;
+		return RECEIVE_ERROR;
 	}
 
 	json js;
@@ -585,13 +598,13 @@ bool Server::receivepunish( const std::string & encryptedMessage , bool ban ) {
 	}
 	catch ( const json::parse_error & e ) {
 		std::cout << xorstr_( "Failed to parse JSON: " ) << e.what( ) << std::endl;
-		return false;
+		return RECEIVE_ERROR;
 	}
 
 	// Verificar HWID
 	if ( !CheckHWID( js ) ) {
 		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Can't get hwid!" ) , RED );
-		return false;
+		return RECEIVE_ERROR;
 	}
 
 	// Verificar campos obrigatórios
@@ -606,7 +619,7 @@ bool Server::receivepunish( const std::string & encryptedMessage , bool ban ) {
 	for ( const auto & field : requiredFields ) {
 		if ( !js.contains( field ) || js[ field ].empty( ) ) {
 			utils::Get( ).WarnMessage( _SERVER , xorstr_( "Can't get " ) + field + xorstr_( "!" ) , RED );
-			return false;
+			return RECEIVE_ERROR;
 		}
 	}
 
@@ -680,13 +693,13 @@ bool Server::receivepunish( const std::string & encryptedMessage , bool ban ) {
 
 	utils::Get( ).WarnMessage( _SERVER , xorstr_( "Sent ban to webhook request list!" ) , GREEN );
 
-	return true;
+	return RECEIVED;
 }
 
-bool Server::receivemessage( const std::string & encryptedMessage ) {
+CommunicationResponse Server::receivemessage( const std::string & encryptedMessage ) {
 	if ( encryptedMessage.empty( ) ) {
 		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Empty message!" ) , RED );
-		return false;
+		return RECEIVE_ERROR;
 	}
 
 	json js;
@@ -695,16 +708,16 @@ bool Server::receivemessage( const std::string & encryptedMessage ) {
 	}
 	catch ( const json::parse_error & e ) {
 		std::cout << xorstr_( "Failed to parse JSON: " ) << e.what( ) << std::endl;
-		return false;
+		return RECEIVE_ERROR;
 	}
 
 	if ( !CheckHWID( js ) ) {
-		return false;
+		return RECEIVE_ERROR;
 	}
 
 	if ( !js.contains( xorstr_( "message" ) ) || js[ xorstr_( "message" ) ].empty( ) ) {
 		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Can't get message!" ) , RED );
-		return false;
+		return RECEIVE_ERROR;
 	}
 
 	std::string Ip = js[ xorstr_( "ip" ) ];
@@ -714,7 +727,7 @@ bool Server::receivemessage( const std::string & encryptedMessage ) {
 
 	WebhookList.emplace_back( WHookRequest( WHOOKTYPE::MESSAGE_ , Message , "" , Ip , dpp::colors::blue_aquamarine ) );
 
-	return true;
+	return RECEIVED;
 }
 
 bool isNumeric( const std::string & str ) {
@@ -723,9 +736,10 @@ bool isNumeric( const std::string & str ) {
 
 std::mutex QueueMessagesMutex;
 
+
 void Server::ProcessMessages( ) {
 	while ( true ) {
-		std::vector<std::pair<CommunicationType , std::string>> qMessages;
+		std::vector<Communication> qMessages;
 
 		{
 			// Bloqueia o acesso à fila de mensagens e faz uma cópia das mensagens
@@ -733,37 +747,40 @@ void Server::ProcessMessages( ) {
 			qMessages = this->QueuedMessages;
 		}
 
+
 		// Iterar sobre a cópia das mensagens
 		for ( const auto & message : qMessages ) {
-			switch ( message.first ) {
+
+
+			CommunicationResponse Response = RECEIVE_ERROR;
+
+			switch ( message.MessageType ) {
 			case PING:
 				//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Received ping!" ) , WHITE );
-				if ( !receiveping( message.second ) ) {
-					utils::Get( ).WarnMessage( _SERVER , xorstr_( "Denied ping!" ) , RED );
-				}
+				Response = receiveping( message.Message );
 				break;
 			case BAN:
 				//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Received ban!" ) , WHITE );
-				if ( !receivepunish( message.second , true ) ) {
-					utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to process ban." ) , RED );
-				}
+				Response = receivepunish( message.Message , true );
 				break;
 			case WARN:
 				//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Received warn!" ) , WHITE );
-				if ( !receivepunish( message.second , false ) ) {
-					utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to process warn." ) , RED );
-				}
+				Response = receivepunish( message.Message , false );
 				break;
 			case MESSAGE:
 				//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Received message!" ) , WHITE );
-				if ( !receivemessage( message.second ) ) {
-					utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to process message." ) , RED );
-				}
+				Response = receivemessage( message.Message );
 				break;
 			default:
 				utils::Get( ).WarnMessage( _SERVER , xorstr_( "Invalid message type!" ) , RED );
 				break;
 			}
+
+			if ( !SendData( std::to_string( Response ) , message.Socket ) ) {
+				utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to send answer to client" ) , RED );
+			}
+
+			closesocket( message.Socket );
 		}
 
 		// Limpar a fila de mensagens
@@ -998,9 +1015,7 @@ void Server::handleClient( SOCKET clientSock ) {
 
 	{
 		std::lock_guard<std::mutex> lock( QueueMessagesMutex );
-		QueuedMessages.emplace_back( messageType , encryptedMessage );
+		QueuedMessages.emplace_back( Communication( messageType , encryptedMessage , clientSock ) );
 		//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Emplaced back: " ) + encryptedMessage.substr( 0 , 10 ) + xorstr_( "..." ) , COLORS::GREEN );
 	}
-
-	closesocket( clientSock );
 }

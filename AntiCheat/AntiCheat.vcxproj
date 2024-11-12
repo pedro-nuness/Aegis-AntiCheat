@@ -142,15 +142,16 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
       <AdditionalDependencies>libssl.lib;libcrypto.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>/ALIGN:0x10000 %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Modules\AntiDebugger\AntiDebugger.cpp" />
     <ClCompile Include="Modules\ThreadHolder\ThreadHolder.cpp" />
+    <ClCompile Include="Systems\AntiTamper\remap.cpp" />
     <ClCompile Include="Systems\Services\Services.cpp" />
-    <ClCompile Include="Systems\Authentication\Authentication.cpp" />
+    <ClCompile Include="Systems\AntiTamper\Authentication.cpp" />
     <ClCompile Include="Client\client.cpp" />
-    <ClCompile Include="Client\receiver.cpp" />
     <ClCompile Include="Systems\Preventions\Preventions.cpp" />
     <ClCompile Include="Process\Exports.cpp" />
     <ClCompile Include="Process\Handles.cpp" />
@@ -179,10 +180,10 @@
   <ItemGroup>
     <ClInclude Include="Modules\AntiDebugger\AntiDebugger.h" />
     <ClInclude Include="Obscure\ntldr.h" />
+    <ClInclude Include="Systems\AntiTamper\remap.hpp" />
     <ClInclude Include="Systems\Services\Services.h" />
-    <ClInclude Include="Systems\Authentication\Authentication.h" />
+    <ClInclude Include="Systems\AntiTamper\Authentication.h" />
     <ClInclude Include="Client\client.h" />
-    <ClInclude Include="Client\receiver.h" />
     <ClInclude Include="Systems\Preventions\Preventions.h" />
     <ClInclude Include="Process\Exports.hpp" />
     <ClInclude Include="Process\Handles.hpp" />
