@@ -804,62 +804,85 @@ void Server::threadfunction( ) {
 
 	LoadBlockedSets( ); // Carrega os conjuntos bloqueados ao iniciar o servidor
 
-	// Criar socket para escutar conexões
-	SOCKET listenSock = socket( AF_INET , SOCK_STREAM , 0 );
-	if ( listenSock == INVALID_SOCKET ) {
-		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Socket creation failed." ) , COLORS::RED );
-		WSACleanup( );
-		return;
-	}
+
 
 	sockaddr_in serverAddr;
 	const int serverPort = 12345;
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_port = htons( serverPort );
+	// Configurar para escutar todos os endereços de IP disponíveis (INADDR_ANY)
+	serverAddr.sin_addr.s_addr = INADDR_ANY;  // Escuta em todos os endereços de rede da máquina
 
 	// Obter o nome do host
 	char hostName[ 256 ];
 	if ( gethostname( hostName , sizeof( hostName ) ) == SOCKET_ERROR ) {
 		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to get host name. Error code: " ) + std::to_string( WSAGetLastError( ) ) , COLORS::RED );
-		closesocket( listenSock );
 		WSACleanup( );
 		return;
 	}
 
 	// Obter informações sobre o host para encontrar um IP disponível
 	struct addrinfo hints = {} , * res;
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags = AI_PASSIVE;
+	hints.ai_family = AF_INET;        // IPv4
+	hints.ai_socktype = SOCK_STREAM;  // TCP
+	hints.ai_protocol = IPPROTO_TCP;
+	hints.ai_flags = AI_PASSIVE;      // Configura o socket para escutar
 
 
 	if ( getaddrinfo( hostName , nullptr , &hints , &res ) != 0 ) {
 		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to get address info." ) , COLORS::RED );
-		closesocket( listenSock );
+		WSACleanup( );
+		return;
+	}
+//
+//	std::vector<IN_ADDR> AvailableIP;
+//
+//	// Iterar pelas interfaces disponíveis e escolher o IP
+//	for ( struct addrinfo * ptr = res; ptr != nullptr; ptr = ptr->ai_next ) {
+//		sockaddr_in * sockaddr_ipv4 = reinterpret_cast< sockaddr_in * >( ptr->ai_addr );
+//		if ( sockaddr_ipv4 ) {
+//			AvailableIP.emplace_back( sockaddr_ipv4->sin_addr );
+//			continue;
+//		}
+//	}
+//	freeaddrinfo( res );
+//
+//	if ( AvailableIP.empty( ) ) {
+//		utils::Get( ).WarnMessage( _SERVER , xorstr_( "No available IP address found." ) , COLORS::RED );
+//		WSACleanup( );
+//		return;
+//	}
+//
+//	for ( int i = 0; i < AvailableIP.size( ); i++ ) {
+//		char ipStr[ INET_ADDRSTRLEN ];
+//		inet_ntop( AF_INET , &AvailableIP[ i ] , ipStr , sizeof( ipStr ) );
+//
+//		std::cout << "[" << i << "] " << ipStr << std::endl;
+//	}
+//
+//	int Option;
+//choose:
+//	std::cin >> Option;
+//	if ( Option >= 0 && Option < AvailableIP.size( ) ) {
+//		serverAddr.sin_addr = AvailableIP[ Option ];
+//	}
+//	else {
+//		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Invalid options!" ) , COLORS::RED );
+//		goto choose;
+//	}
+
+
+
+	// Criar socket para escutar conexões
+	SOCKET listenSock = socket( res->ai_family , res->ai_socktype , res->ai_protocol );
+	if ( listenSock == INVALID_SOCKET ) {
+		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Socket creation failed." ) , COLORS::RED );
 		WSACleanup( );
 		return;
 	}
 
-	// Iterar pelas interfaces disponíveis e escolher o primeiro IP válido
-	bool ipFound = false;
-	for ( struct addrinfo * ptr = res; ptr != nullptr; ptr = ptr->ai_next ) {
-		sockaddr_in * sockaddr_ipv4 = reinterpret_cast< sockaddr_in * >( ptr->ai_addr );
-		if ( sockaddr_ipv4 ) {
-			serverAddr.sin_addr = sockaddr_ipv4->sin_addr;
-			ipFound = true;
-			break;
-		}
-	}
-	freeaddrinfo( res );
-
-	if ( !ipFound ) {
-		utils::Get( ).WarnMessage( _SERVER , xorstr_( "No available IP address found." ) , COLORS::RED );
-		closesocket( listenSock );
-		WSACleanup( );
-		return;
-	}
-
-	// Associar o socket ao endereço IP encontrado e porta
+	// Associar o socket ao ender
+	// eço IP encontrado e porta
 	if ( bind( listenSock , ( sockaddr * ) &serverAddr , sizeof( serverAddr ) ) == SOCKET_ERROR ) {
 		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Bind failed. Error code: " ) + std::to_string( WSAGetLastError( ) ) , COLORS::RED );
 		closesocket( listenSock );
@@ -893,6 +916,8 @@ void Server::threadfunction( ) {
 			utils::Get( ).WarnMessage( _SERVER , xorstr_( "Accept failed." ) , COLORS::RED );
 			continue;
 		}
+		
+		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Received new connection" ) , COLORS::GREEN );
 
 		// Criar uma nova thread para lidar com a conexão do cliente
 		std::thread( &Server::handleClient , this , clientSock ).detach( ); // A nova thread gerencia a conexão do cliente

@@ -215,6 +215,9 @@
     <ClInclude Include="Systems\AntiTamper\remap.hpp">
       <Filter>Arquivos de Cabeçalho</Filter>
     </ClInclude>
+    <ClInclude Include="Process\Imports.h">
+      <Filter>Arquivos de Cabeçalho</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="x64\Release\Icon.ico">

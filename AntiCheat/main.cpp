@@ -20,6 +20,7 @@
 #include "Systems/Memory/memory.h"
 #include "Systems/Monitoring/Monitoring.h"
 #include "Systems/FileChecking/FileChecking.h"
+#include "Systems/Hardware/hardware.h"
 
 #include "Client/client.h"
 
@@ -34,11 +35,12 @@ void Startup( ) {
 	AntiDebugger AntiDbg;
 	DetectionEvent.SetupPid( Globals::Get( ).OriginalProcess , Globals::Get( ).ProtectProcess );
 
-
 	CommunicationEvent.start( );
 	DetectionEvent.start( );
 	TriggerEvent.start( );
 	AntiDbg.start( );
+
+	DetectionEvent.InitializeThreads( );
 
 	std::vector<std::pair<ThreadHolder * , int>> threads = {
 		std::make_pair( &DetectionEvent, DETECTIONS ),
@@ -47,9 +49,11 @@ void Startup( ) {
 		std::make_pair( &CommunicationEvent, COMMUNICATION )
 	};
 
-
 	ThreadGuard monitor( threads );
 	Globals::Get( ).GuardMonitorPointer = &monitor;
+	Globals::Get( ).DetectionsPointer = &DetectionEvent;
+	Globals::Get( ).TriggersPointer = &TriggerEvent;
+	Globals::Get( ).AntiDebuggerPointer = &AntiDbg;
 	monitor.start( );
 
 	while ( !Globals::Get( ).VerifiedSession ) {
@@ -76,6 +80,8 @@ void Startup( ) {
 int main( int argc , char * argv[ ] ) {
 	//Ignore load library missing msgbox
 	SetErrorMode( SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX );
+	LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Hello world!" ) , GREEN );
+	hardware::Get( ).GenerateCache( );
 	Preventions::Get( ).Deploy( );
 #if false
 	FreeConsole( );
@@ -101,17 +107,17 @@ int main( int argc , char * argv[ ] ) {
 	Globals::Get( ).SelfID = ::_getpid( );
 	FileChecking::Get( ).ValidateFiles( );
 
-	
-
 	if ( client::Get( ).SendPingToServer( ) ) {
 		Startup( );
+	}
+	else {
+		LogSystem::Get( ).LogWithMessageBox( xorstr_( "Server declined ping!" ) , xorstr_( "Server declined ping" ) );
 	}
 
 	while ( true ) {
 		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "ping" ) , GRAY );
 		std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
 	}
-
 
 	return 1;
 }

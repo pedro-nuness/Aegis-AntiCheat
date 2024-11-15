@@ -24,7 +24,7 @@ class client : public CSingleton<client>{
 
 	//std::string key = xorstr_("ib33o5m8zsqlcgys3w46cfmtn8ztg1kn"); // 32 bytes para AES-256
 	//std::string iv = xorstr_( "ume9ugz3m7lgch1z");  // 16 bytes para AES
-	std::string ipaddres = xorstr_( "26.114.178.232");
+	std::string ipaddres = xorstr_( "181.215.236.116");
 	int Port = 12345;
 
 

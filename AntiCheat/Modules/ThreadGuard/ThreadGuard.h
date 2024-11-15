@@ -5,6 +5,8 @@
 #include <thread>
 #include <chrono>
 #include <mutex>
+#include "../../Process/Imports.h"
+
 
 
 enum THREADS {
@@ -20,14 +22,14 @@ public:
 	ThreadGuard( std::vector<std::pair<ThreadHolder * , int>> & threads );
 	~ThreadGuard( );
 
-	int RunningThreads( ) { return this->m_threads.size( ); }
-	HANDLE  GetThread( int i );
-
-	bool IsThreadrunning( int i );
+	void AddThreadToList( DWORD PID );
+	std::vector<DWORD> GetRunningThreadsID( );
 
 	bool isRunning( ) const override;
 
 private:
+	std::vector<DWORD> RunningThreadsID;
+
 	void threadFunction( ) override;
 
 	std::string GetThreadName( int thread );

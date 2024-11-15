@@ -75,32 +75,32 @@ int main( ) {
 	}
 
 
-	HANDLE handle = INVALID_HANDLE_VALUE;
+	/*HANDLE handle = INVALID_HANDLE_VALUE;
 	WINDIVERT_ADDRESS addr;
 	char packet[ MAXBUF ];
 	UINT packetLen;
 
-	int Error = 0;
+	int Error = 0;*/
 
-	//filter port allocation
-	{
-		std::vector<std::string> filter { std::string( xorstr_( "remotePort == " ) + std::to_string( config::Get( ).GetCapturePort( ) ) ).c_str( ) };
-		// Abertura de handle com filtro
-		for ( const auto & f : filter ) {
-			handle = WinDivertOpen( f.c_str( ) , WINDIVERT_LAYER_NETWORK , 0 , 0 );
-			if ( handle == INVALID_HANDLE_VALUE ) {
-				Error = GetLastError( );
-			}
-		}
-	}
+	////filter port allocation
+	//{
+	//	std::vector<std::string> filter { std::string( xorstr_( "remotePort == " ) + std::to_string( config::Get( ).GetCapturePort( ) ) ).c_str( ) };
+	//	// Abertura de handle com filtro
+	//	for ( const auto & f : filter ) {
+	//		handle = WinDivertOpen( f.c_str( ) , WINDIVERT_LAYER_NETWORK , 0 , 0 );
+	//		if ( handle == INVALID_HANDLE_VALUE ) {
+	//			Error = GetLastError( );
+	//		}
+	//	}
+	//}
 
-	if ( handle == INVALID_HANDLE_VALUE ) {
-		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to initialize packet capture, error: " ) + std::to_string( Error ) , RED );
-		std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
-		return -1;
-	}
+	//if ( handle == INVALID_HANDLE_VALUE ) {
+	//	utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to initialize packet capture, error: " ) + std::to_string( Error ) , RED );
+	//	std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
+	//	return -1;
+	//}
 
-	utils::Get( ).WarnMessage( _SERVER , xorstr_( "Sucessfully started packet capture on port " ) + std::to_string( config::Get( ).GetCapturePort( ) ) , LIGHT_GREEN );
+	//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Sucessfully started packet capture on port " ) + std::to_string( config::Get( ).GetCapturePort( ) ) , LIGHT_GREEN );
 
 
 	std::thread( &Server::threadfunction , &connection_server ).detach( );
@@ -108,15 +108,15 @@ int main( ) {
 		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
 	}
 
-	globals::Get( ).whook.SetServerAddress( &connection_server );
-	globals::Get( ).whook.InitBot( );
+	//globals::Get( ).whook.SetServerAddress( &connection_server );
+	//globals::Get( ).whook.InitBot( );
 
 
-	while ( !globals::Get( ).whook.BotReady ) {
+	/*while ( !globals::Get( ).whook.BotReady ) {
 		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
 	}
 
-	globals::Get( ).whook.SendWebHookMessage( xorstr_( "Server initialized!" ) , xorstr_( "Server Message" ) , 0x00FFFF );
+	globals::Get( ).whook.SendWebHookMessage( xorstr_( "Server initialized!" ) , xorstr_( "Server Message" ) , 0x00FFFF );*/
 
 	// Armazenar SelfIP localmente
 	std::string selfIPStr;
@@ -126,63 +126,66 @@ int main( ) {
 	}
 
 	// Loop de monitoramento de pacotes
+	//while ( true ) {
+	//	if ( !WinDivertRecv( handle , packet , sizeof( packet ) , &packetLen , &addr ) ) {
+	//		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to capture a packet" ) , RED );
+	//		continue;
+	//	}
+
+	//	// Declarações de cabeçalhos
+	//	WINDIVERT_ETHHDR * ethHeader = ( WINDIVERT_ETHHDR * ) packet;
+	//	WINDIVERT_IPHDR * ipHeader = NULL;
+	//	WINDIVERT_TCPHDR * tcpHeader = NULL;
+	//	WINDIVERT_UDPHDR * udpHeader = NULL;
+	//	UINT8 protocol = 0;
+
+	//	WinDivertHelperParsePacket(
+	//		packet , packetLen , &ipHeader , NULL , &protocol ,
+	//		NULL , NULL , &tcpHeader , &udpHeader , NULL , NULL , NULL , NULL );
+
+	//	// Processamento de pacotes
+	//	if ( ipHeader != NULL ) {
+	//		std::string srcIPStr = ipToStr( ntohl( ipHeader->SrcAddr ) );
+
+	//		if ( tcpHeader || udpHeader ) {
+	//			UINT ipHeaderLen = ipHeader->HdrLength * 4;
+	//			UINT transportHeaderLen = tcpHeader ? tcpHeader->HdrLength * 4 : sizeof( WINDIVERT_UDPHDR );
+	//			UINT dataOffset = ipHeaderLen + transportHeaderLen;
+
+	//			if ( dataOffset < packetLen ) {
+	//				const char * payload = packet + dataOffset;
+	//				UINT payloadLen = packetLen - dataOffset;
+	//				std::string payloadStr = packetToString( payload , payloadLen );
+	//				if ( payloadStr.substr( 0 , 5 ) != xorstr_( "aegis" ) ) {
+	//					bool found = false;
+	//					{
+	//						std::lock_guard<std::mutex> lock( connection_server.connectionMutex );
+	//						found = globals::Get( ).ConnectionMap.find( srcIPStr ) != globals::Get( ).ConnectionMap.end( );
+	//					}
+	//					if ( !found ) continue;
+	//				}
+	//			}
+	//		}
+	//		else {
+	//			bool found = false;
+	//			{
+	//				std::lock_guard<std::mutex> lock( connection_server.connectionMutex );
+	//				found = globals::Get( ).ConnectionMap.find( srcIPStr ) != globals::Get( ).ConnectionMap.end( );
+	//			}
+	//			if ( !found ) continue;
+	//		}
+	//	}
+
+
+	//	// Reenvio do pacote
+	//	if ( !WinDivertSend( handle , packet , packetLen , NULL , &addr ) ) {
+	//		std::cerr << xorstr_( "Failed to send packet." ) << std::endl;
+	//	}
+	//}
+
+	//WinDivertClose( handle );
 	while ( true ) {
-		if ( !WinDivertRecv( handle , packet , sizeof( packet ) , &packetLen , &addr ) ) {
-			utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to capture a packet" ) , RED );
-			continue;
-		}
-
-		// Declarações de cabeçalhos
-		WINDIVERT_ETHHDR * ethHeader = ( WINDIVERT_ETHHDR * ) packet;
-		WINDIVERT_IPHDR * ipHeader = NULL;
-		WINDIVERT_TCPHDR * tcpHeader = NULL;
-		WINDIVERT_UDPHDR * udpHeader = NULL;
-		UINT8 protocol = 0;
-
-		WinDivertHelperParsePacket(
-			packet , packetLen , &ipHeader , NULL , &protocol ,
-			NULL , NULL , &tcpHeader , &udpHeader , NULL , NULL , NULL , NULL );
-
-		// Processamento de pacotes
-		if ( ipHeader != NULL ) {
-			std::string srcIPStr = ipToStr( ntohl( ipHeader->SrcAddr ) );
-
-			if ( tcpHeader || udpHeader ) {
-				UINT ipHeaderLen = ipHeader->HdrLength * 4;
-				UINT transportHeaderLen = tcpHeader ? tcpHeader->HdrLength * 4 : sizeof( WINDIVERT_UDPHDR );
-				UINT dataOffset = ipHeaderLen + transportHeaderLen;
-
-				if ( dataOffset < packetLen ) {
-					const char * payload = packet + dataOffset;
-					UINT payloadLen = packetLen - dataOffset;
-					std::string payloadStr = packetToString( payload , payloadLen );
-					if ( payloadStr.substr( 0 , 5 ) != xorstr_( "aegis" ) ) {
-						bool found = false;
-						{
-							std::lock_guard<std::mutex> lock( connection_server.connectionMutex );
-							found = globals::Get( ).ConnectionMap.find( srcIPStr ) != globals::Get( ).ConnectionMap.end( );
-						}
-						if ( !found ) continue;
-					}
-				}
-			}
-			else {
-				bool found = false;
-				{
-					std::lock_guard<std::mutex> lock( connection_server.connectionMutex );
-					found = globals::Get( ).ConnectionMap.find( srcIPStr ) != globals::Get( ).ConnectionMap.end( );
-				}
-				if ( !found ) continue;
-			}
-		}
-
-
-		// Reenvio do pacote
-		if ( !WinDivertSend( handle , packet , packetLen , NULL , &addr ) ) {
-			std::cerr << xorstr_( "Failed to send packet." ) << std::endl;
-		}
+		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
 	}
-
-	WinDivertClose( handle );
 	return 0;
 }

@@ -6,7 +6,6 @@
 #include <sddl.h>       
 #include <tchar.h>      
 
-
 #include "../../Process/Process.hpp"
 #include "../../Process/Exports.hpp"
 #include "../AntiTamper/remap.hpp"
@@ -14,6 +13,7 @@
 #include "../Utils/utils.h"
 #include "../Utils/xorstr.h"
 #include "../LogSystem/Log.h"
+#include "../../Obscure/ntldr.h"
 
 
 bool Preventions::RestrictProcessAccess( ) {
@@ -234,7 +234,7 @@ bool Preventions::RandomizeModuleName( )
 		success = true;
 		/*UnmanagedGlobals::wCurrentModuleName = wstring( newModuleName );
 		UnmanagedGlobals::CurrentModuleName = Utility::ConvertWStringToString( UnmanagedGlobals::wCurrentModuleName );*/
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "changed module name to " ) + *newModuleName , GREEN );
+		// LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "changed module name to " ) + *newModuleName , GREEN );
 
 		// Logger::logfw( "UltimateAnticheat.log" , Info , L"Changed module name to: %s\n" , UnmanagedGlobals::wCurrentModuleName.c_str( ) );
 	}
@@ -270,7 +270,7 @@ bool Preventions::StopAPCInjection( )
 
 		if ( !VirtualProtect( ( LPVOID ) Oridinal8 , sizeof( std::byte ) , PAGE_EXECUTE_READWRITE , &dwOldProt ) )
 		{
-			std::cout << xorstr_( "Failed to call VirtualProtect on Oridinal8 address @ Stop\n");
+			std::cout << xorstr_( "Failed to call VirtualProtect on Oridinal8 address @ Stop\n" );
 			return false;
 		}
 		else
@@ -291,6 +291,22 @@ bool Preventions::StopAPCInjection( )
 	return true;
 }
 
+/*
+	PreventShellcodeThreads - changes export routine name of K32's CreateThread such that external attackers cannot look up the functions address.
+	 *Note* : Changing export names for certain important dll routines can result in popup errors for the end-user, thus its not recommended for a live product. Alternatively, routines can have their function preambles 'ret' patched for similar effects (if you know it wont impact program functionality).
+*/
+bool Preventions::PreventThreadCreation( ) {
+	bool success = FALSE;
+	char * RandString1 = Utils::Get( ).GenerateRandomString( 12 );
+
+	if ( Exports::ChangeFunctionName( xorstr_( "KERNEL32.DLL" ) , xorstr_( "CreateThread" ) , RandString1 ) )
+		success = TRUE;
+
+	delete[ ] RandString1;
+	RandString1 = nullptr;
+	return success;
+
+}
 
 bool Preventions::PreventDllInjection( )
 {
@@ -323,24 +339,39 @@ bool Preventions::PreventDllInjection( )
 	return success;
 }
 
-void Preventions::Deploy( ) {
-	if ( !Preventions::Get( ).RestrictProcessAccess( ) ) {
-		LogSystem::Get( ).Log( xorstr_( "[1] Failed to protect process" ) );
-	}
-	if ( !Preventions::Get( ).RandomizeModuleName( ) ) {
-		LogSystem::Get( ).Log( xorstr_( "[2] Failed to protect process" ) );
-	}
+bool Preventions::DeployDllLoadNotifation( ) {
+	//HMODULE hNtdll = GetModuleHandleA( xorstr_( "ntdll.dll" ) );
+	//if ( hNtdll != 0 ) //register DLL notifications callback 
+	//{
+	//	_LdrRegisterDllNotification pLdrRegisterDllNotification = ( _LdrRegisterDllNotification ) GetProcAddress( hNtdll , "LdrRegisterDllNotification" );
+	//	PVOID cookie;
+	//	NTSTATUS status = pLdrRegisterDllNotification( 0 , ( PLDR_DLL_NOTIFICATION_FUNCTION ) Detecions::OnDllNotification , this , &cookie );
+	//}
+}
 
-	if ( !Preventions::Get( ).PreventDllInjection( ) ) {
+void Preventions::Deploy( ) {
+
+	if ( !Preventions::Get( ).RestrictProcessAccess( ) )
+		LogSystem::Get( ).Log( xorstr_( "[1] Failed to protect process" ) );
+
+	if ( !Preventions::Get( ).RandomizeModuleName( ) )
+		LogSystem::Get( ).Log( xorstr_( "[2] Failed to protect process" ) );
+
+	if ( !Preventions::Get( ).PreventDllInjection( ) )
+		LogSystem::Get( ).Log( xorstr_( "[3] Failed to protect process" ) );
+
+	if(!Preventions::Get().PreventThreadCreation() )
 		LogSystem::Get( ).Log( xorstr_( "[4] Failed to protect process" ) );
-	}
 
 	/*if ( !Preventions::Get( ).RemapProgramSections( ) ) {
 		LogSystem::Get( ).Log( xorstr_( "[0] Failed to protect process" ) );
 	}
-	
+
 	if ( !Preventions::Get( ).EnableProcessMitigations( true , true , false , true , false ) ) {
 		LogSystem::Get( ).Log( xorstr_( "[3] Failed to protect process" ) );
 	}*/
-	
+
+	LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "deployed sucessfully" ) , GREEN );
+
 }
+

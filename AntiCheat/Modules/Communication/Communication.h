@@ -32,7 +32,7 @@ class Communication : public ThreadHolder {
 
 	void OpenRequestServer( );
 
-	void SendPingToServer( );
+	static void SendPingToServer( LPVOID AD);
 
 	bool InitializeClient( );
 	bool SendPasswordToServer( );

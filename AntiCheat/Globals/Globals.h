@@ -18,6 +18,9 @@ public:
 	int SelfID;
 
 	void * GuardMonitorPointer;
+	void * DetectionsPointer;
+	void * TriggersPointer;
+	void * AntiDebuggerPointer;
 
 	bool VerifiedSession = false;
 

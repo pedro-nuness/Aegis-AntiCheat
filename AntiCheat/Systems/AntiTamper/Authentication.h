@@ -6,9 +6,9 @@
 
 class Authentication : public CSingleton<Authentication>
 {
-public:
 	BOOL VerifyEmbeddedSignature( std::string pwszSourceFile );
 	BOOL VerifyCatalogSignature( std::string filePath );
+public:
 	BOOL HasSignature( std::string filePath );
 };
 

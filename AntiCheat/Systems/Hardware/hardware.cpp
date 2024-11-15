@@ -31,320 +31,365 @@
 #pragma comment(lib, "comsuppw.lib")
 
 
-#include "../Utils/xorstr.h"
 #include "../../Systems/LogSystem/File/File.h"
 #include "../../Systems/LogSystem/Log.h"
 
+#include "../Utils/xorstr.h"
+#include "../Utils/utils.h"
+
+#include "../Utils/StringCrypt/StringCrypt.h"
 
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 
+CryptedString CachedMotherBoardSerialNumber;
+CryptedString CachedDiskSerialNumber;
+std::vector<CryptedString> CachedMac;
+CryptedString CachedIp;
+
+
+void hardware::GenerateCache( ) {
+	GetMotherboardSerialNumber(nullptr );
+	GetDiskSerialNumber( nullptr );
+	getMacAddress( );
+	GetIp( );
+}
+
 bool hardware::GetMotherboardSerialNumber( std::string * buffer ) {
-    HRESULT hres;
+	if ( !CachedMotherBoardSerialNumber.EncryptedString.empty( ) && buffer != nullptr ) {
+		std::string * Str = StringCrypt::Get( ).DecryptString( CachedMotherBoardSerialNumber );
+		*buffer = *Str;
+		StringCrypt::Get( ).CleanString( Str );
+		return true;
+	}
 
-    // Inicializa o COM
-    hres = CoInitializeEx( 0 , COINIT_MULTITHREADED );
-    if ( FAILED( hres ) ) {
-        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to initialize COM library" ) , RED );
-        return false;
-    }
+	HRESULT hres;
 
-    // Define os níveis de segurança do COM
-    hres = CoInitializeSecurity(
-        nullptr , -1 , nullptr , nullptr ,
-        RPC_C_AUTHN_LEVEL_DEFAULT ,
-        RPC_C_IMP_LEVEL_IMPERSONATE ,
-        nullptr , EOAC_NONE , nullptr );
+	// Inicializa o COM
+	hres = CoInitializeEx( 0 , COINIT_MULTITHREADED );
+	if ( FAILED( hres ) ) {
+		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to initialize COM library" ) , RED );
+		return false;
+	}
 
-    if ( FAILED( hres ) ) {
-        CoUninitialize( );
-        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to initialize security" ) , RED );
-        return false;
-    }
+	// Define os níveis de segurança do COM
+	hres = CoInitializeSecurity(
+		nullptr , -1 , nullptr , nullptr ,
+		RPC_C_AUTHN_LEVEL_DEFAULT ,
+		RPC_C_IMP_LEVEL_IMPERSONATE ,
+		nullptr , EOAC_NONE , nullptr );
 
-    // Obtém o ponteiro para o serviço WMI
-    IWbemLocator * pLoc = nullptr;
+	if ( FAILED( hres ) ) {
+		CoUninitialize( );
+		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to initialize security" ) , RED );
+		return false;
+	}
 
-    hres = CoCreateInstance(
-        CLSID_WbemLocator , 0 ,
-        CLSCTX_INPROC_SERVER ,
-        IID_IWbemLocator , ( LPVOID * ) &pLoc );
+	// Obtém o ponteiro para o serviço WMI
+	IWbemLocator * pLoc = nullptr;
 
-    if ( FAILED( hres ) ) {
-        CoUninitialize( );
-        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to create IWbemLocator object" ) , RED );
-        return false;
-    }
+	hres = CoCreateInstance(
+		CLSID_WbemLocator , 0 ,
+		CLSCTX_INPROC_SERVER ,
+		IID_IWbemLocator , ( LPVOID * ) &pLoc );
 
-    IWbemServices * pSvc = nullptr;
+	if ( FAILED( hres ) ) {
+		CoUninitialize( );
+		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to create IWbemLocator object" ) , RED );
+		return false;
+	}
 
-    // Conecta-se ao namespace root\cimv2
-    hres = pLoc->ConnectServer(
-        _bstr_t( L"ROOT\\CIMV2" ) , nullptr , nullptr , 0 ,
-        NULL , 0 , 0 , &pSvc );
+	IWbemServices * pSvc = nullptr;
 
-    if ( FAILED( hres ) ) {
-        pLoc->Release( );
-        CoUninitialize( );
-        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Could not connect to WMI namespace" ) , RED );
-        return false;
-    }
+	// Conecta-se ao namespace root\cimv2
+	hres = pLoc->ConnectServer(
+		_bstr_t( L"ROOT\\CIMV2" ) , nullptr , nullptr , 0 ,
+		NULL , 0 , 0 , &pSvc );
 
-    // Define os níveis de segurança do proxy
-    hres = CoSetProxyBlanket(
-        pSvc , RPC_C_AUTHN_WINNT , RPC_C_AUTHZ_NONE , nullptr ,
-        RPC_C_AUTHN_LEVEL_CALL , RPC_C_IMP_LEVEL_IMPERSONATE ,
-        nullptr , EOAC_NONE );
+	if ( FAILED( hres ) ) {
+		pLoc->Release( );
+		CoUninitialize( );
+		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Could not connect to WMI namespace" ) , RED );
+		return false;
+	}
 
-    if ( FAILED( hres ) ) {
-        pSvc->Release( );
-        pLoc->Release( );
-        CoUninitialize( );
-        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Could not set proxy blanket" ) , RED );
-        return false;
-    }
+	// Define os níveis de segurança do proxy
+	hres = CoSetProxyBlanket(
+		pSvc , RPC_C_AUTHN_WINNT , RPC_C_AUTHZ_NONE , nullptr ,
+		RPC_C_AUTHN_LEVEL_CALL , RPC_C_IMP_LEVEL_IMPERSONATE ,
+		nullptr , EOAC_NONE );
 
-    // Faz a consulta WMI
-    IEnumWbemClassObject * pEnumerator = nullptr;
-    hres = pSvc->ExecQuery(
-        bstr_t( xorstr_( "WQL" ) ) ,
-        bstr_t( xorstr_( "SELECT SerialNumber FROM Win32_BaseBoard" ) ) ,
-        WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY ,
-        nullptr ,
-        &pEnumerator );
+	if ( FAILED( hres ) ) {
+		pSvc->Release( );
+		pLoc->Release( );
+		CoUninitialize( );
+		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Could not set proxy blanket" ) , RED );
+		return false;
+	}
 
-    if ( FAILED( hres ) ) {
-        pSvc->Release( );
-        pLoc->Release( );
-        CoUninitialize( );
-        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Query for motherboard serial number failed" ) , RED );
-        return false;
-    }
+	// Faz a consulta WMI
+	IEnumWbemClassObject * pEnumerator = nullptr;
+	hres = pSvc->ExecQuery(
+		bstr_t( xorstr_( "WQL" ) ) ,
+		bstr_t( xorstr_( "SELECT SerialNumber FROM Win32_BaseBoard" ) ) ,
+		WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY ,
+		nullptr ,
+		&pEnumerator );
 
-    IWbemClassObject * pclsObj = nullptr;
-    ULONG uReturn = 0;
-    std::string serialNumber;
+	if ( FAILED( hres ) ) {
+		pSvc->Release( );
+		pLoc->Release( );
+		CoUninitialize( );
+		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Query for motherboard serial number failed" ) , RED );
+		return false;
+	}
 
-    while ( pEnumerator ) {
-        HRESULT hr = pEnumerator->Next( WBEM_INFINITE , 1 , &pclsObj , &uReturn );
-        if ( 0 == uReturn ) {
-            break;
-        }
+	IWbemClassObject * pclsObj = nullptr;
+	ULONG uReturn = 0;
+	std::string serialNumber;
 
-        VARIANT vtProp;
-        hr = pclsObj->Get( L"SerialNumber" , 0 , &vtProp , nullptr , nullptr );
-        if ( SUCCEEDED( hr ) ) {
-            serialNumber = _bstr_t( vtProp.bstrVal );
-            VariantClear( &vtProp );
-        }
+	while ( pEnumerator ) {
+		HRESULT hr = pEnumerator->Next( WBEM_INFINITE , 1 , &pclsObj , &uReturn );
+		if ( 0 == uReturn ) {
+			break;
+		}
 
-        pclsObj->Release( );
-    }
+		VARIANT vtProp;
+		hr = pclsObj->Get( L"SerialNumber" , 0 , &vtProp , nullptr , nullptr );
+		if ( SUCCEEDED( hr ) ) {
+			serialNumber = _bstr_t( vtProp.bstrVal );
+			VariantClear( &vtProp );
+		}
 
-    // Libera recursos
-    pSvc->Release( );
-    pLoc->Release( );
-    pEnumerator->Release( );
-    CoUninitialize( );
-    *buffer = serialNumber;
-    return true;
+		pclsObj->Release( );
+	}
+
+	// Libera recursos
+	pSvc->Release( );
+	pLoc->Release( );
+	pEnumerator->Release( );
+	CoUninitialize( );
+
+	CachedMotherBoardSerialNumber = StringCrypt::Get( ).EncryptString( serialNumber );
+
+	if ( buffer != nullptr )
+		*buffer = serialNumber;
+	return true;
 }
 
 bool hardware::GetDiskSerialNumber( std::string * buffer ) {
-    HRESULT hres;
+	if ( !CachedDiskSerialNumber.EncryptedString.empty( ) && buffer != nullptr ) {
+		std::string * Str = StringCrypt::Get( ).DecryptString( CachedDiskSerialNumber );
+		*buffer = *Str;
+		StringCrypt::Get( ).CleanString( Str );
+		return true;
+	}
 
-    // Inicializa o COM
-    hres = CoInitializeEx( 0 , COINIT_MULTITHREADED );
-    if ( FAILED( hres ) ) {
-        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to initialize COM library" ) , RED );
-        return false;
-    }
 
-    // Define os níveis de segurança do COM
-    hres = CoInitializeSecurity(
-        nullptr , -1 , nullptr , nullptr ,
-        RPC_C_AUTHN_LEVEL_DEFAULT ,
-        RPC_C_IMP_LEVEL_IMPERSONATE ,
-        nullptr , EOAC_NONE , nullptr );
+	HRESULT hres;
 
-    if ( FAILED( hres ) ) {
-        CoUninitialize( );
-        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to initialize security" ) , RED );
-        return false;
-    }
+	// Inicializa o COM
+	hres = CoInitializeEx( 0 , COINIT_MULTITHREADED );
+	if ( FAILED( hres ) ) {
+		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to initialize COM library" ) , RED );
+		return false;
+	}
 
-    // Obtém o ponteiro para o serviço WMI
-    IWbemLocator * pLoc = nullptr;
+	// Define os níveis de segurança do COM
+	hres = CoInitializeSecurity(
+		nullptr , -1 , nullptr , nullptr ,
+		RPC_C_AUTHN_LEVEL_DEFAULT ,
+		RPC_C_IMP_LEVEL_IMPERSONATE ,
+		nullptr , EOAC_NONE , nullptr );
 
-    hres = CoCreateInstance(
-        CLSID_WbemLocator , 0 ,
-        CLSCTX_INPROC_SERVER ,
-        IID_IWbemLocator , ( LPVOID * ) &pLoc );
+	if ( FAILED( hres ) ) {
+		CoUninitialize( );
+		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to initialize security" ) , RED );
+		return false;
+	}
 
-    if ( FAILED( hres ) ) {
-        CoUninitialize( );
-        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to create IWbemLocator object" ) , RED );
-        return false;
-    }
+	// Obtém o ponteiro para o serviço WMI
+	IWbemLocator * pLoc = nullptr;
 
-    IWbemServices * pSvc = nullptr;
+	hres = CoCreateInstance(
+		CLSID_WbemLocator , 0 ,
+		CLSCTX_INPROC_SERVER ,
+		IID_IWbemLocator , ( LPVOID * ) &pLoc );
 
-    // Conecta-se ao namespace root\cimv2
-    hres = pLoc->ConnectServer(
-        _bstr_t( L"ROOT\\CIMV2" ) , nullptr , nullptr , 0 ,
-        NULL , 0 , 0 , &pSvc );
+	if ( FAILED( hres ) ) {
+		CoUninitialize( );
+		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to create IWbemLocator object" ) , RED );
+		return false;
+	}
 
-    if ( FAILED( hres ) ) {
-        pLoc->Release( );
-        CoUninitialize( );
-        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Could not connect to WMI namespace" ) , RED );
-        return false;
-    }
+	IWbemServices * pSvc = nullptr;
 
-    // Define os níveis de segurança do proxy
-    hres = CoSetProxyBlanket(
-        pSvc , RPC_C_AUTHN_WINNT , RPC_C_AUTHZ_NONE , nullptr ,
-        RPC_C_AUTHN_LEVEL_CALL , RPC_C_IMP_LEVEL_IMPERSONATE ,
-        nullptr , EOAC_NONE );
+	// Conecta-se ao namespace root\cimv2
+	hres = pLoc->ConnectServer(
+		_bstr_t( L"ROOT\\CIMV2" ) , nullptr , nullptr , 0 ,
+		NULL , 0 , 0 , &pSvc );
 
-    if ( FAILED( hres ) ) {
-        pSvc->Release( );
-        pLoc->Release( );
-        CoUninitialize( );
-        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Could not set proxy blanket" ) , RED );
-        return false;
-    }
+	if ( FAILED( hres ) ) {
+		pLoc->Release( );
+		CoUninitialize( );
+		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Could not connect to WMI namespace" ) , RED );
+		return false;
+	}
 
-    // Faz a consulta WMI
-    IEnumWbemClassObject * pEnumerator = nullptr;
-    hres = pSvc->ExecQuery(
-        bstr_t( xorstr_( "WQL" ) ) ,
-        bstr_t( xorstr_( "SELECT SerialNumber FROM Win32_DiskDrive" ) ) ,
-        WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY ,
-        nullptr ,
-        &pEnumerator );
+	// Define os níveis de segurança do proxy
+	hres = CoSetProxyBlanket(
+		pSvc , RPC_C_AUTHN_WINNT , RPC_C_AUTHZ_NONE , nullptr ,
+		RPC_C_AUTHN_LEVEL_CALL , RPC_C_IMP_LEVEL_IMPERSONATE ,
+		nullptr , EOAC_NONE );
 
-    if ( FAILED( hres ) ) {
-        pSvc->Release( );
-        pLoc->Release( );
-        CoUninitialize( );
-        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Query for disk drive serial number failed" ) , RED );
-        return false;
-    }
+	if ( FAILED( hres ) ) {
+		pSvc->Release( );
+		pLoc->Release( );
+		CoUninitialize( );
+		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Could not set proxy blanket" ) , RED );
+		return false;
+	}
 
-    IWbemClassObject * pclsObj = nullptr;
-    ULONG uReturn = 0;
-    std::string serialNumber;
+	// Faz a consulta WMI
+	IEnumWbemClassObject * pEnumerator = nullptr;
+	hres = pSvc->ExecQuery(
+		bstr_t( xorstr_( "WQL" ) ) ,
+		bstr_t( xorstr_( "SELECT SerialNumber FROM Win32_DiskDrive" ) ) ,
+		WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY ,
+		nullptr ,
+		&pEnumerator );
 
-    while ( pEnumerator ) {
-        HRESULT hr = pEnumerator->Next( WBEM_INFINITE , 1 , &pclsObj , &uReturn );
-        if ( 0 == uReturn ) {
-            break;
-        }
+	if ( FAILED( hres ) ) {
+		pSvc->Release( );
+		pLoc->Release( );
+		CoUninitialize( );
+		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Query for disk drive serial number failed" ) , RED );
+		return false;
+	}
 
-        VARIANT vtProp;
-        hr = pclsObj->Get( L"SerialNumber" , 0 , &vtProp , nullptr , nullptr );
-        if ( SUCCEEDED( hr ) ) {
-            serialNumber = _bstr_t( vtProp.bstrVal );
-            VariantClear( &vtProp );
-        }
+	IWbemClassObject * pclsObj = nullptr;
+	ULONG uReturn = 0;
+	std::string serialNumber;
 
-        pclsObj->Release( );
-    }
+	while ( pEnumerator ) {
+		HRESULT hr = pEnumerator->Next( WBEM_INFINITE , 1 , &pclsObj , &uReturn );
+		if ( 0 == uReturn ) {
+			break;
+		}
 
-    // Libera recursos
-    pSvc->Release( );
-    pLoc->Release( );
-    pEnumerator->Release( );
-    CoUninitialize( );
+		VARIANT vtProp;
+		hr = pclsObj->Get( L"SerialNumber" , 0 , &vtProp , nullptr , nullptr );
+		if ( SUCCEEDED( hr ) ) {
+			serialNumber = _bstr_t( vtProp.bstrVal );
+			VariantClear( &vtProp );
+		}
 
-    *buffer = serialNumber;
+		pclsObj->Release( );
+	}
 
-    return true;
+	// Libera recursos
+	pSvc->Release( );
+	pLoc->Release( );
+	pEnumerator->Release( );
+	CoUninitialize( );
+
+	CachedDiskSerialNumber = StringCrypt::Get( ).EncryptString( serialNumber );
+
+	if ( buffer != nullptr )
+		*buffer = serialNumber;
+
+	return true;
 }
-
 
 std::string checkRegistryForSteamPath( ) {
-    HKEY hKey;
-    std::string path = xorstr_( "SOFTWARE\\Valve\\Steam" );
-    char steamPath[ MAX_PATH ];
-    DWORD pathSize = sizeof( steamPath );
+	HKEY hKey;
+	std::string path = xorstr_( "SOFTWARE\\Valve\\Steam" );
+	char steamPath[ MAX_PATH ];
+	DWORD pathSize = sizeof( steamPath );
 
-    if ( RegOpenKeyExA( HKEY_CURRENT_USER , path.c_str( ) , 0 , KEY_READ , &hKey ) == ERROR_SUCCESS ) {
-        if ( RegQueryValueExA( hKey , xorstr_( "SteamPath" ) , nullptr , nullptr , ( LPBYTE ) steamPath , &pathSize ) == ERROR_SUCCESS ) {
-            RegCloseKey( hKey );
-            return std::string( steamPath );
-        }
-        RegCloseKey( hKey );
-    }
-    return "";
+	if ( RegOpenKeyExA( HKEY_CURRENT_USER , path.c_str( ) , 0 , KEY_READ , &hKey ) == ERROR_SUCCESS ) {
+		if ( RegQueryValueExA( hKey , xorstr_( "SteamPath" ) , nullptr , nullptr , ( LPBYTE ) steamPath , &pathSize ) == ERROR_SUCCESS ) {
+			RegCloseKey( hKey );
+			return std::string( steamPath );
+		}
+		RegCloseKey( hKey );
+	}
+	return "";
 }
 
-
 std::vector<std::string> extractUserIds( const std::string & rawInput ) {
-    std::string processed = rawInput;
+	std::string processed = rawInput;
 
-    // Remove quebras de linha e tabulações
-    processed = std::regex_replace( processed , std::regex( xorstr_("[\\r\\n]+") ) , " " );
-    processed = std::regex_replace( processed , std::regex( xorstr_( "[\\t]+" ) ) , " " );
+	// Remove quebras de linha e tabulações
+	processed = std::regex_replace( processed , std::regex( xorstr_( "[\\r\\n]+" ) ) , " " );
+	processed = std::regex_replace( processed , std::regex( xorstr_( "[\\t]+" ) ) , " " );
 
-    // Remove múltiplos espaços em branco
-    processed = std::regex_replace( processed , std::regex( xorstr_(" +") ) , " " );
+	// Remove múltiplos espaços em branco
+	processed = std::regex_replace( processed , std::regex( xorstr_( " +" ) ) , " " );
 
-    // Extrai os IDs de usuário
-    std::vector<std::string> userIds;
-    std::regex userIdRegex( "\"([0-9]+)\"\\s*\\{" );
-    std::smatch matches;
+	// Extrai os IDs de usuário
+	std::vector<std::string> userIds;
+	std::regex userIdRegex( "\"([0-9]+)\"\\s*\\{" );
+	std::smatch matches;
 
-    while ( std::regex_search( processed , matches , userIdRegex ) ) {
-        userIds.push_back( matches[ 1 ] ); // Adiciona o ID ao vetor
-        processed = matches.suffix( ).str( ); // Continua a buscar após o ID encontrado
-    }
+	while ( std::regex_search( processed , matches , userIdRegex ) ) {
+		userIds.push_back( matches[ 1 ] ); // Adiciona o ID ao vetor
+		processed = matches.suffix( ).str( ); // Continua a buscar após o ID encontrado
+	}
 
-    // Constrói o JSON a partir dos IDs extraídos
-    nlohmann::json jsonOutput;
-   
-    return userIds; // Retorna o JSON como string
+	// Constrói o JSON a partir dos IDs extraídos
+	nlohmann::json jsonOutput;
+
+	return userIds; // Retorna o JSON como string
 }
 
 bool hardware::GetLoggedUsers( std::vector<std::string> * Buffer ) {
 
-    std::string SteamPath = checkRegistryForSteamPath( );
-    if ( SteamPath.empty( ) ) {
-        LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "failed to get steam path" ) , RED );
-        return false;
-    }
 
-    std::string LoginUsers = SteamPath + xorstr_( "\\config\\loginusers.vdf" );
-    File LoginUsersFile( LoginUsers );
-    if ( !LoginUsersFile.Exists( ) ) {
-        LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "can't find loginusers" ) , RED );
-        return false;
-    }
+	std::string SteamPath = checkRegistryForSteamPath( );
+	if ( SteamPath.empty( ) ) {
+		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "failed to get steam path" ) , RED );
+		return false;
+	}
 
-    std::string LoginUsersFileContent = LoginUsersFile.Read( );
-    if ( LoginUsersFileContent.empty( ) )
-    {
-        LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "loggin users empty!" ) , RED );
-        return false;
-    }
+	std::string LoginUsers = SteamPath + xorstr_( "\\config\\loginusers.vdf" );
+	File LoginUsersFile( LoginUsers );
+	if ( !LoginUsersFile.Exists( ) ) {
+		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "can't find loginusers" ) , RED );
+		return false;
+	}
 
-    if ( Buffer != nullptr ) {
-        *Buffer = extractUserIds( LoginUsersFileContent );
-    }
+	std::string LoginUsersFileContent = LoginUsersFile.Read( );
+	if ( LoginUsersFileContent.empty( ) )
+	{
+		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "loggin users empty!" ) , RED );
+		return false;
+	}
 
-    return true;
+	if ( Buffer != nullptr ) {
+		*Buffer = extractUserIds( LoginUsersFileContent );
+	}
+
+	return true;
 }
 
 std::vector<std::string> hardware::getMacAddress( ) {
 	std::vector < std::string > MACS;
+	if ( !CachedMac.empty( ) ) {
+		for ( CryptedString & CryptedMac : CachedMac ) {
+			std::string * Str = StringCrypt::Get( ).DecryptString( CryptedMac );
+			MACS.emplace_back( *Str );
+			StringCrypt::Get( ).CleanString( Str );
+		}
+		return MACS;
+	}
 
 	IP_ADAPTER_INFO AdapterInfo[ 16 ];              // Aloca informações para até 16 NICs
 	DWORD dwBufLen = sizeof( AdapterInfo );         // Salva o tamanho da memória de AdapterInfo
 	DWORD dwStatus = GetAdaptersInfo( AdapterInfo , &dwBufLen );
 	if ( dwStatus != ERROR_SUCCESS ) {
-        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "GetAdaptersInfo failed with error:" ) , RED );
+		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "GetAdaptersInfo failed with error:" ) , RED );
 		return MACS;
 	}
 
@@ -363,53 +408,30 @@ std::vector<std::string> hardware::getMacAddress( ) {
 		pAdapterInfo = pAdapterInfo->Next;  // Move para o próximo adaptador
 	}
 
+	for ( auto MAC : MACS )
+		CachedMac.emplace_back( StringCrypt::Get( ).EncryptString( MAC ) );
+
 	return MACS;
 }
 
-std::string hardware::GetIp( int port ) {
-    std::string Result = "";
-    WSADATA wsaData;
-    char hostname[ 256 ];
-    struct addrinfo hints , * res = nullptr;
+std::string hardware::GetIp( ) {
+	if ( CachedIp.EncryptedString.empty( ) ) {
+		json js;
+		try {
+			js = json::parse( Utils::Get( ).DownloadString( xorstr_( "https://httpbin.org/ip" ) ) );
+		}
+		catch ( const json::parse_error & e ) {
+			std::cout << xorstr_( "Failed to parse JSON: " ) << e.what( ) << std::endl;
+			return "";
+		}
 
-    // Initialize Winsock
-    if ( WSAStartup( MAKEWORD( 2 , 2 ) , &wsaData ) != 0 ) {
-        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "WSAStartup failed" ) , RED );
-        return Result;
-    }
+		CachedIp = StringCrypt::Get( ).EncryptString( js[ xorstr_( "origin" ) ] );
+		return js[ xorstr_( "origin" ) ];
+	}
+	std::string * str = StringCrypt::Get( ).DecryptString( CachedIp );
+	std::string result = *str;
+	StringCrypt::Get( ).CleanString( str );
 
-    // Get the hostname of the local machine
-    if ( gethostname( hostname , sizeof( hostname ) ) == SOCKET_ERROR ) {
-        LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Error getting local hostname" ) , RED );
-        WSACleanup( );
-        return Result;
-    }
 
-    // Set up the hints for the type of address we're looking for
-    memset( &hints , 0 , sizeof( hints ) );
-    hints.ai_family = AF_INET; // IPv4
-    hints.ai_socktype = SOCK_STREAM;
-
-    // Resolve the hostname to an IP address
-    if ( getaddrinfo( hostname , NULL , &hints , &res ) != 0 ) {
-        LogSystem::Get( ).ConsoleLog(_HWID , xorstr_( "Error getting local IP address" ) , RED );
-        WSACleanup( );
-        return Result;
-    }
-
-    // Extract the IP address from the result
-    struct sockaddr_in * addr = ( struct sockaddr_in * ) res->ai_addr;
-    char ip[ INET_ADDRSTRLEN ];
-
-    // Use inet_ntoa instead of inet_ntop for better compatibility with Windows
-    strcpy( ip , inet_ntoa( addr->sin_addr ) );
-
-    // Return the extracted IP address as a string
-    Result = std::string( ip );
-
-    // Clean up
-    freeaddrinfo( res );
-    WSACleanup( );
-
-    return Result;
+	return result;
 }

@@ -28,7 +28,8 @@ enum FLAG_DETECTION {
 	UNVERIFIED_MODULE_LOADED ,
 	SUSPECT_WINDOW_OPEN ,
 	HIDE_FROM_CAPTURE_WINDOW ,
-	FUNCTION_HOOKED
+	FUNCTION_HOOKED,
+	OPENHANDLE_TO_US,
 };
 
 class Detections : public ThreadHolder {
@@ -39,17 +40,29 @@ class Detections : public ThreadHolder {
 	std::vector<DetectionStruct> cDetections;
 	std::vector<std::string> LoadedDlls;
 	std::vector<std::string> PendingLoadedDlls;
+
 	std::vector<std::pair<FLAG_DETECTION , DetectionStruct>> DetectedFlags;
 
+	std::vector<DWORD> AllowedThreads;
+	bool RegisteredThreads = false;
+
 	bool DoesFunctionAppearHooked( std::string moduleName , std::string functionName );
+
 	void CheckLoadedDrivers( );
 	void CheckLoadedDlls( );
+	void CheckOpenHandles( );
 	void CheckFunctions( );
+	void CheckRunningThreads( );
+
 	void ScanWindows( );
 	void ScanModules( );
+	void ScanParentModules( );
+
 	void AddDetection( FLAG_DETECTION flag , DetectionStruct Detect );
 	void DigestDetections( );
-	void ScanParentModules( );
+	
+
+
 	
 	std::string GenerateDetectionStatus( FLAG_DETECTION flag , DetectionStruct _detection );
 
@@ -58,11 +71,11 @@ class Detections : public ThreadHolder {
 
 
 public:
+	void InitializeThreads( );
+	void AddThreadToWhitelist( DWORD PID );
 	void SetupPid( DWORD _MomProcess , DWORD _ProtectProcess );
+
 	Detections( );
-
-	Thread * GetDetectionThread( ) const { return this->ThreadObject.get( ); }
-
 	~Detections( );
 
 	bool isRunning( ) const override;

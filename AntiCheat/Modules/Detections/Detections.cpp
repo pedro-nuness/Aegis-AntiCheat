@@ -5,6 +5,8 @@
 #include <unordered_map>
 #include <memory.h>
 
+#include "../ThreadGuard/ThreadGuard.h"
+
 #include "../../Systems/AntiTamper/Authentication.h"
 #include "../../Systems/Memory/memory.h"
 #include "../../Systems/Utils/xorstr.h"
@@ -18,13 +20,19 @@
 
 #include <TlHelp32.h>
 
-
+void Detections::InitializeThreads( ) {
+	for ( ThreadInfo Thread : Mem::Thread::Get( ).EnumerateThreads( GetCurrentProcessId( ) ) ) {
+		AllowedThreads.emplace_back( Thread.threadID );
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Allowed thread ID: " ) + std::to_string( Thread.threadID ) , GREEN );
+	}
+}
 
 Detections::Detections( ) {
+
 	HMODULE hNtdll = GetModuleHandleA( xorstr_( "ntdll.dll" ) );
 	if ( hNtdll != 0 ) //register DLL notifications callback 
 	{
-		_LdrRegisterDllNotification pLdrRegisterDllNotification = ( _LdrRegisterDllNotification ) GetProcAddress( hNtdll , "LdrRegisterDllNotification" );
+		_LdrRegisterDllNotification pLdrRegisterDllNotification = ( _LdrRegisterDllNotification ) GetProcAddress( hNtdll , xorstr_("LdrRegisterDllNotification") );
 		PVOID cookie;
 		NTSTATUS status = pLdrRegisterDllNotification( 0 , ( PLDR_DLL_NOTIFICATION_FUNCTION ) OnDllNotification , this , &cookie );
 	}
@@ -97,7 +105,54 @@ void Detections::CheckLoadedDrivers( ) {
 				LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Unverified Driver loaded: " ) + Driver , RED );
 				AddDetection( UNVERIFIED_DRIVER_RUNNING , DetectionStruct( Driver , DETECTED ) );
 			}
-			std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
+			std::this_thread::sleep_for( std::chrono::milliseconds( 5 ) );
+		}
+	}
+}
+
+
+bool DoesProcessHaveOpenHandleTous( DWORD pid , std::vector <_SYSTEM_HANDLE> handles )
+{
+	if ( pid == 0 || pid == 4 ) //system idle process + system pids
+		return false;
+
+	for ( const auto & handle : handles )
+	{
+		if ( handle.ProcessId == pid && handle.ReferencingUs )
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void Detections::CheckOpenHandles( ) {
+	std::vector<_SYSTEM_HANDLE> handles = Mem::Handle::Get( ).DetectOpenHandlesToProcess( );
+
+	for ( auto & handle : handles )
+	{
+		if ( DoesProcessHaveOpenHandleTous( handle.ProcessId , handles ) )
+		{
+			/*
+			* System processes
+			Process C:\Windows\System32\svchost.exe has open handle to us!
+			Process C:\Windows\System32\conhost.exe has open handle to us!
+			*/
+
+			std::string ProcessPath = Mem::Get( ).GetProcessExecutablePath( handle.ProcessId );
+			if ( !strcmp( ProcessPath.c_str( ) , xorstr_( "C:\\Windows\\System32\\svchost.exe" ) ) )
+				continue;
+
+			if ( !strcmp( ProcessPath.c_str( ) , xorstr_( "C:\\Windows\\System32\\conhost.exe" ) ) )
+				continue;
+
+			AddDetection( OPENHANDLE_TO_US , DetectionStruct( ProcessPath , SUSPECT ) );
+
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Process " ) + Mem::Get( ).GetProcessExecutablePath( handle.ProcessId ) + xorstr_( " has open handle to us!" ) , RED );
+			//Logger::logfw( "UltimateAnticheat.log" , Detection , L"Process %s has open process handle to our process." , procName.c_str( ) );
+			//foundHandle = TRUE;
+			//continue;
 		}
 	}
 }
@@ -145,6 +200,12 @@ std::string Detections::GenerateDetectionStatus( FLAG_DETECTION flag , Detection
 		break;
 	case HIDE_FROM_CAPTURE_WINDOW:
 		_result += xorstr_( "** Found window hiding from capture **\n" );
+		break;
+	case FUNCTION_HOOKED:
+		_result += xorstr_( "** Found hook in function **\n" );
+		break;
+	case OPENHANDLE_TO_US:
+		_result += xorstr_( "** Found open handle to our process **\n" );
 		break;
 	}
 
@@ -228,81 +289,55 @@ bool Detections::DoesFunctionAppearHooked( std::string moduleName , std::string 
 
 void Detections::ScanWindows( ) {
 	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "starting window scan" ) , GREEN );
-	std::unordered_map<DWORD , int> Map;
+
+	std::unordered_map<DWORD , bool> processedProcesses;
+	std::unordered_map<HWND , DWORD> detectedWindows;
 
 	// Enumerate all top-level windows
-	std::vector<WindowInfo> Windows;
-	EnumWindows( Mem::EnumWindowsProc , ( LPARAM ) ( &Windows ) );
+	std::vector<WindowInfo> windows;
+	EnumWindows( Mem::EnumWindowsProc , reinterpret_cast< LPARAM >( &windows ) );
 
-	std::unordered_map<HWND , DWORD> DetectedWindows;
-
-
-	for ( const auto & window : Windows ) {
+	for ( const auto & window : windows ) {
 		// Check for overlay characteristics
 		LONG_PTR exStyle = GetWindowLongPtr( window.hwnd , GWL_EXSTYLE );
-		if ( ( exStyle & WS_EX_LAYERED ) && ( exStyle & WS_EX_TRANSPARENT ) ) {
-			if ( Map[ window.processId ] == true ) {
-				continue;
-			}
-			std::string ProcessName = Mem::Get( ).GetProcessName( window.processId );
-
+		if ( ( exStyle & WS_EX_LAYERED ) && ( exStyle & WS_EX_TRANSPARENT ) && !processedProcesses[ window.processId ] ) {
 			RECT overlayRect;
-			if ( GetWindowRect( window.hwnd , &overlayRect ) ) {
-
-				if ( !overlayRect.left && !overlayRect.right && !overlayRect.bottom && !overlayRect.top )
-					continue;
-
-				//emplace_item on map
-				Map[ window.processId ] = true;
+			if ( GetWindowRect( window.hwnd , &overlayRect ) &&
+				( overlayRect.left || overlayRect.right || overlayRect.bottom || overlayRect.top ) ) {
+				// Mark process as processed
+				processedProcesses[ window.processId ] = true;
 			}
 		}
 
-		DWORD windowAffinity = NULL;
-		if ( !GetWindowDisplayAffinity( window.hwnd , &windowAffinity ) ) {
-			continue;
+		DWORD windowAffinity;
+		if ( GetWindowDisplayAffinity( window.hwnd , &windowAffinity ) && windowAffinity != WDA_NONE ) {
+			detectedWindows[ window.hwnd ] = window.processId;
 		}
-		if ( windowAffinity != WDA_NONE ) {
-			//LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "got window affinity of id " ) + std::to_string( window.processId ) , GREEN );
-			DetectedWindows[ window.hwnd ] = window.processId;
+
+		std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
+	}
+
+	if ( !detectedWindows.empty( ) ) {
+		for ( const auto & [hwnd , processId] : detectedWindows ) {
+			std::string logMessage = Mem::Get( ).GetProcessExecutablePath( processId ) + xorstr_( "\n" );
+			Injector::Get( ).Inject( xorstr_( "windows.dll" ) , processId );
+			AddDetection( HIDE_FROM_CAPTURE_WINDOW , DetectionStruct( logMessage , DETECTED ) );
+		}
+	}
+
+	for ( const auto & [processId , _] : processedProcesses ) {
+		HANDLE hProcess = OpenProcess( PROCESS_VM_READ | PROCESS_QUERY_INFORMATION , FALSE , processId );
+		if ( hProcess ) {
+			std::string processPath = Mem::Get( ).GetProcessExecutablePath( processId );
+			if ( !Authentication::Get( ).HasSignature( processPath ) ) {
+				AddDetection( SUSPECT_WINDOW_OPEN , DetectionStruct( processPath , SUSPECT ) );
+				LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "process " ) + Mem::Get( ).GetProcessName( processId ) + xorstr_( " has open window!" ) , YELLOW );
+			}
+			CloseHandle( hProcess );
 		}
 		std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
 	}
 
-	if ( !DetectedWindows.empty( ) ) {
-		std::string Log = "";
-		for ( const auto & pair : DetectedWindows ) {
-			Injector::Get( ).Inject( xorstr_( "windows.dll" ) , pair.second );
-			Log += Mem::Get( ).GetProcessExecutablePath( pair.second ) + xorstr_( "\n" );
-		}
-
-		AddDetection( HIDE_FROM_CAPTURE_WINDOW , DetectionStruct( Log , DETECTED ) );
-	}
-
-	for ( const auto & pair : Map ) {
-
-		HANDLE hProcess = OpenProcess( PROCESS_VM_READ | PROCESS_QUERY_INFORMATION , FALSE , pair.first );
-		if ( hProcess == NULL )
-			continue;
-
-		std::string ProcessName = Mem::Get( ).GetProcessName( pair.first );
-		std::string ProcessPath = Mem::Get( ).GetProcessExecutablePath( pair.first );
-
-
-		if ( !Authentication::Get( ).HasSignature( ProcessPath ) ) {
-			AddDetection( SUSPECT_WINDOW_OPEN , DetectionStruct( ProcessPath , SUSPECT ) );
-			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "process " ) + ProcessName + xorstr_( " has open window!" ) , YELLOW );
-		}
-		else {
-
-
-		}
-
-		//LogSystem::Get( ).ConsoleLog( _DETECTION  , xorstr_( "scanning " ) + ProcessName , WHITE );
-
-
-		CloseHandle( hProcess );
-		std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
-	}
 	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "ending window scan" ) , GREEN );
 	this->ScanModules( );
 }
@@ -323,7 +358,7 @@ void Detections::ScanModules( ) {
 }
 
 void Detections::ScanParentModules( ) {
-	std::vector<std::string> MomModules = Mem::Get( ).GetModules( this->MomProcess );
+	std::vector<ModuleInfo> MomModules = Mem::Module::Get( ).EnumerateModules( this->MomProcess );
 
 	for ( auto MomModule : MomModules ) {
 
@@ -340,9 +375,46 @@ void Detections::CheckFunctions( ) {
 	}*/
 }
 
+void Detections::CheckRunningThreads( ) {
+
+	if ( !RegisteredThreads ) {
+		ThreadGuard * Guard = reinterpret_cast< ThreadGuard * >( Globals::Get( ).GuardMonitorPointer );
+		for ( auto ID : Guard->GetRunningThreadsID( ) ) {
+			bool Found = false;
+			for ( DWORD AllowedThread : AllowedThreads ) {
+				if ( ID == AllowedThread ) {
+					Found = true;
+				}
+			}
+			if ( !Found ) {
+				AllowedThreads.emplace_back( ID );
+			}
+		}
+		AllowedThreads.emplace_back( Guard->ThreadObject->GetId( ) );
+		RegisteredThreads = true;
+	}
+
+	std::vector<ThreadInfo> CurrentThreadsOnProcess = Mem::Thread::Get( ).EnumerateThreads( GetCurrentProcessId( ) );
+	std::vector<ThreadInfo> UnregisteredThread;
+
+	for ( const auto & threadInfo : CurrentThreadsOnProcess ) {
+		if ( std::find( AllowedThreads.begin( ) , AllowedThreads.end( ) , threadInfo.threadID ) == AllowedThreads.end( ) ) {
+			// Identifica uma thread não permitida
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Unauthorized thread detected: " ) + std::to_string( threadInfo.threadID ) , RED );
+			//AddDetection( UNAUTHORIZED_THREAD_RUNNING , DetectionStruct( std::to_string( threadInfo.ThreadId ) , DETECTED ) );
+		}
+	}
+}
+
+void Detections::AddThreadToWhitelist( DWORD threadPID ) {
+	this->AllowedThreads.emplace_back( threadPID );
+}
+
 void Detections::threadFunction( ) {
+
+
 	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );
-	
+
 	while ( !Globals::Get( ).VerifiedSession ) {
 		//as fast as possible cuh
 		std::this_thread::sleep_for( std::chrono::nanoseconds( 1 ) ); // Check every 30 seconds
@@ -350,6 +422,7 @@ void Detections::threadFunction( ) {
 
 	bool Running = true;
 
+	int CurrentDetection = 0;
 
 	while ( Running ) {
 
@@ -362,25 +435,52 @@ void Detections::threadFunction( ) {
 			LogSystem::Get( ).Log( xorstr_( "Test signing or debug mode is enabled" ) );
 		}
 
-		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "checking functions!" ) , GRAY );
-		this->CheckFunctions( );
-		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning loaded drivers!" ) , GRAY );
-		this->CheckLoadedDrivers( );
 
-		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning loaded dlls!" ) , GRAY );
-		this->CheckLoadedDlls( );
+		switch ( CurrentDetection ) {
+		case 0:
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "checking open handles!" ) , GRAY );
+			this->CheckOpenHandles( );
+			break;
+		case 1:
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "checking functions!" ) , GRAY );
+			this->CheckFunctions( );
+			break;
+		case 2:
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning loaded drivers!" ) , GRAY );
+			this->CheckLoadedDrivers( );
+			break;
+		case 3:
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning loaded dlls!" ) , GRAY );
+			this->CheckLoadedDlls( );
+			break;
+		case 4:
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning open windows!" ) , GRAY );
+			this->ScanWindows( );
+			break;
+		case 5:
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning running threads!" ) , GRAY );
+			this->CheckRunningThreads( );
+			break;
+		case 6:
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning parent modules!" ) , GRAY );
+			this->ScanParentModules( );
+			break;
+		case 7:
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "digesting detecions!" ) , GRAY );
+			this->DigestDetections( );
+			break;
+		default:
+			std::this_thread::sleep_for( std::chrono::seconds( this->getThreadSleepTime( ) ) );
+			//SET TO -1, CAUSE ++ = 0, so we wont miss handle verification
+			CurrentDetection = -1;
+			break;
+		}
 
-		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning open windows!" ) , GRAY );
-		this->ScanWindows( );
 
-		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning parent modules!" ) , GRAY );
-		this->ScanParentModules( );
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "ping" ) , GRAY );
 
-		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "digesting detecions!" ) , GRAY );
-		this->DigestDetections( );
+		CurrentDetection++;
 
-		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "detection thread" ) , GRAY );
-
-		std::this_thread::sleep_for( std::chrono::seconds( this->getThreadSleepTime( ) ) );
+		std::this_thread::sleep_for( std::chrono::milliseconds( 250 ) );
 	}
 }

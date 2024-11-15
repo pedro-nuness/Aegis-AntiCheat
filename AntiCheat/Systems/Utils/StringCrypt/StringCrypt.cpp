@@ -30,7 +30,7 @@ CryptedString StringCrypt::EncryptString( std::string str ) {
 
 	std::string Result;
 	for ( int i = 0; i < str.size( ); i++ ) {
-		int Num = Utils::Get( ).RandomNumber( 1 , 5000 );
+		int Num = Utils::Get( ).RandomNumber( 1 , 50000 );
 		CryptedChar cChar;
 		cChar._Key = Num;
 		cChar.Letter = str[ i ] - cChar._Key;

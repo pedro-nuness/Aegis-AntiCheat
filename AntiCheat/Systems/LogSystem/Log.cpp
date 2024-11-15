@@ -20,7 +20,7 @@ std::mutex PrintMutex;
 
 void DetachModules( std::string Message , std::string BoxMessage , bool ShowMessageBox ) {
 
-	LogSystem::Get().ConsoleLog( _LOG , Message , LIGHT_WHITE );
+	LogSystem::Get( ).ConsoleLog( _LOG , Message , LIGHT_WHITE );
 
 	if ( Globals::Get( ).GuardMonitorPointer != nullptr ) {
 		//Stop threads
@@ -28,14 +28,6 @@ void DetachModules( std::string Message , std::string BoxMessage , bool ShowMess
 
 		std::vector<HANDLE> threadsObject;
 
-		int i = 0;
-		while ( Guard->GetThread( i ) != NULL ) {
-			threadsObject.emplace_back( Guard->GetThread( i ) );
-			while ( !Guard->IsThreadrunning( i ) ) {
-				std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
-			}
-			i++;
-		}
 
 		Guard->ThreadObject->SignalShutdown( true );
 
@@ -68,18 +60,21 @@ void DetachModules( std::string Message , std::string BoxMessage , bool ShowMess
 std::vector<CryptedString> CachedLogs;
 
 
+#define log_key xorstr_("fmu843q0fpgonamgfjkang08fgd94qgn")
+#define log_iv xorstr_("f43qjg98adnmdamn")
+
 
 void LogSystem::SaveCachedLogsToFile( std::string LastLog ) {
 
 
 	std::string FileName = xorstr_( "AC.output_" ) + Utils::Get( ).GetRandomWord( 5 ) + xorstr_( ".txt" );
 	File LogFile( "ACLogs\\" , FileName );
-	
-
 
 	for ( auto & Log : CachedLogs ) {
 		std::string * Str = StringCrypt::Get( ).DecryptString( Log );
-		LogFile.Write( *Str );
+		std::string EncryptedLog;
+		if ( Utils::Get( ).encryptMessage( *Str , EncryptedLog , log_key , log_iv ) )
+			LogFile.Write( EncryptedLog );
 		StringCrypt::Get( ).CleanString( Str );
 	}
 	LogFile.Write( LastLog );
@@ -149,7 +144,7 @@ void LogSystem::ConsoleLog( MODULE_SENDER sender , std::string Message , COLORS 
 #if true
 
 	while ( CachedLogs.size( ) > 50 ) {
-		CachedLogs.erase(CachedLogs.begin());
+		CachedLogs.erase( CachedLogs.begin( ) );
 	}
 
 	//[DETECTION] Log....
@@ -161,7 +156,7 @@ void LogSystem::ConsoleLog( MODULE_SENDER sender , std::string Message , COLORS 
 	ColoredText( xorstr_( " " ) + Message + xorstr_( "\n" ) , _col );
 
 #else
-	
+
 
 
 	Warn( custom_col , custom_text );

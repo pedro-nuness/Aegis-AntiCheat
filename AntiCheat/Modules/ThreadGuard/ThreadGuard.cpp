@@ -7,12 +7,27 @@
 #include "../../Systems/Utils/utils.h"
 #include "../../Globals/Globals.h"
 
-ThreadGuard::ThreadGuard( std::vector<std::pair<ThreadHolder * , int>> & threads ) : m_threads( threads ) {}
+std::mutex ListMutex;
+
+ThreadGuard::ThreadGuard( std::vector<std::pair<ThreadHolder * , int>> & threads ) {
+	this->m_threads = threads;
+	for ( auto thread : m_threads ) {
+		this->RunningThreadsID.emplace_back( thread.first->ThreadObject->GetId( ) );
+	}
+}
 
 ThreadGuard::~ThreadGuard( ) {
 	stop( );
 }
 
+void ThreadGuard::AddThreadToList( DWORD PID ) {
+	std::lock_guard<std::mutex> lock( ListMutex );
+	this->RunningThreadsID.emplace_back( PID );
+}
+
+std::vector<DWORD> ThreadGuard::GetRunningThreadsID( ) {
+	return this->RunningThreadsID;
+}
 
 
 bool ThreadGuard::isRunning( ) const {
@@ -28,9 +43,6 @@ bool ThreadGuard::isRunning( ) const {
 
 	return true;
 }
-
-
-
 
 std::string ThreadGuard::GetThreadName( int thread ) {
 	switch ( thread )
@@ -48,19 +60,6 @@ std::string ThreadGuard::GetThreadName( int thread ) {
 	return  xorstr_( "undefined" );
 }
 
-HANDLE ThreadGuard::GetThread( int i ) {
-	if ( i >= m_threads.size( ) || i < 0 )
-		return NULL;
-
-	return m_threads.at( i ).first->ThreadObject->GetHandle( );
-}
-
-bool ThreadGuard::IsThreadrunning( int i ) {
-	if ( i >= m_threads.size( ) || i < 0 )
-		return false;
-
-	return m_threads.at( i ).first->ThreadObject->IsThreadRunning;
-}
 
 void ThreadGuard::threadFunction( ) {
 

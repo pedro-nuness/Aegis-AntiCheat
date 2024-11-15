@@ -180,6 +180,7 @@
   <ItemGroup>
     <ClInclude Include="Modules\AntiDebugger\AntiDebugger.h" />
     <ClInclude Include="Obscure\ntldr.h" />
+    <ClInclude Include="Process\Imports.h" />
     <ClInclude Include="Systems\AntiTamper\remap.hpp" />
     <ClInclude Include="Systems\Services\Services.h" />
     <ClInclude Include="Systems\AntiTamper\Authentication.h" />

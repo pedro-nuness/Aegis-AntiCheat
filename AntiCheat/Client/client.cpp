@@ -93,13 +93,13 @@ bool client::GetResponse( CommunicationResponse * response ) {
 	}
 
 	char sizeBuffer[ 16 ];
-	int received = recv( this->CurrentSocket , sizeBuffer , sizeof( sizeBuffer ), 0 );
+	int received = recv( this->CurrentSocket , sizeBuffer , sizeof( sizeBuffer ) , 0 );
 	if ( received <= 0 ) {
 		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to receive message size." ) , RED );
 		return false;
 	}
 
-	std::string encryptedMessage( sizeBuffer , sizeof( sizeBuffer ));
+	std::string encryptedMessage( sizeBuffer , sizeof( sizeBuffer ) );
 
 	if ( !Utils::Get( ).decryptMessage( encryptedMessage , encryptedMessage , key , iv ) ) {
 		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to decrypt message" ) , RED );
@@ -195,21 +195,17 @@ bool GetHWIDJson( json & js ) {
 
 
 	std::string MotherboardID = "";
+
 	if ( !hardware::Get( ).GetMotherboardSerialNumber( &MotherboardID ) )
 		return false;
+
 	if ( MotherboardID.empty( ) )
 		return false;
+
 	js[ xorstr_( "mb" ) ] = MotherboardID;
 
 
-	std::vector<int> Ports { 4444, 4040, 8080 };
-	std::string Ip;
-	for ( auto port : Ports ) {
-		Ip = hardware::Get( ).GetIp( 8080 );
-
-		if ( !Ip.empty( ) )
-			break;
-	}
+	std::string Ip = hardware::Get( ).GetIp(  );
 
 	if ( Ip.empty( ) ) {
 		return false;
@@ -263,7 +259,7 @@ bool client::SendPingToServer( ) {
 		break;
 	case RECEIVE_BANNED:
 		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "You have been banned!" ) , RED );
-		LogSystem::Get( ).LogWithMessageBox( xorstr_("Server denied ping" ) , xorstr_( "You have been banned!" ) );
+		LogSystem::Get( ).LogWithMessageBox( xorstr_( "Server denied ping" ) , xorstr_( "You have been banned!" ) );
 		success = false;
 		break;
 	}

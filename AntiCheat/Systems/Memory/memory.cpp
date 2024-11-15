@@ -47,6 +47,353 @@ typedef NTSTATUS( NTAPI * NtQuerySystemInformationPtr )(
 #define SystemHandleInformation (SYSTEM_INFORMATION_CLASS)16
 #endif
 
+
+std::vector<ThreadInfo> Mem::Thread::EnumerateThreads( DWORD processID ) {
+	std::vector<ThreadInfo> threadsInfo;
+
+	HANDLE hThreadSnap = CreateToolhelp32Snapshot( TH32CS_SNAPTHREAD , 0 );
+	if ( hThreadSnap == INVALID_HANDLE_VALUE ) {
+		std::cerr << "Error: Unable to create snapshot of threads." << std::endl;
+		return threadsInfo;
+	}
+
+	THREADENTRY32 te32;
+	te32.dwSize = sizeof( THREADENTRY32 );
+
+	if ( !Thread32First( hThreadSnap , &te32 ) ) {
+		std::cerr << "Error: Unable to get first thread." << std::endl;
+		CloseHandle( hThreadSnap );
+		return threadsInfo;
+	}
+
+	do {
+		if ( te32.th32OwnerProcessID == processID ) {
+			ThreadInfo tInfo;
+			tInfo.threadID = te32.th32ThreadID;
+			tInfo.ownerProcessID = te32.th32OwnerProcessID;
+			tInfo.priority = te32.tpBasePri;
+
+			HANDLE hThread = OpenThread( THREAD_QUERY_INFORMATION | THREAD_GET_CONTEXT , FALSE , te32.th32ThreadID );
+			if ( hThread ) {
+				tInfo.threadHandle = hThread;
+
+				CONTEXT context;
+				context.ContextFlags = CONTEXT_FULL;  // Obtenha todos os registros da CPU
+				if ( GetThreadContext( hThread , &context ) ) {
+					// Para x86 (32-bit), use Esp
+#if defined(_M_X64) || defined(_AMD64)
+	// Para x64 (64-bit), use Rsp
+					tInfo.stackAddress = ( LPVOID ) context.Rsp;
+					// std::cout << "Stack Pointer (Rsp): " << ( LPVOID ) context.Rsp << std::endl;
+#else
+	// Para x86 (32-bit), use Esp
+					tInfo.stackAddress = ( LPVOID ) context.Esp;
+					//std::cout << "Stack Pointer (Esp): " << context.Esp << std::endl;
+#endif
+				}
+				else {
+					std::cerr << "Erro ao obter o contexto da thread." << std::endl;
+				}
+
+
+				// Obtenha tempos de criação, saída, kernel e usuário
+				GetThreadTimes( hThread , &tInfo.creationTime , &tInfo.exitTime , &tInfo.kernelTime , &tInfo.userTime );
+
+				CloseHandle( hThread );
+			}
+
+			threadsInfo.push_back( tInfo );
+		}
+	} while ( Thread32Next( hThreadSnap , &te32 ) );
+
+	CloseHandle( hThreadSnap );
+	return threadsInfo;
+}
+
+std::vector<ModuleInfo> Mem::Module::EnumerateModules( DWORD processID ) {
+	std::vector<ModuleInfo> modulesInfo;
+
+	HANDLE hModuleSnap = CreateToolhelp32Snapshot( TH32CS_SNAPMODULE , processID );
+	if ( hModuleSnap == INVALID_HANDLE_VALUE ) {
+		std::cerr << "Error: Unable to create snapshot of modules for process ID " << processID << "." << std::endl;
+		return modulesInfo;
+	}
+
+	MODULEENTRY32 me32;
+	me32.dwSize = sizeof( MODULEENTRY32 );
+
+	if ( !Module32First( hModuleSnap , &me32 ) ) {
+		std::cerr << "Error: Unable to get first module." << std::endl;
+		CloseHandle( hModuleSnap );
+		return modulesInfo;
+	}
+
+	do {
+		ModuleInfo mInfo;
+		mInfo.moduleName = me32.szModule;
+		mInfo.modulePath = me32.szExePath;
+		mInfo.baseAddress = ( DWORD ) me32.modBaseAddr;
+		mInfo.size = me32.modBaseSize;
+		mInfo.moduleHandle = me32.hModule;
+
+		modulesInfo.push_back( mInfo );
+	} while ( Module32Next( hModuleSnap , &me32 ) );
+
+	CloseHandle( hModuleSnap );
+	return modulesInfo;
+}
+
+
+std::vector<SYSTEM_HANDLE> Mem::Handle::EnumerateHandles( DWORD processID ) {
+	NtQuerySystemInformationPtr NtQuerySystemInformation = ( NtQuerySystemInformationPtr ) GetProcAddress(
+		GetModuleHandle( "ntdll.dll" ) , "NtQuerySystemInformation" );
+
+	if ( !NtQuerySystemInformation ) {
+		std::cerr << "Não foi possível obter NtQuerySystemInformation." << std::endl;
+		return {};
+	}
+
+	ULONG bufferSize = 0x10000;
+	PSYSTEM_HANDLE_INFORMATION handleInfo = nullptr;
+	NTSTATUS status;
+
+	do {
+		handleInfo = ( PSYSTEM_HANDLE_INFORMATION ) realloc( handleInfo , bufferSize );
+		status = NtQuerySystemInformation( SystemHandleInformation , handleInfo , bufferSize , &bufferSize );
+		if ( status == STATUS_INFO_LENGTH_MISMATCH ) {
+			bufferSize *= 2;
+		}
+		else if ( !NT_SUCCESS( status ) ) {
+			std::cerr << "NtQuerySystemInformation falhou com status: 0x" << std::hex << status << std::endl;
+			free( handleInfo );
+			return {};
+		}
+	} while ( status == STATUS_INFO_LENGTH_MISMATCH );
+
+	std::vector< SYSTEM_HANDLE > Handles;
+
+	ULONG oldPid = NULL;
+	DWORD currentPID = GetCurrentProcessId( );
+	for ( ULONG i = 0; i < handleInfo->HandleCount; i++ ) {
+		SYSTEM_HANDLE handle = handleInfo->Handles[ i ];
+		if ( handle.ProcessId != currentPID ) {
+			if ( oldPid != handle.ProcessId )
+			{
+				Handles.emplace_back( handle );
+				oldPid = handle.ProcessId;
+			}
+		}
+	}
+
+	free( handleInfo );
+
+	return Handles;
+}
+
+
+
+std::vector<_SYSTEM_HANDLE> Mem::Handle::DetectOpenHandlesToProcess( )
+{
+	DWORD currentProcessId = GetCurrentProcessId( );
+	auto handles = GetHandles( );
+	std::vector<_SYSTEM_HANDLE> handlesTous;
+
+	for ( auto & handle : handles )
+	{
+		if ( handle.ProcessId != currentProcessId )
+		{
+			if ( handle.ProcessId == 0 || handle.ProcessId == 4 )
+			{
+				continue;
+			}
+
+			HANDLE processHandle = OpenProcess( PROCESS_DUP_HANDLE , FALSE , handle.ProcessId );
+
+			if ( processHandle )
+			{
+				HANDLE duplicatedHandle = INVALID_HANDLE_VALUE;
+
+				if ( DuplicateHandle( processHandle , ( HANDLE ) handle.Handle , GetCurrentProcess( ) , &duplicatedHandle , 0 , FALSE , DUPLICATE_SAME_ACCESS ) )
+				{
+					if ( GetProcessId( duplicatedHandle ) == currentProcessId )
+					{
+						handle.ReferencingUs = true;
+						//Logger::logf( "UltimateAnticheat.log" , Detection , "Handle %d from process %d is referencing our process." , handle.Handle , handle.ProcessId );
+						handlesTous.push_back( handle );
+					}
+					else
+					{
+						handle.ReferencingUs = false;
+					}
+
+					if ( duplicatedHandle != INVALID_HANDLE_VALUE )
+						CloseHandle( duplicatedHandle );
+				}
+
+				CloseHandle( processHandle );
+			}
+			else
+			{
+				//Logger::logf("UltimateAnticheat.log", Warning, "Couldn't open process with id %d @ Handles::DetectOpenHandlesToProcess (possible LOCAL SERVICE or SYSTEM process)", handle.ProcessId);
+				continue;
+			}
+		}
+	}
+
+	return handlesTous;
+}
+
+
+std::vector<ProcessInfo> Mem::Process::EnumerateProcesses( ) {
+	std::vector<ProcessInfo> processesInfo;
+
+	HANDLE hProcessSnap = CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS , 0 );
+	if ( hProcessSnap == INVALID_HANDLE_VALUE ) {
+		std::cerr << "Error: Unable to create snapshot of processes." << std::endl;
+		return processesInfo;
+	}
+
+	PROCESSENTRY32 pe32;
+	pe32.dwSize = sizeof( PROCESSENTRY32 );
+
+	if ( !Process32First( hProcessSnap , &pe32 ) ) {
+		std::cerr << "Error: Unable to get first process." << std::endl;
+		CloseHandle( hProcessSnap );
+		return processesInfo;
+	}
+
+	do {
+
+		ProcessInfo pInfo;
+		pInfo.processID = pe32.th32ProcessID;
+		pInfo.processName = pe32.szExeFile;
+		pInfo.threadCount = pe32.cntThreads;
+
+		// Obter classe de prioridade do processo
+		HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION | PROCESS_VM_READ , FALSE , pInfo.processID );
+		if ( hProcess ) {
+			pInfo.priorityClass = GetPriorityClass( hProcess );
+			CloseHandle( hProcess );
+		}
+
+		pInfo.threads = Mem::Thread::Get().EnumerateThreads( pInfo.processID );
+		pInfo.modules = Mem::Module::Get( ).EnumerateModules( pInfo.processID );
+		pInfo.openhandles = Mem::Handle::Get( ).EnumerateHandles( pInfo.processID );
+
+		// Adicione o processo à lista
+		processesInfo.push_back( pInfo );
+
+	} while ( Process32Next( hProcessSnap , &pe32 ) );
+
+	CloseHandle( hProcessSnap );
+	return processesInfo;
+}
+
+ProcessInfo Mem::Process::GetProcessInfo( DWORD Pid ) {
+	ProcessInfo processesInfo;
+
+	if ( !Pid )
+		return processesInfo;
+
+	HANDLE hProcessSnap = CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS , 0 );
+	if ( hProcessSnap == INVALID_HANDLE_VALUE ) {
+		std::cerr << "Error: Unable to create snapshot of processes." << std::endl;
+		return processesInfo;
+	}
+
+	PROCESSENTRY32 pe32;
+	pe32.dwSize = sizeof( PROCESSENTRY32 );
+
+	if ( !Process32First( hProcessSnap , &pe32 ) ) {
+		std::cerr << "Error: Unable to get first process." << std::endl;
+		CloseHandle( hProcessSnap );
+		return processesInfo;
+	}
+
+	do {
+		if ( pe32.th32ProcessID != Pid )
+			continue;
+
+		ProcessInfo pInfo;
+		pInfo.processID = pe32.th32ProcessID;
+		pInfo.processName = pe32.szExeFile;
+		pInfo.threadCount = pe32.cntThreads;
+
+		// Obter classe de prioridade do processo
+		HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION | PROCESS_VM_READ , FALSE , pInfo.processID );
+		if ( hProcess ) {
+			pInfo.priorityClass = GetPriorityClass( hProcess );
+			CloseHandle( hProcess );
+		}
+
+		pInfo.threads = Mem::Thread::Get( ).EnumerateThreads( pInfo.processID );
+		pInfo.modules = Mem::Module::Get( ).EnumerateModules( pInfo.processID );
+		pInfo.openhandles = Mem::Handle::Get( ).EnumerateHandles( pInfo.processID );
+
+		// Adicione o processo à lista
+		return pInfo;
+
+	} while ( Process32Next( hProcessSnap , &pe32 ) );
+
+
+	return processesInfo;
+}
+
+
+ProcessInfo Mem::Process::GetProcessInfo( std::string Name) {
+	ProcessInfo processesInfo;
+
+	if ( Name.empty( ) )
+		return processesInfo;
+
+	HANDLE hProcessSnap = CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS , 0 );
+	if ( hProcessSnap == INVALID_HANDLE_VALUE ) {
+		std::cerr << "Error: Unable to create snapshot of processes." << std::endl;
+		return processesInfo;
+	}
+
+	PROCESSENTRY32 pe32;
+	pe32.dwSize = sizeof( PROCESSENTRY32 );
+
+	if ( !Process32First( hProcessSnap , &pe32 ) ) {
+		std::cerr << "Error: Unable to get first process." << std::endl;
+		CloseHandle( hProcessSnap );
+		return processesInfo;
+	}
+
+	do {
+		if ( pe32.szExeFile != Name.c_str( ) )
+			continue;
+
+
+		ProcessInfo pInfo;
+		pInfo.processID = pe32.th32ProcessID;
+		pInfo.processName = pe32.szExeFile;
+		pInfo.threadCount = pe32.cntThreads;
+
+		// Obter classe de prioridade do processo
+		HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION | PROCESS_VM_READ , FALSE , pInfo.processID );
+		if ( hProcess ) {
+			pInfo.priorityClass = GetPriorityClass( hProcess );
+			CloseHandle( hProcess );
+		}
+
+		pInfo.threads = Mem::Thread::Get( ).EnumerateThreads( pInfo.processID );
+		pInfo.modules = Mem::Module::Get( ).EnumerateModules( pInfo.processID );
+		pInfo.openhandles = Mem::Handle::Get( ).EnumerateHandles( pInfo.processID );
+
+		// Adicione o processo à lista
+		return pInfo;
+
+	} while ( Process32Next( hProcessSnap , &pe32 ) );
+
+
+	return processesInfo;
+}
+
+
+
+
 std::vector<SYSTEM_HANDLE> Mem::GetHandlesForProcess( DWORD processId )
 {
 	NtQuerySystemInformationPtr NtQuerySystemInformation = ( NtQuerySystemInformationPtr ) GetProcAddress(
@@ -94,56 +441,6 @@ std::vector<SYSTEM_HANDLE> Mem::GetHandlesForProcess( DWORD processId )
 	return Handles;
 }
 
-bool Mem::RestrictProcessAccess( ) {
-	HANDLE hProcess = GetCurrentProcess( );
-	PSECURITY_DESCRIPTOR pSD = NULL;
-	PACL pOldDACL = NULL , pNewDACL = NULL;
-	EXPLICIT_ACCESS ea = { 0 };
-	PSID pEveryoneSID = NULL;
-	SID_IDENTIFIER_AUTHORITY SIDAuthWorld = SECURITY_WORLD_SID_AUTHORITY;
-
-
-	if ( GetSecurityInfo( hProcess , SE_KERNEL_OBJECT , DACL_SECURITY_INFORMATION ,
-		NULL , NULL , &pOldDACL , NULL , &pSD ) != ERROR_SUCCESS ) {
-		return false;
-	}
-
-
-	if ( !AllocateAndInitializeSid( &SIDAuthWorld , 1 ,
-		SECURITY_WORLD_RID ,
-		0 , 0 , 0 , 0 , 0 , 0 , 0 ,
-		&pEveryoneSID ) ) {
-		if ( pSD ) LocalFree( pSD );
-		return false;
-	}
-
-	ea.grfAccessPermissions = PROCESS_CREATE_THREAD | PROCESS_VM_OPERATION | PROCESS_VM_WRITE;
-	ea.grfAccessMode = DENY_ACCESS;
-	ea.grfInheritance = NO_INHERITANCE;
-	ea.Trustee.TrusteeForm = TRUSTEE_IS_SID;
-	ea.Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
-	ea.Trustee.ptstrName = ( LPSTR ) pEveryoneSID;
-
-	if ( SetEntriesInAcl( 1 , &ea , pOldDACL , &pNewDACL ) != ERROR_SUCCESS ) {
-		if ( pSD ) LocalFree( pSD );
-		if ( pEveryoneSID ) FreeSid( pEveryoneSID );
-		return false;
-	}
-
-	if ( SetSecurityInfo( hProcess , SE_KERNEL_OBJECT , DACL_SECURITY_INFORMATION ,
-		NULL , NULL , pNewDACL , NULL ) != ERROR_SUCCESS ) {
-		if ( pSD ) LocalFree( pSD );
-		if ( pEveryoneSID ) FreeSid( pEveryoneSID );
-		if ( pNewDACL ) LocalFree( pNewDACL );
-		return false;
-	}
-
-	if ( pSD ) LocalFree( pSD );
-	if ( pEveryoneSID ) FreeSid( pEveryoneSID );
-	if ( pNewDACL ) LocalFree( pNewDACL );
-
-	return true;
-}
 
 float Mem::GetProcessMemoryUsage( DWORD processID ) {
 	HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION | PROCESS_VM_READ , FALSE , processID );
@@ -205,80 +502,8 @@ bool Mem::ProcessIsOnSystemFolder( int pid ) {
 		Utils::Get( ).CheckStrings( Path , xorstr_( "\\system32\\" ) );
 }
 
-bool Mem::VerifySignature( HANDLE hProcess ) {
-	char processImagePath[ MAX_PATH ];
-	if ( GetModuleFileNameExA( hProcess , nullptr , processImagePath , MAX_PATH ) == 0 )
-	{
-		std::cerr << "Could not get process image path." << std::endl;
-		CloseHandle( hProcess );
-		return false;
-	}
 
-	// Initialize the WINTRUST_FILE_INFO structure
-	WINTRUST_FILE_INFO fileInfo;
-	memset( &fileInfo , 0 , sizeof( fileInfo ) );
-	fileInfo.cbStruct = sizeof( WINTRUST_FILE_INFO );
 
-	wchar_t wideProcessImagePath[ MAX_PATH ];
-	// Converte de multibyte (char) para wide char (wchar_t)
-	MultiByteToWideChar( CP_ACP , 0 , processImagePath , -1 , wideProcessImagePath , MAX_PATH );
-	fileInfo.pcwszFilePath = wideProcessImagePath;
-
-	// Initialize the WINTRUST_DATA structure
-	WINTRUST_DATA trustData;
-	memset( &trustData , 0 , sizeof( trustData ) );
-	trustData.cbStruct = sizeof( WINTRUST_DATA );
-	trustData.dwUIChoice = WTD_UI_NONE;
-	trustData.fdwRevocationChecks = WTD_REVOKE_NONE;
-	trustData.dwUnionChoice = WTD_CHOICE_FILE;
-	trustData.pFile = &fileInfo;
-	trustData.dwStateAction = WTD_STATEACTION_VERIFY;
-	trustData.dwProvFlags = WTD_SAFER_FLAG;  // Trust verification flag
-
-	// Use WinVerifyTrust to check if the file is signed and trusted
-	GUID actionGUID = WINTRUST_ACTION_GENERIC_VERIFY_V2;
-	LONG status = WinVerifyTrust( nullptr , &actionGUID , &trustData );
-
-	// Clean up the state data
-	trustData.dwStateAction = WTD_STATEACTION_CLOSE;
-	WinVerifyTrust( nullptr , &actionGUID , &trustData );
-
-	return status == ERROR_SUCCESS;
-}
-
-void Mem::WaitModule( int PID , std::string Module )
-{
-	//std::cout << "Waiting for " << Module;
-	//std::cout << std::endl;
-
-	while ( true )
-	{
-		if ( CheckModule( PID , Module ) )
-		{
-			//Utils::Get( ).Warn( GREEN );
-			//std::cout << "Successfully found " << Module << "!\n\n";
-			break;
-		}
-
-		std::this_thread::sleep_for( std::chrono::milliseconds( 500 ) ); // Sleep,
-	}
-}
-
-bool Mem::CheckModule( int ID , std::string bModule )
-{
-	std::vector<std::string> Modules = GetModules( ID );//Get all loaded mudles
-
-	for ( auto current_module : Modules )//Loop throw them
-	{
-		//std::cout << current_module << std::endl;
-
-		if ( Utils::Get( ).CheckStrings( current_module , bModule ) )//Check them if we found some 
-		{
-			return true;
-		}
-	}
-	return false;
-}
 
 DWORD Mem::GetProcessID( LPCTSTR ProcessName ) // non-conflicting function name
 {
@@ -297,54 +522,6 @@ DWORD Mem::GetProcessID( LPCTSTR ProcessName ) // non-conflicting function name
 	return 0;
 }
 
-
-std::vector<std::string> Mem::GetModules( DWORD processID )
-{
-	std::vector<std::string> modules;
-
-	HMODULE hMods[ 1024 ];
-	HANDLE hProcess;
-	DWORD cbNeeded;
-	unsigned int i;
-
-	// Print the process identifier.
-
-	//printf("\nProcess ID: %u\n", processID);
-
-	// Get a handle to the process.
-
-	hProcess = OpenProcess( PROCESS_QUERY_INFORMATION |
-		PROCESS_VM_READ ,
-		FALSE , processID );
-	if ( NULL == hProcess )
-		return modules;
-
-	// Get a list of all the modules in this process.
-
-	if ( EnumProcessModules( hProcess , hMods , sizeof( hMods ) , &cbNeeded ) )
-	{
-		for ( i = 0; i < ( cbNeeded / sizeof( HMODULE ) ); i++ )
-		{
-			TCHAR szModName[ MAX_PATH ];
-
-			// Get the full path to the module's file.
-
-			if ( GetModuleBaseName( hProcess , hMods[ i ] , szModName ,
-				sizeof( szModName ) / sizeof( TCHAR ) ) )
-			{
-				// Print the module name and handle value.
-				//_tprintf(TEXT("\t%s (0x%08X)\n"), szModName, hMods[i]);
-				modules.emplace_back( szModName );
-			}
-		}
-	}
-
-	// Release the handle to the process.
-
-	CloseHandle( hProcess );
-
-	return modules;
-}
 
 BOOL CALLBACK sEnumWindows( HWND hwnd , LPARAM lParam ) {
 	const DWORD TITLE_SIZE = 1024;
@@ -445,131 +622,6 @@ std::string Mem::ConvertWchar( WCHAR inCharText[ 260 ] )
 }
 
 
-uintptr_t Mem::GetModule( const std::string & ModuleName , int processID )
-{
-	uintptr_t wModule {};
-	HMODULE hMods[ 1024 ];
-	HANDLE hProcess;
-	DWORD cbNeeded;
-	unsigned int i;
-
-	// Print the process identifier.
-
-	//printf("\nProcess ID: %u\n", processID);
-
-	// Get a handle to the process.
-
-	hProcess = OpenProcess( PROCESS_QUERY_INFORMATION |
-		PROCESS_VM_READ ,
-		FALSE , processID );
-	if ( NULL == hProcess )
-		return wModule;
-
-	// Get a list of all the modules in this process.
-
-	if ( EnumProcessModules( hProcess , hMods , sizeof( hMods ) , &cbNeeded ) )
-	{
-		for ( i = 0; i < ( cbNeeded / sizeof( HMODULE ) ); i++ )
-		{
-			TCHAR szModName[ MAX_PATH ];
-
-			// Get the full path to the module's file.
-
-			if ( GetModuleFileNameEx( hProcess , hMods[ i ] , szModName ,
-				sizeof( szModName ) / sizeof( TCHAR ) ) )
-			{
-				std::string cModule = szModName;
-
-				size_t found = cModule.find( ModuleName );
-				if ( found != std::string::npos )
-				{
-					wModule = ( uintptr_t ) hMods[ i ];
-					//std::cout << "Found " << ModuleName << " at " << wModule << std::endl;
-
-					break;
-				}
-			}
-		}
-	}
-
-	// Release the handle to the process.
-
-	CloseHandle( hProcess );
-
-	return wModule;
-}
-
-bool Mem::SearchStringInDump( const std::vector<MemoryRegion> & memoryDump , const std::string & searchString ) {
-	for ( const auto & region : memoryDump ) {
-		if ( std::string( region.buffer.begin( ) , region.buffer.end( ) ).find( searchString ) != std::string::npos ) {
-			//std::cout << "String encontrada no endereço: " << region.baseAddress << std::endl;
-			return true;
-		}
-	}
-	return false;
-}
-std::vector<std::pair<std::string , LPVOID>>  Mem::DumpAndSearch( HANDLE hProcess , std::vector< std::string> & searchStrings ) {
-
-	SYSTEM_INFO sysInfo;
-	GetSystemInfo( &sysInfo );
-
-	LPCVOID startAddress = sysInfo.lpMinimumApplicationAddress;
-	LPCVOID endAddress = sysInfo.lpMaximumApplicationAddress;
-
-	MEMORY_BASIC_INFORMATION mbi;
-
-	std::vector<std::pair<std::string , LPVOID>> data;
-
-	std::unordered_map<int , bool> map;
-
-	while ( startAddress < endAddress ) {
-		if ( VirtualQueryEx( hProcess , startAddress , &mbi , sizeof( mbi ) ) == 0 ) {
-			break;
-		}
-
-		// Verificar se a região pode ser lida
-		if ( mbi.State == MEM_COMMIT && ( ( mbi.Protect & PAGE_READONLY ) || ( mbi.Protect & PAGE_READWRITE ) ) ) {
-			MemoryRegion region;
-			region.baseAddress = mbi.BaseAddress;
-			region.size = mbi.RegionSize;
-			region.buffer.resize( mbi.RegionSize );
-
-			SIZE_T bytesRead;
-			if ( ReadProcessMemory( hProcess , mbi.BaseAddress , &region.buffer[ 0 ] , mbi.RegionSize , &bytesRead ) ) {
-
-				for ( int i = 0; i < searchStrings.size( ); i++ ) {
-					if ( map[ i ] )
-						continue;
-
-					if ( std::string( region.buffer.begin( ) , region.buffer.end( ) ).find( searchStrings[ i ] ) != std::string::npos ) {
-						//std::cout << "found " << searchStrings[i] << " on " << region.baseAddress << "\n";
-						map[ i ] = true;
-						data.push_back( std::make_pair( searchStrings[i ] , region.baseAddress ) );
-						break;
-					}
-				}
-			}
-		}
-
-		startAddress = ( LPCVOID ) ( ( SIZE_T ) mbi.BaseAddress + mbi.RegionSize );
-	}
-
-	return data;
-}
-
-std::vector<std::pair<std::string , LPVOID>>  Mem::SearchStringsInDump( const std::vector<MemoryRegion> & memoryDump , std::vector< std::string> & searchStrings ) {
-	std::vector<std::pair<std::string , LPVOID>> data;
-	for ( auto searchString : searchStrings ) {
-		for ( const auto & region : memoryDump ) {
-			if ( std::string( region.buffer.begin( ) , region.buffer.end( ) ).find( searchString ) != std::string::npos ) {
-				data.push_back( std::make_pair( searchString , region.baseAddress ) );
-				break;
-			}
-		}
-	}
-	return data;
-}
-
 BOOL CALLBACK Mem::EnumWindowsProc( HWND hwnd , LPARAM lParam ) {
 	std::vector<WindowInfo> * Windows = reinterpret_cast< std::vector<WindowInfo> * >( lParam );
 	DWORD processId;
@@ -580,59 +632,6 @@ BOOL CALLBACK Mem::EnumWindowsProc( HWND hwnd , LPARAM lParam ) {
 	return TRUE;
 }
 
-uintptr_t Mem::GetModuleBaseAddress( std::string  lpszModuleName , DWORD PID ) {
-	uintptr_t dwModuleBaseAddress = 0;
-	HANDLE hSnapshot = CreateToolhelp32Snapshot( TH32CS_SNAPMODULE , PID );
-	MODULEENTRY32 ModuleEntry32 = { 0 };
-	ModuleEntry32.dwSize = sizeof( MODULEENTRY32 );
-
-	if ( Module32First( hSnapshot , &ModuleEntry32 ) )
-	{
-		do {
-			if ( _tcscmp( ModuleEntry32.szModule , lpszModuleName.c_str( ) ) == 0 )
-			{
-				dwModuleBaseAddress = ( uintptr_t ) ModuleEntry32.modBaseAddr;
-				//this->pSize = ModuleEntry32.modBaseSize;
-				break;
-			}
-		} while ( Module32Next( hSnapshot , &ModuleEntry32 ) );
-
-
-	}
-	CloseHandle( hSnapshot );
-	return dwModuleBaseAddress;
-}
-
-bool Mem::DumpProcessMemory( HANDLE hProcess , std::vector<MemoryRegion> & memoryDump ) {
-	SYSTEM_INFO sysInfo;
-	GetSystemInfo( &sysInfo );
-
-	LPCVOID startAddress = sysInfo.lpMinimumApplicationAddress;
-	LPCVOID endAddress = sysInfo.lpMaximumApplicationAddress;
-
-	MEMORY_BASIC_INFORMATION mbi;
-	while ( startAddress < endAddress ) {
-		if ( VirtualQueryEx( hProcess , startAddress , &mbi , sizeof( mbi ) ) == 0 ) {
-			break;
-		}
-
-		// Verificar se a região pode ser lida
-		if ( mbi.State == MEM_COMMIT && ( ( mbi.Protect & PAGE_READONLY ) || ( mbi.Protect & PAGE_READWRITE ) ) ) {
-			MemoryRegion region;
-			region.baseAddress = mbi.BaseAddress;
-			region.size = mbi.RegionSize;
-			region.buffer.resize( mbi.RegionSize );
-
-			SIZE_T bytesRead;
-			if ( ReadProcessMemory( hProcess , mbi.BaseAddress , &region.buffer[ 0 ] , mbi.RegionSize , &bytesRead ) ) {
-				memoryDump.push_back( region );
-			}
-		}
-
-		startAddress = ( LPCVOID ) ( ( SIZE_T ) mbi.BaseAddress + mbi.RegionSize );
-	}
-	return true;
-}
 
 std::string Mem::GetProcessName( DWORD PID ) {
 	PROCESSENTRY32 processInfo;
@@ -708,53 +707,6 @@ HANDLE Mem::GetProcessHandle( DWORD PID )
 	return processHandle;
 }
 
-uintptr_t Mem::GetAddressFromSignature( DWORD PID , std::string module_name , std::vector<int> signature ) {
-
-	HANDLE processHandle = GetProcessHandle( PID );
-
-	if ( processHandle == NULL ) {
-		return NULL;
-	}
-
-	auto module = GetModuleBaseAddress( module_name.c_str( ) , PID );
-	auto module_size = GetModuleSize( module_name.c_str( ) , PID );
-
-	if ( !module ) {
-		//std::cout << "!module!\n";
-		return NULL;
-	}
-
-	if ( !module_size ) {
-		//std::cout << "!size\n";
-		return NULL;
-	}
-
-	std::vector<byte> memBuffer( module_size );
-
-	int nearest = 0;
-
-	if ( !ReadProcessMemory( processHandle , ( LPCVOID ) ( module ) , memBuffer.data( ) , module_size , NULL ) ) {
-		//std::cout << GetLastError( ) << std::endl;
-		CloseHandle( processHandle );
-		return NULL;
-	}
-	for ( int i = 0; i < module_size; i++ ) {
-		for ( uintptr_t j = 0; j < signature.size( ); j++ ) {
-			if ( signature.at( j ) != -1 && signature[ j ] != memBuffer[ i + j ] )
-				//	//std::cout << std::hex << signature.at( j ) << " - " << ( void * ) memBuffer[ i + j ] << std::endl;
-				break;
-			//if ( signature[ j ] == memBuffer[ i + j ] && j > 0 )
-				//std::cout << std::hex << int( signature[ j ] ) << std::hex << int( memBuffer[ i + j ] ) << j << std::endl;
-			if ( j + 1 == signature.size( ) ) {
-				CloseHandle( processHandle );
-				return module + i;
-			}
-		}
-	}
-	CloseHandle( processHandle );
-	return NULL;
-}
-
 
 
 bool Mem::IsPIDRunning( DWORD dwPid ) {
@@ -769,23 +721,47 @@ bool Mem::IsPIDRunning( DWORD dwPid ) {
 	return false;
 }
 
-DWORD Mem::GetModuleSize( std::string lpszModuleName , DWORD PID ) {
-	uintptr_t dwModuleBaseAddress = 0;
-	HANDLE hSnapshot = CreateToolhelp32Snapshot( TH32CS_SNAPMODULE , PID );
-	MODULEENTRY32 ModuleEntry32 = { 0 };
-	ModuleEntry32.dwSize = sizeof( MODULEENTRY32 );
-	DWORD size = 0;
-	if ( Module32First( hSnapshot , &ModuleEntry32 ) )
-	{
-		do {
-			if ( _tcscmp( ModuleEntry32.szModule , lpszModuleName.c_str( ) ) == 0 )
-			{
-				size = ModuleEntry32.modBaseSize;
-				break;
-			}
 
-		} while ( Module32Next( hSnapshot , &ModuleEntry32 ) );
+#include "../../Process/Handles.hpp"
+
+std::vector<_SYSTEM_HANDLE> Mem::Handle::GetHandles( )
+{
+	Handles::NtQuerySystemInformationFunc NtQuerySystemInformation = ( Handles::NtQuerySystemInformationFunc ) GetProcAddress( GetModuleHandleW( L"ntdll.dll" ) , xorstr_( "NtQuerySystemInformation" ) );
+	if ( !NtQuerySystemInformation )
+	{
+		//Logger::logf( "UltimateAnticheat.log" , Err , "Could not get NtQuerySystemInformation function address @ Handles::GetHandles" );
+		return {};
 	}
-	CloseHandle( hSnapshot );
-	return size;
+
+	ULONG bufferSize = 0x10000;
+	PVOID buffer = nullptr;
+	NTSTATUS status = 0;
+
+	do
+	{
+		buffer = malloc( bufferSize );
+		if ( !buffer )
+		{
+			//Logger::logf( "UltimateAnticheat.log" , Err , "Memory allocation failed @ Handles::GetHandles" );
+			return {};
+		}
+
+		status = NtQuerySystemInformation( ( Handles::SYSTEM_INFORMATION_CLASS ) 16 , buffer , bufferSize , &bufferSize );
+		if ( status == STATUS_INFO_LENGTH_MISMATCH )
+		{
+			free( buffer );
+			bufferSize *= 2;
+		}
+		else if ( !( ( ( NTSTATUS ) ( status ) ) >= 0 ) )
+		{
+			//Logger::logf( "UltimateAnticheat.log" , Err , "NtQuerySystemInformation failed @ Handles::GetHandles" );
+			free( buffer );
+			return {};
+		}
+	} while ( status == STATUS_INFO_LENGTH_MISMATCH );
+
+	PSYSTEM_HANDLE_INFORMATION handleInfo = ( PSYSTEM_HANDLE_INFORMATION ) buffer;
+	std::vector<SYSTEM_HANDLE> handles( handleInfo->Handles , handleInfo->Handles + handleInfo->HandleCount );
+	free( buffer );
+	return handles;
 }

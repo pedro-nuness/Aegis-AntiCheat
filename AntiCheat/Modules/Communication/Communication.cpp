@@ -7,6 +7,9 @@
 
 #include <algorithm>
 
+
+#include "../ThreadGuard/ThreadGuard.h"
+
 #include "../../Globals/Globals.h"
 #include "../../Systems/Memory/memory.h"
 #include "../../Systems/LogSystem/Log.h"
@@ -27,11 +30,10 @@ using json = nlohmann::json;
 #define communication_key xorstr_("bfdgsam8ujf80942unv08wdnb08adu98") // 32 bytes para AES-256
 #define communication_iv xorstr_("nviuofdsanbv890j") // 16 bytes para AES
 
-
 Communication::~Communication( ) {
+	this->SignalShutdown( true );
 	stop( );
 }
-
 
 bool Communication::isRunning( ) const {
 	if ( this->ThreadObject->IsThreadSuspended( this->ThreadObject->GetHandle( ) ) ) {
@@ -136,7 +138,6 @@ SOCKET Communication::listenForClient( SOCKET ListenSocket , int timeoutSeconds 
 }
 
 bool Communication::sendMessage( SOCKET ClientSocket , std::string message ) {
-
 
 	if ( this->ClientSocket == INVALID_SOCKET ) {
 		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Invalid socket." ) , RED );
@@ -337,7 +338,6 @@ bool Communication::CheckReceivedPassword( ) {
 
 	//Allocate memory for the uncrypted message
 	{
-
 		std::string ReceivedPassword;
 		//Wait for the message
 		ReceivedPassword = receiveMessage( ClientSocket , 10 );
@@ -356,17 +356,21 @@ bool Communication::CheckReceivedPassword( ) {
 	return true;
 }
 
-void Communication::SendPingToServer( ) {
+void Communication::SendPingToServer(LPVOID AD ) {
+
+	Communication * communication = reinterpret_cast< Communication * >( AD );
+
 	while ( true ) {
-		if ( this->IsShutdownSignalled( ) ) {
+		
+		if ( communication->IsShutdownSignalled( ) ) {
 			return;
 		}
 
 		// Envia PING para o servidor
 		if ( client::Get( ).SendPingToServer( ) )
-			this->ServerResponse = RECEIVED;
+			communication->ServerResponse = RECEIVED;
 		else
-			this->ServerResponse = RECEIVE_ERROR;
+			communication->ServerResponse = RECEIVE_ERROR;
 
 
 		std::this_thread::sleep_for( std::chrono::seconds( 10 ) );
@@ -374,6 +378,8 @@ void Communication::SendPingToServer( ) {
 }
 
 void Communication::OpenRequestServer( ) {
+
+
 
 	SOCKET ListenSock = openConnection( xorstr_( "127.0.0.10" ) , 4444 );
 	if ( ListenSock == INVALID_SOCKET ) {
@@ -406,6 +412,8 @@ void Communication::OpenRequestServer( ) {
 	}
 }
 
+
+
 void Communication::threadFunction( ) {
 
 	LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );
@@ -428,6 +436,7 @@ void Communication::threadFunction( ) {
 	if ( this->ClientSocket == INVALID_SOCKET ) {
 		this->closeconnection( this->ListenSocket );
 		LogSystem::Get( ).Log( xorstr_( "[801] Can't open client connection!" ) );
+		this->~Communication( );
 	}
 
 	LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "client connected sucessfully" ) , GREEN );
@@ -435,14 +444,25 @@ void Communication::threadFunction( ) {
 
 	if ( !this->SendPasswordToServer( ) ) {
 		LogSystem::Get( ).Log( xorstr_( "[0001] Failed to send password to server!" ) );
+		this->~Communication( );
 	}
 
 	if ( !this->CheckReceivedPassword( ) ) {
 		LogSystem::Get( ).Log( xorstr_( "[0001] Hash mismatch!" ) );
+		this->~Communication( );
 	}
 
-	std::thread PingThread( &Communication::SendPingToServer , this );
-	PingThread.detach( );
+	std::unique_ptr<Thread> PingThread;
+	PingThread = std::make_unique<Thread>( ( LPTHREAD_START_ROUTINE ) Communication::SendPingToServer , this , true );
+	if ( !PingThread->GetHandle( ) || PingThread->GetHandle( ) == INVALID_HANDLE_VALUE ) {
+		LogSystem::Get( ).Log( "Failed to start thread." );
+		this->~Communication( );
+	}
+	{
+		ThreadGuard * Guard = reinterpret_cast< ThreadGuard * >( Globals::Get( ).GuardMonitorPointer );
+		Guard->AddThreadToList( PingThread->GetId( ) );
+	}
+
 
 	//Unlock all threads
 	Globals::Get( ).VerifiedSession = true;
