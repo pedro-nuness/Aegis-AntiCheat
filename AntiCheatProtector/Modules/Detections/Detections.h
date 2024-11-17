@@ -1,31 +1,23 @@
 #pragma once
-#include "../ThreadMonitor/ThreadMonitor.h"
+#include "../ThreadHolder/ThreadHolder.h"
 #include <string>
 #include <vector>
 #include <windows.h>
 #include <unordered_map>
 
-class Detections:  public ThreadMonitor
+enum DETECTION_STATUS {
+	NOTHING_DETECTED ,
+	DETECTED ,
+	SUSPECT
+};
+
+
+class Detections:  public ThreadHolder
 {
-	void threadFunction( );
-	void KeepThreadAlive( );
-
-	std::thread m_thread;
-	std::atomic<bool> m_running;
-	std::atomic<bool> m_healthy;
-
-	void DetectMemoryPermissions( );
-	void DetectUnknownModules( );
-	bool CheckCriticalFunctionRedirects( std::string funcName );
-	bool DetectTrampolines( FARPROC func , const BYTE * expectedBytes , SIZE_T length );
-	void CheckDynamicModules( );
-	void MonitorExternalProcesses( );
-	void RunDetections( );
+	void threadFunction( ) override;	
+	
 
 	void CheckHandles( );
-	void CheckThreads( );
-	bool ScanCurrentThreads( );
-
 	bool InjectProcess( DWORD processId );  
 	void RemoveInjection( DWORD processId );
 	void CheckInjectedProcesses( );
@@ -35,12 +27,6 @@ public:
 	Detections( );
 	~Detections( );
 
-	void start( );
-	void stop( );
-
-
 	bool isRunning( ) const override;
-	void reset( ) override;
-	void requestupdate( ) override;
 };
 

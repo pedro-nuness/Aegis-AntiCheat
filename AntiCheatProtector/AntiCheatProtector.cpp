@@ -8,19 +8,23 @@
 
 
 #include "Systems/Memory/memory.h"
-#include "Systems/Globals/Globals.h"
+#include "Globals/Globals.h"
 #include "Systems/Utils/utils.h"
 #include "Systems/Utils/xorstr.h"
 #include "Systems/LogSystem/Log.h"
 #include "Systems/Security/security.h"
+#include "Systems/Preventions/Preventions.h"
 
 #include "Modules/Communication/Communication.h"
 #include "Modules/Detections/Detections.h"
-#include "Modules/ThreadMonitor/MonitorThread.h"
+#include "Modules/ThreadGuard/ThreadGuard.h"
 
 
 DWORD WINAPI main( PVOID base )
 {
+	SetErrorMode( SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX );
+	Preventions::Get( ).Deploy( );
+
 #ifdef  _DEBUG
 	AllocConsole( );
 
@@ -42,13 +46,13 @@ DWORD WINAPI main( PVOID base )
 	}
 
 
-	Utils::Get( ).WarnMessage( GREEN , xorstr_( "AEGIS" ) , xorstr_( "Sucessfully attached :)" ) , WHITE );
+	LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Sucessfully attached :)" ) , WHITE );
 
 	/*if ( Mem::Get( ).RestrictProcessAccess( ) ) {
-		Utils::Get( ).WarnMessage( GREEN , xorstr_( "-" ) , xorstr_( "Memory protected sucessfully" ) , GREEN );
+		LogSystem::Get( ).ConsoleLog( GREEN , xorstr_( "-" ) , xorstr_( "Memory protected sucessfully" ) , GREEN );
 	}
 	else {
-		Utils::Get( ).WarnMessage( RED , xorstr_( "!" ) , xorstr_( "Failed to protect memory!" ) , RED );
+		LogSystem::Get( ).ConsoleLog( RED , xorstr_( "!" ) , xorstr_( "Failed to protect memory!" ) , RED );
 		LogSystem::Get( ).Log( xorstr_( "[0] Failed to protect process!" ) );
 	}*/
 
@@ -57,21 +61,17 @@ DWORD WINAPI main( PVOID base )
 
 	CommunicationEvents.start( );
 
-
-
 	while ( !Globals::Get( ).VerifiedSession )
 		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
 
 
-	std::vector<std::pair<ThreadMonitor * , int>> threads = {
-	std::make_pair( &CommunicationEvents, COMMUNICATION ) ,
-	std::make_pair( &DetectionsEvents, DETECTIONS )
+	std::vector<std::pair<ThreadHolder * , int>> threads = {
+		std::make_pair( &CommunicationEvents, COMMUNICATION ) ,
+		std::make_pair( &DetectionsEvents, DETECTIONS )
 	};
 
 	DetectionsEvents.start( );
-
-	MonitorThread monitor( threads );
-
+	ThreadGuard monitor( threads );
 	monitor.start( );
 
 	while ( true ) {

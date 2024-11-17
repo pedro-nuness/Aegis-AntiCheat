@@ -27,6 +27,43 @@ bool Utils::ExistsFile( const std::string & name )
 
 
 
+char * Utils::GenerateRandomString( int length ) //make sure to delete[] memory after
+{
+	if ( length == 0 )
+		return NULL;
+
+	const char charset[ ] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()";
+
+	char * randomString = new char[ ( length + 1 ) * sizeof( char ) ];
+
+	srand( time( ( time_t * ) NULL ) );
+
+	for ( int i = 0; i < length; ++i )
+		randomString[ i ] = charset[ rand( ) % ( strlen( charset ) - 1 ) ];
+
+	randomString[ length ] = '\0';
+
+	return randomString;
+}
+
+wchar_t * Utils::GenerateRandomWString( int length ) //make sure to delete[] memory after
+{
+	if ( length == 0 )
+		return NULL;
+
+	const wchar_t charset[ ] = L"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()";
+
+	wchar_t * randomString = new wchar_t[ ( length + 1 ) * sizeof( wchar_t ) ];
+
+	srand( time( ( time_t * ) NULL ) );
+
+	for ( int i = 0; i < length; ++i )
+		randomString[ i ] = charset[ rand( ) % ( wcslen( charset ) - 1 ) ];
+
+	randomString[ length ] = '\0';
+
+	return randomString;
+}
 
 
 std::string Utils::GetRandomLetter( )
@@ -70,16 +107,32 @@ bool Utils::isNumber( const std::string & str ) {
 
 	return true;
 }
+std::string Utils::GenerateRandomKey( int size ) {
 
+	std::string name;
 
+	for ( int b = 0; b < size; b++ )
+		name += GetRandomCharacter( );
 
+	return name;
+}
 
-void Utils::ColoredText( std::string text , COLORS color )
-{
-	HANDLE hConsole = GetStdHandle( STD_OUTPUT_HANDLE );
-	SetConsoleTextAttribute( hConsole , color );
-	std::cout << text;
-	SetConsoleTextAttribute( hConsole , WHITE );
+std::string Utils::GetRandomCharacter( ) {
+	std::string letters[ ] = { "a", "b", "c", "d", "e", "f", "g", "h", "i",
+					"j", "k", "l", "m", "n", "o", "p", "q", "r",
+					"s", "t", "u", "v", "w", "x", "y", "z", "A", "B", "C"
+					"D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O"
+					"P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "0",
+	"1", "2", "3", "4", "5", "6", "7", "8", "9", "!", "@", "#", "%","^", "&", "*", "(", ")",
+	"_", "-", "+", "=", "?", ";", "'", "[", "]" };
+
+	std::random_device r;
+	std::seed_seq seed { r( ), r( ), r( ), r( ), r( ), r( ), r( ), r( ) };
+	std::shuffle( std::begin( letters ) , std::end( letters ) ,
+		std::mt19937( seed ) );
+
+	for ( auto c : letters )
+		return c;
 }
 
 bool Utils::CheckStrings( std::string bString1 , std::string bExpectedResult )
@@ -91,20 +144,6 @@ bool Utils::CheckStrings( std::string bString1 , std::string bExpectedResult )
 	}
 
 	return false;
-}
-
-void Utils::Warn( COLORS color , std::string custom_text )
-{
-	std::string text = custom_text == ( "" ) ? ( "-" ) : custom_text;
-	ColoredText( xorstr_( "[" ) , WHITE );
-	ColoredText( text , color );
-	ColoredText( xorstr_( "] " ) , WHITE );
-}
-
-
-void Utils::WarnMessage( COLORS color , std::string custom_text , std::string Message , COLORS _col ) {
-	Warn( color , custom_text );
-	ColoredText( xorstr_( " " ) + Message + xorstr_("\n" ) , _col );
 }
 
 

@@ -29,6 +29,15 @@ std::vector<DWORD> ThreadGuard::GetRunningThreadsID( ) {
 	return this->RunningThreadsID;
 }
 
+std::vector<HANDLE> ThreadGuard::GetRunningThreadHandle( ) {
+	std::vector<HANDLE> Result;
+	
+	for ( auto & thread : this->m_threads ) {
+		Result.emplace_back( thread.first->ThreadObject->GetHandle( ) );
+	}
+	return Result;
+}
+
 
 bool ThreadGuard::isRunning( ) const {
 	if ( this->ThreadObject->IsThreadSuspended( this->ThreadObject->GetHandle( ) ) ) {
@@ -66,7 +75,14 @@ void ThreadGuard::threadFunction( ) {
 	LogSystem::Get( ).ConsoleLog( _MONITOR , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );
 
 	while ( !Globals::Get( ).VerifiedSession ) {
-		//as fast as possible cuh
+		if ( this->ThreadObject->IsShutdownSignalled( ) ) {
+			LogSystem::Get( ).ConsoleLog( _MONITOR , xorstr_( "shutting down thread, shutting down threads" ) , RED );
+			for ( auto & thread : this->m_threads ) {
+				thread.first->ThreadObject->SignalShutdown( true );
+			}
+			return;
+		}
+
 		std::this_thread::sleep_for( std::chrono::nanoseconds( 1 ) );
 	}
 

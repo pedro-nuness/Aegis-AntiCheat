@@ -18,7 +18,16 @@
 std::mutex PrintMutex;
 
 
+bool Running = false;
+
 void DetachModules( std::string Message , std::string BoxMessage , bool ShowMessageBox ) {
+
+
+	//Multiple Log calls
+	if ( Running )
+		return;
+
+	Running = true;
 
 	LogSystem::Get( ).ConsoleLog( _LOG , Message , LIGHT_WHITE );
 
@@ -26,8 +35,7 @@ void DetachModules( std::string Message , std::string BoxMessage , bool ShowMess
 		//Stop threads
 		ThreadGuard * Guard = reinterpret_cast< ThreadGuard * >( Globals::Get( ).GuardMonitorPointer );
 
-		std::vector<HANDLE> threadsObject;
-
+		std::vector<HANDLE> threadsObject = Guard->GetRunningThreadHandle();
 
 		Guard->ThreadObject->SignalShutdown( true );
 
@@ -59,10 +67,8 @@ void DetachModules( std::string Message , std::string BoxMessage , bool ShowMess
 
 std::vector<CryptedString> CachedLogs;
 
-
 #define log_key xorstr_("fmu843q0fpgonamgfjkang08fgd94qgn")
 #define log_iv xorstr_("f43qjg98adnmdamn")
-
 
 void LogSystem::SaveCachedLogsToFile( std::string LastLog ) {
 
@@ -146,11 +152,7 @@ void LogSystem::ConsoleLog( MODULE_SENDER sender , std::string Message , COLORS 
 	while ( CachedLogs.size( ) > 50 ) {
 		CachedLogs.erase( CachedLogs.begin( ) );
 	}
-
-	//[DETECTION] Log....
-	std::string Log = xorstr_( "[" ) + std::to_string( sender ) + xorstr_( "] " ) + Message;
-
-	CachedLogs.emplace_back( StringCrypt::Get( ).EncryptString( Log ) );
+	CachedLogs.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "[" ) + custom_text + xorstr_( "] " ) + Message ) );
 
 	Warn( custom_col , custom_text );
 	ColoredText( xorstr_( " " ) + Message + xorstr_( "\n" ) , _col );
@@ -164,12 +166,9 @@ void LogSystem::ConsoleLog( MODULE_SENDER sender , std::string Message , COLORS 
 #endif
 }
 
-
-
 void LogSystem::Log( std::string Message , std::string nFile ) {
 	std::thread( DetachModules , Message , "" , false ).detach( );
 }
-
 
 void LogSystem::LogWithMessageBox( std::string Message , std::string BoxMessage ) {
 	std::thread( DetachModules , Message , BoxMessage , true ).detach( );
@@ -182,7 +181,6 @@ void LogSystem::Warn( COLORS color , std::string custom_text )
 	ColoredText( text , color );
 	ColoredText( xorstr_( "] " ) , WHITE );
 }
-
 
 void LogSystem::ColoredText( std::string text , COLORS color )
 {

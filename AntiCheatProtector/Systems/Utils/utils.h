@@ -3,33 +3,19 @@
 #include "singleton.h"
 #include <string>
 
-enum COLORS
-{
-	DARK_BLUE = 1 ,
-	GREEN ,
-	BLUE ,
-	RED ,
-	PURPLE ,
-	YELLOW ,
-	WHITE ,
-	GRAY ,
-	LIGHT_BLUE ,
-	LIGHT_GREEN ,
-	LIGHTER_BLUE ,
-	LIGHT_RED ,
-	PINK ,
-	LIGHT_YELLOW ,
-	LIGHT_WHITE
-};
 
 class Utils : public CSingleton<Utils>
 {
 public:
-	void ColoredText( std::string text , COLORS color );
+
+	char * GenerateRandomString( int length ); //make sure to delete[] memory after
+	wchar_t * GenerateRandomWString( int length ); //make sure to delete[] memory after
+
+
+
+
 	bool ExistsFile( const std::string & name );
 	bool CheckStrings( std::string bString1 , std::string bExpectedResult );
-	void Warn( COLORS color , std::string custom_text = "" );
-	void WarnMessage( COLORS color , std::string custom_text, std::string Message, COLORS _col );
 	int RandomNumber( int min , int max );
 	bool isNumber( const std::string & str );
 	bool encryptMessage( const std::string & plaintext , std::string & ciphertext , const std::string & key , const std::string & iv );
@@ -37,5 +23,7 @@ public:
 
 	std::string GetRandomWord( int size );
 	std::string GetRandomLetter( );
+	std::string GetRandomCharacter( );
+	std::string GenerateRandomKey( int size );
 	std::string DownloadString( std::string URL );
 };

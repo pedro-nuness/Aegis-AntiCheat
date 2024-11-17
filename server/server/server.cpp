@@ -901,7 +901,7 @@ void Server::threadfunction( ) {
 	char ipStr[ INET_ADDRSTRLEN ];
 	inet_ntop( AF_INET , &serverAddr.sin_addr , ipStr , sizeof( ipStr ) );
 	globals::Get( ).SelfIP = ipStr;
-	utils::Get( ).WarnMessage( _SERVER , xorstr_( "Server listening on " ) + std::string( ipStr ) + xorstr_( ":" ) + std::to_string( serverPort ) , COLORS::GREEN );
+	utils::Get( ).WarnMessage( _SERVER , xorstr_( "Server listening on port " ) + std::to_string( serverPort ) , COLORS::GREEN );
 
 	globals::Get( ).ServerOpen = true;
 

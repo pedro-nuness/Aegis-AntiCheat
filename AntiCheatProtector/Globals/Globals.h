@@ -1,5 +1,5 @@
 #pragma once
-#include "../Utils/singleton.h"
+#include "../Systems/Utils/singleton.h"
 
 class Globals : public CSingleton<Globals> {
 

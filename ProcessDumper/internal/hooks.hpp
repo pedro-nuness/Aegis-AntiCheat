@@ -13,6 +13,9 @@
 using json = nlohmann::json;
 
 #include "../hardware/hardware.h"
+#include <mutex>
+
+std::mutex CallerMutex;
 
 
 
@@ -50,11 +53,6 @@ DWORD GetPID( LPCSTR ProcessName ) {
 	return ( DWORD ) 0;
 }
 
-
-
-#include <mutex>
-
-std::mutex CallerMutex;
 
 
 
@@ -96,22 +94,31 @@ bool CheckTarget( HANDLE hProcess , std::string Caller ) {
 	return true;
 }
 
-
 /* WriteProcessMemory */
 typedef BOOL( WINAPI * tWriteProcessMemory )( HANDLE  hProcess , LPVOID  lpBaseAddress , LPCVOID lpBuffer , SIZE_T  nSize , SIZE_T * lpNumberOfBytesWritten );
 tWriteProcessMemory pWriteProcessMemory = nullptr; // original function pointer after hook
 bool WINAPI hookedWriteProcessMemory( HANDLE  hProcess , LPVOID  lpBaseAddress , LPCVOID lpBuffer , SIZE_T  nSize , SIZE_T * lpNumberOfBytesWritten ) {
 
+	//if you managed to bypass the open handle protection, this will as well fuck you, if trying to write memory on user mode
 	CheckTarget( hProcess , xorstr_( "WriteProcessMemory" ) );
-
-	//std::cout xorstr_( " [WriteProcessMemory-Dumped] called to id:" ) << GetProcessId(hProcess) << std::endl;
 
 
 	return pWriteProcessMemory( hProcess , lpBaseAddress , lpBuffer , nSize , lpNumberOfBytesWritten );
 }
 
+typedef BOOL( WINAPI * SetWindowDisplayAffinity_t )( HWND , DWORD );
+SetWindowDisplayAffinity_t OriginalSetWindowDisplayAffinity = nullptr;
 
+// Hooked function
+BOOL WINAPI hookedSetWindowDisplayAffinity( HWND hWnd , DWORD dwAffinity ) {
+	// Block other affinities, you're cooked, 100%, unless you changed the function name or sum shit
+	if ( dwAffinity != WDA_NONE ) {
+		return TRUE;
+	}
 
+	// Call the original function
+	return OriginalSetWindowDisplayAffinity( hWnd , dwAffinity );
+}
 
 /* ReadProcessMemory */
 typedef BOOL( WINAPI * tReadProcessMemory )( HANDLE  hProcess , LPCVOID lpBaseAddress , LPVOID  lpBuffer , SIZE_T  nSize , SIZE_T * lpNumberOfBytesRead );
@@ -123,19 +130,6 @@ bool WINAPI hookedReadProcessMemory( HANDLE  hProcess , LPCVOID lpBaseAddress , 
 	return pReadProcessMemory( hProcess , lpBaseAddress , lpBuffer , nSize , lpNumberOfBytesRead );
 }
 
-typedef BOOL( WINAPI * tDeleteFileW )( LPCWSTR lpFileName );
-tDeleteFileW pDeleteFileW;
-bool WINAPI hookedDeleteFileW( LPCWSTR lpFileName ) {
-
-	return pDeleteFileW( lpFileName );
-}
-
-typedef BOOL( WINAPI * tDeleteFileA )( LPCSTR lpFileName );
-tDeleteFileA pDeleteFileA;
-bool WINAPI hookedDeleteFileA( LPCSTR lpFileName ) {
-
-	return pDeleteFileA( lpFileName );
-}
 
 typedef NTSTATUS( NTAPI * tNtRaiseHardError )( NTSTATUS ErrorStatus , ULONG NumberOfParameters , ULONG UnicodeStringParameterMask , PULONG_PTR Parameters , ULONG ResponseOption , PULONG Response );
 tNtRaiseHardError pNtRaiseHardError;

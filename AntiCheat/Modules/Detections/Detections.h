@@ -63,7 +63,7 @@ class Detections : public ThreadHolder {
 	
 
 
-	
+	 
 	std::string GenerateDetectionStatus( FLAG_DETECTION flag , DetectionStruct _detection );
 
 	void threadFunction( ) override;

@@ -22,7 +22,7 @@ class Communication : public ThreadHolder {
 	void SignalShutdown( bool shut ) { this->ShutdownServerPing = shut; }
 	bool IsShutdownSignalled( ) { return this->ShutdownServerPing; }
 
-	int PingLimit = 25;
+	int PingLimit = 10;
 	std::chrono::steady_clock::time_point LastClientPing;
 	bool PingInTime( );
 	void UpdatePingTime( );
@@ -34,7 +34,7 @@ class Communication : public ThreadHolder {
 
 	static void SendPingToServer( LPVOID AD);
 
-	bool InitializeClient( );
+
 	bool SendPasswordToServer( );
 	bool CheckReceivedPassword( );
 
@@ -52,6 +52,8 @@ class Communication : public ThreadHolder {
 	SOCKET ListenSocket;
 	SOCKET ClientSocket;
 public:
+
+	static bool InitializeClient( );
 
 	Communication( DWORD Pid , DWORD GamePid  )
 		: ProcessPID( Pid ) , GamePID( GamePid )  {}

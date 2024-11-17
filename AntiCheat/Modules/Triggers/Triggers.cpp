@@ -354,6 +354,10 @@ void Triggers::threadFunction(  ) {
 	LogSystem::Get( ).ConsoleLog( _TRIGGERS , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );
 
 	while ( !Globals::Get( ).VerifiedSession ) {
+		if ( this->ThreadObject->IsShutdownSignalled( ) ) {
+			LogSystem::Get( ).ConsoleLog( _TRIGGERS , xorstr_( "shutting down thread" ) , RED );
+			return;
+		}
 		//as fast as possible cuh
 		std::this_thread::sleep_for( std::chrono::nanoseconds( 1 ) ); // Check every 30 seconds
 	}

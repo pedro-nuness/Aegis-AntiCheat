@@ -98,14 +98,10 @@ bool sender::SendData( std::string data ) {
 		return false;
 	}
 
-
-
 	long int messageSize = encryptedMessage.size( );
 
 	//Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Sending message..." ) , BLUE );
 	//Utils::Get( ).WarnMessage( _SERVER , xorstr_( "Message size: " ) + std::to_string( messageSize ) , LIGHT_BLUE );
-
-
 
 	std::string messageSizeStr = std::to_string( messageSize );
 	if ( send( this->CurrentSocket , messageSizeStr.c_str( ) , messageSizeStr.size( ) , 0 ) == SOCKET_ERROR ) {

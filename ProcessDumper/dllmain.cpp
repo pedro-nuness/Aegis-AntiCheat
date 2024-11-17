@@ -17,14 +17,14 @@ DWORD WINAPI InitExec() {
 
     /* Security Based Hooks */
     if (MH_CreateHookApi(L"kernel32.dll", xorstr_("GetThreadContext"), &hookedGetThreadContext, reinterpret_cast<void**>(&pGetThreadContext)) != MH_OK) {
-        MessageBoxA(NULL, xorstr_("Failed To Hook GetThreadContext"), "", MB_OK);
+        //MessageBoxA(NULL, xorstr_("Failed To Hook GetThreadContext"), "", MB_OK);
     }
     else {
         //std::cout xorstr_("[security-enabled] GetThreadContext->dr. for HW Breakpoints\n");
     }
 
     if (MH_CreateHookApi(L"ntdll.dll", xorstr_("NtRaiseHardError"), &hookedNtRaiseHardError, reinterpret_cast<void**>(&pNtRaiseHardError)) != MH_OK) {
-        MessageBoxA(NULL, xorstr_("Failed To Hook NtRaisedHardError"), "", MB_OK);
+        //MessageBoxA(NULL, xorstr_("Failed To Hook NtRaisedHardError"), "", MB_OK);
     }
     else {
         //std::cout xorstr_("[security-enabled] GetThreadContext->dr. for HW Breakpoints\n");
@@ -32,7 +32,15 @@ DWORD WINAPI InitExec() {
 
     /* RPM / WPM Hooks */
     if (MH_CreateHookApi(L"kernel32.dll", xorstr_("WriteProcessMemory"), &hookedWriteProcessMemory, reinterpret_cast<void**>(&pWriteProcessMemory)) != MH_OK) {
-        MessageBoxA(NULL, xorstr_("Failed To Hook WriteProcessMemory"), "", MB_OK);
+        // MessageBoxA(NULL, xorstr_("Failed To Hook WriteProcessMemory"), "", MB_OK);
+    }
+    else {
+        //std::cout xorstr_("[enabled] WriteProcessMemory Dumper\n");
+    }
+
+    /* RPM / SWDP Hooks */
+    if ( MH_CreateHookApi( L"user32.dll" , xorstr_( "SetWindowDisplayAffinity" ) , &hookedSetWindowDisplayAffinity , reinterpret_cast< void ** >( &pWriteProcessMemory ) ) != MH_OK ) {
+        // MessageBoxA( NULL , xorstr_( "Failed To Hook WriteProcessMemory" ) , "" , MB_OK );
     }
     else {
         //std::cout xorstr_("[enabled] WriteProcessMemory Dumper\n");
@@ -45,19 +53,6 @@ DWORD WINAPI InitExec() {
         //std::cout xorstr_("[enabled] ReadProcessMemory Dumper\n");
     }  
 
-    if (MH_CreateHookApi(L"kernel32.dll", xorstr_("DeleteFileW"), &hookedDeleteFileW, reinterpret_cast<void**>(&pDeleteFileW)) != MH_OK) {
-        MessageBoxA(NULL, xorstr_("Failed To Hook DeleteFileW"), "", MB_OK);
-    }
-    else {
-        //std::cout xorstr_("[enabled] DeleteFileW Dumper\n");
-    }
-
-    if (MH_CreateHookApi(L"kernel32.dll", xorstr_("DeleteFileA"), &hookedDeleteFileA, reinterpret_cast<void**>(&pDeleteFileA)) != MH_OK) {
-        MessageBoxA(NULL, xorstr_("Failed To Hook DeleteFileA"), "", MB_OK);
-    }
-    else {
-        //std::cout xorstr_("[enabled] DeleteFileA Dumper\n");
-    }
     
     MH_EnableHook(MH_ALL_HOOKS);
     while (true) {
@@ -113,9 +108,10 @@ int __stdcall DllMain(const HMODULE hModule, const std::uintptr_t reason, const 
         //std::cout xorstr_("[-] AllocConsole - freopen_s | SET\n");
         DllHandle = hModule;
 
+        hyde::CreateThread( main , DllHandle );
         hyde::CreateThread(InitExec, DllHandle);
         //std::cout xorstr_("[-] Started Main Thread...\n");
-        hyde::CreateThread( main , DllHandle );
+     
         return true;
     }
     return true;

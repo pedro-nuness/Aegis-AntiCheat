@@ -3,12 +3,10 @@
 #include <Windows.h>
 #include <chrono>
 #include <string>
-#include "../ThreadMonitor/ThreadMonitor.h"
+#include "../ThreadHolder/ThreadHolder.h"
 
-class Communication : public ThreadMonitor
+class Communication : public ThreadHolder
 {
-	
-
 	std::string ReceiveHash;
 	std::string ExpectedMessage;
 
@@ -17,9 +15,6 @@ class Communication : public ThreadMonitor
 	bool PingInTime( );
 	void UpdatePingTime( );
 
-	std::thread m_thread;
-	std::atomic<bool> m_running;
-	std::atomic<bool> m_healthy;
 
 	SOCKET openConnection( const char * serverIp , int serverPort );
 	void SendPasswordToServer( );
@@ -27,7 +22,7 @@ class Communication : public ThreadMonitor
 	bool sendMessage( SOCKET ConnectSocket , std::string message );
 	std::string receiveMessage( SOCKET ConnectSocket, int timeout );
 
-	void threadFunction( );
+	void threadFunction( ) override;
 
 public:
 
@@ -36,12 +31,7 @@ public:
 
 	
 
-	void start( );
-	void stop( );
-
 
 	bool isRunning( ) const override;
-	void reset( ) override;
-	void requestupdate( ) override;
 };
 

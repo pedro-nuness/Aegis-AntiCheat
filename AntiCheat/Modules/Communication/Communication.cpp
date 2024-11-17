@@ -26,7 +26,7 @@
 
 using json = nlohmann::json;
 
-#define SALT xorstr_("pjA5w1hoyzKCFEnk19hwtB8K11rCkWU1")
+#define SALT xorstr_("pjA5w1hoyzKCFEnk19hwtB8K11rCkWU1")	
 #define communication_key xorstr_("bfdgsam8ujf80942unv08wdnb08adu98") // 32 bytes para AES-256
 #define communication_iv xorstr_("nviuofdsanbv890j") // 16 bytes para AES
 
@@ -297,16 +297,7 @@ void Communication::HandleMissingPing( ) {
 	closeconnection( ListenSocket );
 
 	if ( Mem::Get( ).IsPIDRunning( Globals::Get( ).ProtectProcess ) ) {
-		// Usando RAII para garantir que o handle seja fechado corretamente
-		HANDLE hProcess = Mem::Get( ).GetProcessHandle( Globals::Get( ).ProtectProcess );
-		auto processHandleGuard = std::unique_ptr<void , decltype( &CloseHandle )>( hProcess , CloseHandle );
-
-		if ( hProcess != NULL ) {
-			while ( !TerminateProcess( hProcess , 0 ) ) {
-				std::this_thread::sleep_for( std::chrono::milliseconds( 250 ) );
-			}
-			LogSystem::Get( ).Log( xorstr_( "[303] Can't find client answer!" ) );
-		}
+		LogSystem::Get( ).Log( xorstr_( "[303] Can't find client answer!" ) );
 	}
 	else {
 		LogSystem::Get( ).Log( xorstr_( "[303] Can't find client answer!" ) );
@@ -322,7 +313,6 @@ bool Communication::SendPasswordToServer( ) {
 	{
 		std::string Password = Utils::Get( ).GenerateRandomKey( 256 );
 		sendMessage( ClientSocket , Password.c_str( ) );
-
 
 		//expected response
 		this->ExpectedMessage = Mem::Get( ).GenerateHash( Password + SALT );
@@ -356,12 +346,12 @@ bool Communication::CheckReceivedPassword( ) {
 	return true;
 }
 
-void Communication::SendPingToServer(LPVOID AD ) {
+void Communication::SendPingToServer( LPVOID AD ) {
 
 	Communication * communication = reinterpret_cast< Communication * >( AD );
 
 	while ( true ) {
-		
+
 		if ( communication->IsShutdownSignalled( ) ) {
 			return;
 		}
@@ -378,9 +368,6 @@ void Communication::SendPingToServer(LPVOID AD ) {
 }
 
 void Communication::OpenRequestServer( ) {
-
-
-
 	SOCKET ListenSock = openConnection( xorstr_( "127.0.0.10" ) , 4444 );
 	if ( ListenSock == INVALID_SOCKET ) {
 		LogSystem::Get( ).Log( xorstr_( "[601] Can't open listener connection!" ) );
@@ -425,12 +412,6 @@ void Communication::threadFunction( ) {
 	}
 
 	LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "waiting client connection..." ) , WHITE );
-
-	if ( !this->InitializeClient( ) ) {
-		LogSystem::Get( ).Log( xorstr_( "[0001] Can't init client!" ) );
-	}
-
-	LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "started client sucessfully" ) , WHITE );
 
 	this->ClientSocket = this->listenForClient( this->ListenSocket , 10 );
 	if ( this->ClientSocket == INVALID_SOCKET ) {
@@ -479,11 +460,9 @@ void Communication::threadFunction( ) {
 			break;
 		}
 
-
 		this->ExpectedMessage = Mem::Get( ).GenerateHash( this->ExpectedMessage + SALT );
 		// Envia mensagem para o cliente
 		this->sendMessage( this->ClientSocket , this->ExpectedMessage );
-
 
 		//Expected response
 		this->ExpectedMessage = Mem::Get( ).GenerateHash( this->ExpectedMessage + SALT );
@@ -502,8 +481,10 @@ void Communication::threadFunction( ) {
 				this->UpdatePingTime( );
 			}
 		}
-		else if ( !this->PingInTime( ) ) {
+
+		if ( !this->PingInTime( ) ) {
 			this->HandleMissingPing( );
+			this->SignalShutdown( true );
 		}
 
 		// Aguarda por 5 segundos antes do próximo loop
