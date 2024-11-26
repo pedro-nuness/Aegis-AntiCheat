@@ -84,7 +84,7 @@ int main( int argc , char * argv[ ] ) {
 
 	::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
 
-#if true
+#if false
 	//FreeConsole( );
 	//::ShowWindow( ::GetConsoleWindow( ) , SW_HIDE );
 	if ( argc < 3 ) {
@@ -108,6 +108,9 @@ int main( int argc , char * argv[ ] ) {
 #else
 	Globals::Get( ).OriginalProcess = Mem::Get( ).GetProcessID( "explorer.exe" );
 	Globals::Get( ).ProtectProcess = Mem::Get( ).GetProcessID( "notepad.exe" );
+
+	Communication::InitializeClient( );
+
 	::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
 #endif // !DEBUG
 

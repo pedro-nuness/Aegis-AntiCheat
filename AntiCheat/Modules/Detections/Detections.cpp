@@ -345,6 +345,7 @@ void Detections::ScanWindows( ) {
 					if ( !Authentication::Get( ).HasSignature( Module.modulePath ) ) {
 						AddDetection( SUSPECT_WINDOW_OPEN , DetectionStruct( processPath , SUSPECT ) );
 						LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "process " ) + Mem::Get( ).GetProcessName( processId ) + xorstr_( " has open window!" ) , YELLOW );
+						break;
 					}
 				}
 			}

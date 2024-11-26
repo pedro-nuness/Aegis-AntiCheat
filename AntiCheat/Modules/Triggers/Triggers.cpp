@@ -286,8 +286,8 @@ void Triggers::DigestTriggers( ) {
 	std::vector<Trigger> NewTriggers = GetDifferent( this->LastTriggers , this->FoundTriggers );
 
 	if ( !NewTriggers.empty( ) ) {
-		PunishSystem::Get( ).UnsafeSession( );
-		//client::Get( ).SendPunishToServer( GenerateWarningStatus( NewTriggers ) , false );
+		client::Get( ).SendPunishToServer( GenerateWarningStatus( NewTriggers ) , false );
+		LogSystem::Get( ).LogWithMessageBox( xorstr_( "Unsafe" ) , xorstr_( "unsafe session" ) );
 	}
 
 	this->LastTriggers = this->FoundTriggers;
@@ -341,9 +341,10 @@ void Triggers::CheckBlackListedWindows( ) {
 }
 
 std::string Triggers::GenerateWarningStatus( std::vector<Trigger> Triggers ) {
-	std::string STR = xorstr_( "> WARNING\n**Found Malicious process!**\n\n" );
+	std::string STR; ;
 	for ( auto T : Triggers ) {
-		STR += xorstr_( "- " ) + T.Trigger + xorstr_( "\n" );
+		STR += xorstr_( "** Found Malicious process!**\n" );
+		STR += xorstr_( "- " ) + T.Trigger + xorstr_( "\n\n" );
 	}
 	return STR;
 }

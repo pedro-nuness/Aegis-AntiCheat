@@ -16,6 +16,7 @@
 #include <aclapi.h>
 #include <sddl.h>
 #include <unordered_map>
+#include <algorithm>
 
 #include "..\Utils\singleton.h"
 #include "..\Utils\utils.h"
@@ -496,10 +497,8 @@ std::string Mem::GetProcessExecutablePath( DWORD processID ) {
 
 bool Mem::ProcessIsOnSystemFolder( int pid ) {
 	std::string Path = GetProcessExecutablePath( pid );
-
-	return Utils::Get( ).CheckStrings( Path , xorstr_( "\\System32\\" ) ) ||
-		Utils::Get( ).CheckStrings( Path , xorstr_( "\\SysWOW64\\" ) ) ||
-		Utils::Get( ).CheckStrings( Path , xorstr_( "\\system32\\" ) );
+	std::transform( Path.begin( ) , Path.end( ) , Path.begin( ) , &Mem::asciitolower );
+	return Utils::Get( ).CheckStrings( Path , xorstr_( "c:\\windows\\" ) );
 }
 
 

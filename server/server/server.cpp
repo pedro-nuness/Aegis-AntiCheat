@@ -917,7 +917,7 @@ void Server::threadfunction( ) {
 			continue;
 		}
 		
-		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Received new connection" ) , COLORS::GREEN );
+		//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Received new connection" ) , COLORS::GREEN );
 
 		// Criar uma nova thread para lidar com a conexão do cliente
 		std::thread( &Server::handleClient , this , clientSock ).detach( ); // A nova thread gerencia a conexão do cliente
