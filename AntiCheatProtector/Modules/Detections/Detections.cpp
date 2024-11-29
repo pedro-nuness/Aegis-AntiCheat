@@ -9,6 +9,8 @@
 #include <unordered_map>
 #include <dbghelp.h>
 #include <tlhelp32.h>
+#include <fstream>
+
 
 #pragma comment(lib, "dbghelp.lib")
 
@@ -18,6 +20,7 @@
 #include "../../Systems/Injection/Injection.h"
 #include "../../Systems/LogSystem/Log.h"
 #include "../../Systems/AntiTamper/Authentication.h"
+#include "../../Client/client.h"
 
 
 Detections::Detections( ) {}
@@ -70,6 +73,130 @@ bool DoesProcessHaveOpenHandleTous( DWORD pid , std::vector <_SYSTEM_HANDLE> han
 }
 
 
+bool SaveFirstFunctionBytes( const std::string & moduleName , const std::string & functionName , const std::string & outputFileName , size_t byteCount ) {
+	// Obter o handle do módulo
+	HMODULE hModule = GetModuleHandleA( moduleName.c_str( ) );
+	if ( !hModule ) {
+		std::cout << "Erro: Não foi possível encontrar o módulo: " << moduleName << std::endl;
+		return false;
+	}
+
+	// Obter o endereço da função
+	FARPROC funcAddress = GetProcAddress( hModule , functionName.c_str( ) );
+	if ( !funcAddress ) {
+		std::cout << "Erro: Não foi possível encontrar a função: " << functionName << std::endl;
+		return false;
+	}
+
+	// Salvar os primeiros X bytes da função
+	BYTE * start = reinterpret_cast< BYTE * >( funcAddress );
+
+	std::ofstream outFile( outputFileName );
+	if ( !outFile.is_open( ) ) {
+		std::cout << "Erro: Não foi possível abrir o arquivo: " << outputFileName << std::endl;
+		return false;
+	}
+
+	outFile << "unsigned char functionBytes[] = {";
+	for ( size_t i = 0; i < byteCount; ++i ) {
+		outFile << "0x" << std::hex << static_cast< int >( start[ i ] );
+		if ( i < byteCount - 1 ) outFile << ", "; // Adiciona vírgula entre os bytes
+	}
+	outFile << "};" << std::endl;
+
+	outFile.close( );
+	std::cout << "Os primeiros " << byteCount << " bytes da função foram salvos em: " << outputFileName << std::endl;
+	return true;
+}
+
+
+
+bool Detections::DoesFunctionAppearHooked( std::string moduleName , std::string functionName , const unsigned char * expectedBytes )
+{
+	if ( moduleName.empty( ) || functionName.empty( ) )
+		return false;
+
+	if ( !expectedBytes|| expectedBytes == nullptr ) {
+		SaveFirstFunctionBytes( moduleName , functionName , functionName + xorstr_( ".txt" ) , 15 );
+		return false;
+	}
+
+	bool FunctionPreambleHooked = false;
+
+	HMODULE hMod = GetModuleHandleA( moduleName.c_str( ) );
+	if ( hMod == NULL )
+	{
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Couldn't fetch module " ) + moduleName , RED );
+		return false;
+	}
+
+
+	UINT64 AddressFunction = ( UINT64 ) GetProcAddress( hMod , functionName.c_str( ) );
+
+	if ( AddressFunction == NULL )
+	{
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Couldn't fetch address of function " ) + functionName , RED );
+		return FALSE;
+	}
+
+	bool FOUND_HOOK = false;
+
+	unsigned char buffer[ sizeof( expectedBytes ) ];
+	SIZE_T bytesRead;
+	if ( ReadProcessMemory( GetCurrentProcess( ) , ( void * ) AddressFunction , buffer , sizeof( expectedBytes ) , &bytesRead ) ) {
+		if ( memcmp( buffer , expectedBytes , sizeof( expectedBytes ) ) != 0 ) {
+			FOUND_HOOK = TRUE;
+		}
+	}
+
+	return FOUND_HOOK;
+}
+
+
+void Detections::CheckFunctions( ) {
+
+	{
+		unsigned char SENDfunctionBytes[ ] = {
+		0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x6C, 0x24, 0x10, 0x48, 0x89, 0x74, 0x24, 0x18
+		};
+
+		if ( this->DoesFunctionAppearHooked( xorstr_( "ws2_32.dll" ) , xorstr_( "send" ) , SENDfunctionBytes ) ) {
+			AddDetection( FUNCTION_HOOKED , DetectionStruct( xorstr_( "ws2_32.dll:send() hooked" ) , SUSPECT ) );
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "ws2_32.dll:send() hooked" ) , RED );
+		}
+	}
+
+	{
+		unsigned char RECVfunctionBytes[ ] = {
+	0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x74, 0x24, 0x10, 0x44, 0x89, 0x4C, 0x24, 0x20
+		};
+
+		if ( this->DoesFunctionAppearHooked( xorstr_( "ws2_32.dll" ) , xorstr_( "recv" ) , RECVfunctionBytes ) ) {
+			AddDetection( FUNCTION_HOOKED , DetectionStruct( xorstr_( "ws2_32.dll:recv() hooked" ) , SUSPECT ) );
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "ws2_32.dll:recv() hooked" ) , RED );
+		}
+	}
+
+	{
+
+	/*	std::vector<std::tuple<std::string , std::string , const unsigned char *>> functionsToCheck = {
+		{"dxgi.dll", "IDXGISwapChain::Present", nullptr},
+		{"dxgi.dll", "IDXGISwapChain::ResizeBuffers", nullptr},
+		{"d3d11.dll", "ID3D11Device::CreateRenderTargetView", nullptr},
+		{"d3d11.dll", "ID3D11DeviceContext::Draw", nullptr},
+		{"d3d11.dll", "ID3D11DeviceContext::DrawIndexed", nullptr},
+		{"d3d11.dll", "ID3D11Device::CreateBuffer", nullptr},
+		{"d3d11.dll", "ID3D11Device::CreateShaderResourceView", nullptr},
+		};
+
+		for ( const auto & [moduleName , functionName , expectedBytes] : functionsToCheck ) {
+			bool isHooked = DoesFunctionAppearHooked( moduleName , functionName , expectedBytes );
+			if ( isHooked ) {
+				LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Hook detected in function: " ) + functionName , RED );
+			}
+		}*/
+	}
+}
 
 
 // Verifica handles suspeitos
@@ -118,12 +245,12 @@ void Detections::CheckHandles( ) {
 
 				if ( DuplicateHandle( processHandle , ( HANDLE ) handle.Handle , GetCurrentProcess( ) , &duplicatedHandle , 0 , FALSE , DUPLICATE_SAME_ACCESS ) )
 				{
-					if ( Mem::Handle::Get( ).CheckDangerousPermissions( duplicatedHandle ) ) {
+					if ( Mem::Handle::Get( ).CheckDangerousPermissions( duplicatedHandle, nullptr ) ) {
 						LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Process " ) + Mem::Get( ).GetProcessExecutablePath( handle.ProcessId ) + xorstr_( " has open handle to us!" ) , RED );
 
-						//if ( InjectProcess( handle.ProcessId ) ) {
-
-						//}
+						if ( InjectProcess( handle.ProcessId ) ) {
+							LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Dumpped nigga :)") , GREEN );
+						}
 					}
 					else
 						LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Process " ) + Mem::Get( ).GetProcessExecutablePath( handle.ProcessId ) + xorstr_( " has open handle to us!" ) , YELLOW );
@@ -146,6 +273,74 @@ void Detections::CheckHandles( ) {
 		}
 	}
 }
+
+void Detections::AddDetection( FLAG_DETECTION flag , DetectionStruct _detection ) {
+	this->DetectedFlags.emplace_back( std::make_pair( flag , _detection ) );
+}
+
+
+std::string Detections::GenerateDetectionStatus( FLAG_DETECTION flag , DetectionStruct _detection ) {
+
+	std::string _result = "";
+
+	switch ( flag ) {
+	case UNVERIFIED_DRIVER_RUNNING:
+		_result += xorstr_( "** Unverified Driver Running on System**\n" );
+		break;
+	case UNVERIFIED_MODULE_LOADED:
+		_result += xorstr_( "** Unverified Module Loaded **\n" );
+		break;
+	case SUSPECT_WINDOW_OPEN:
+		_result += xorstr_( "** Suspect window open **\n" );
+		break;
+	case HIDE_FROM_CAPTURE_WINDOW:
+		_result += xorstr_( "** Found window hiding from capture **\n" );
+		break;
+	case FUNCTION_HOOKED:
+		_result += xorstr_( "** Found hook in function **\n" );
+		break;
+	case OPENHANDLE_TO_US:
+		_result += xorstr_( "** Found open handle to our process **\n" );
+		break;
+	}
+
+	_result += xorstr_( "`" ) + _detection.Log + xorstr_( "`\n" );
+
+	return _result;
+}
+
+
+void Detections::DigestDetections( ) {
+	if ( DetectedFlags.empty( ) ) {
+		return;
+	}
+
+	if ( !DetectedFlags.empty( ) ) {
+		/*
+		* DIGEST DETECTION
+		*/
+		std::string FinalInfo = "";
+
+		FinalInfo += xorstr_( "> AC FLAG detected\n\n" );
+
+		bool Ban = false;
+
+		for ( auto Detection : DetectedFlags ) {
+			FinalInfo += this->GenerateDetectionStatus( Detection.first , Detection.second );
+			if ( Detection.second._Status == DETECTED )
+				Ban = true;
+		}
+
+		LogSystem::Get( ).ConsoleLog( _DETECTION , FinalInfo , Ban ? RED : YELLOW );
+
+		client::Get( ).SendMessageToServer( FinalInfo , Ban ? BAN : WARN );
+		LogSystem::Get( ).Log( xorstr_( "AC Flagged unsafe!" ) );
+	}
+
+	this->DetectedFlags.clear( );
+}
+
+
 
 // Método de injeção
 bool Detections::InjectProcess( DWORD processId ) {
@@ -178,6 +373,7 @@ void Detections::threadFunction( ) {
 
 	while ( m_running ) {
 		CheckInjectedProcesses( );
+		CheckFunctions( );
 		CheckHandles( );
 		std::this_thread::sleep_for( std::chrono::seconds( 10 ) );
 	}

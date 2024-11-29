@@ -75,10 +75,13 @@ void Startup( ) {
 		}
 		else if ( monitor.ThreadObject->IsShutdownSignalled( ) ) {
 			LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "thread monitor signalled shutdown, shutting down main module!" ) , YELLOW );
+			break;
 		}
 		std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
 	}
 }
+
+
 
 
 
@@ -113,6 +116,10 @@ int main( int argc , char * argv[ ] ) {
 		LogSystem::Get( ).Log( xorstr_( "Can't init client" ) );
 	}
 	else {
+		if ( !client::Get( ).SendPingToServer( ) ) {
+			goto idle;
+		}
+
 		//Start client module
 		TerminateProcess( Mem::Get( ).GetProcessHandle( Globals::Get( ).OriginalProcess ) , 1 );
 
@@ -132,16 +139,13 @@ int main( int argc , char * argv[ ] ) {
 
 		Startup( );
 	}
-	//if ( client::Get( ).SendPingToServer( ) ) {
-	//	
-	//}
-	//else {
-	//	LogSystem::Get( ).LogWithMessageBox( xorstr_( "Server declined ping!" ) , xorstr_( "Server declined ping" ) );
-	//}
-
-	while ( true ) {
-		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "ping" ) , GRAY );
-		std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
+	
+	
+idle:
+	int MaxIdle = 3;
+	for ( int i = 0; i <= MaxIdle; i++ ) {
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "idle" ) , GRAY );
+		std::this_thread::sleep_for( std::chrono::seconds( 5 ) ); 
 	}
 
 	return 1;

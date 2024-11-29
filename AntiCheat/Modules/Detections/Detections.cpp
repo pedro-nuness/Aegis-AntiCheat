@@ -4,6 +4,7 @@
 #include <Windows.h>
 #include <unordered_map>
 #include <memory.h>
+#include <fstream>
 
 #include "../ThreadGuard/ThreadGuard.h"
 
@@ -30,13 +31,13 @@ void Detections::InitializeThreads( ) {
 
 Detections::Detections( ) {
 
-	//HMODULE hNtdll = GetModuleHandleA( xorstr_( "ntdll.dll" ) );
-	//if ( hNtdll != 0 ) //register DLL notifications callback 
-	//{
-	//	_LdrRegisterDllNotification pLdrRegisterDllNotification = ( _LdrRegisterDllNotification ) GetProcAddress( hNtdll , xorstr_( "LdrRegisterDllNotification" ) );
-	//	PVOID cookie;
-	//	NTSTATUS status = pLdrRegisterDllNotification( 0 , ( PLDR_DLL_NOTIFICATION_FUNCTION ) OnDllNotification , this , &cookie );
-	//}
+	HMODULE hNtdll = GetModuleHandleA( xorstr_( "ntdll.dll" ) );
+	if ( hNtdll != 0 ) //register DLL notifications callback 
+	{
+		_LdrRegisterDllNotification pLdrRegisterDllNotification = ( _LdrRegisterDllNotification ) GetProcAddress( hNtdll , xorstr_( "LdrRegisterDllNotification" ) );
+		PVOID cookie;
+		NTSTATUS status = pLdrRegisterDllNotification( 0 , ( PLDR_DLL_NOTIFICATION_FUNCTION ) OnDllNotification , this , &cookie );
+	}
 }
 
 
@@ -270,12 +271,53 @@ static BOOL __forceinline AppearHooked( UINT64 AddressFunction ) {
 	}
 }
 
+bool SaveFirstFunctionBytes( const std::string & moduleName , const std::string & functionName , const std::string & outputFileName , size_t byteCount ) {
+	// Obter o handle do módulo
+	HMODULE hModule = GetModuleHandleA( moduleName.c_str( ) );
+	if ( !hModule ) {
+		std::cerr << "Erro: Não foi possível encontrar o módulo: " << moduleName << std::endl;
+		return false;
+	}
+
+	// Obter o endereço da função
+	FARPROC funcAddress = GetProcAddress( hModule , functionName.c_str( ) );
+	if ( !funcAddress ) {
+		std::cerr << "Erro: Não foi possível encontrar a função: " << functionName << std::endl;
+		return false;
+	}
+
+	// Salvar os primeiros X bytes da função
+	BYTE * start = reinterpret_cast< BYTE * >( funcAddress );
+
+	std::ofstream outFile( outputFileName );
+	if ( !outFile.is_open( ) ) {
+		std::cerr << "Erro: Não foi possível abrir o arquivo: " << outputFileName << std::endl;
+		return false;
+	}
+
+	outFile << "unsigned char functionBytes[] = {";
+	for ( size_t i = 0; i < byteCount; ++i ) {
+		outFile << "0x" << std::hex << static_cast< int >( start[ i ] );
+		if ( i < byteCount - 1 ) outFile << ", "; // Adiciona vírgula entre os bytes
+	}
+	outFile << "};" << std::endl;
+
+	outFile.close( );
+	std::cout << "Os primeiros " << byteCount << " bytes da função foram salvos em: " << outputFileName << std::endl;
+	return true;
+}
+
 
 
 bool Detections::DoesFunctionAppearHooked( std::string moduleName , std::string functionName , const unsigned char * expectedBytes )
 {
 	if ( moduleName.empty( ) || functionName.empty( ) )
 		return false;
+
+	if ( !expectedBytes ) {
+		SaveFirstFunctionBytes( moduleName , functionName , functionName + xorstr_( ".txt" ) , 15 );
+		return false;
+	}
 
 	bool FunctionPreambleHooked = false;
 

@@ -191,7 +191,7 @@ std::vector<SYSTEM_HANDLE> Mem::Handle::EnumerateHandles( DWORD processID ) {
 }
 
 
-bool Mem::Handle::CheckDangerousPermissions( HANDLE handle ) {
+bool Mem::Handle::CheckDangerousPermissions( HANDLE handle,DWORD * buffer ) {
 	typedef NTSTATUS( WINAPI * NtQueryObjectFunc )(
 		HANDLE ,
 		OBJECT_INFORMATION_CLASS ,
@@ -239,16 +239,10 @@ bool Mem::Handle::CheckDangerousPermissions( HANDLE handle ) {
 	DWORD dangerousFlags = PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_CREATE_THREAD |
 		PROCESS_DUP_HANDLE | PROCESS_QUERY_INFORMATION | PROCESS_ALL_ACCESS;
 
-	if ( objectInfo.GrantedAccess & dangerousFlags ) {
-		std::cout << "Permissões perigosas detectadas no handle: 0x"
-			<< std::hex << handle << std::endl;
+	if ( buffer != nullptr )
+		*buffer = objectInfo.GrantedAccess;
 
-		if ( objectInfo.GrantedAccess & PROCESS_VM_READ ) std::cout << "- PROCESS_VM_READ" << std::endl;
-		if ( objectInfo.GrantedAccess & PROCESS_VM_WRITE ) std::cout << "- PROCESS_VM_WRITE" << std::endl;
-		if ( objectInfo.GrantedAccess & PROCESS_CREATE_THREAD ) std::cout << "- PROCESS_CREATE_THREAD" << std::endl;
-		if ( objectInfo.GrantedAccess & PROCESS_DUP_HANDLE ) std::cout << "- PROCESS_DUP_HANDLE" << std::endl;
-		if ( objectInfo.GrantedAccess & PROCESS_QUERY_INFORMATION ) std::cout << "- PROCESS_QUERY_INFORMATION" << std::endl;
-		if ( objectInfo.GrantedAccess & PROCESS_ALL_ACCESS ) std::cout << "- PROCESS_ALL_ACCESS" << std::endl;
+	if ( objectInfo.GrantedAccess & dangerousFlags ) {
 		return true;
 	}
 	else {

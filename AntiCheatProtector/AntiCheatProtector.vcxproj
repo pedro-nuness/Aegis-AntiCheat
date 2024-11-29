@@ -125,7 +125,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_WINSOCK_DEPRECATED_NO_WARNINGS;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
@@ -139,6 +139,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="AntiCheatProtector.cpp" />
+    <ClCompile Include="Client\client.cpp" />
     <ClCompile Include="externals\minhook\src\buffer.c" />
     <ClCompile Include="externals\minhook\src\hde\hde32.c" />
     <ClCompile Include="externals\minhook\src\hde\hde64.c" />
@@ -166,6 +167,7 @@
     <ClCompile Include="Systems\Utils\utils.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Client\client.h" />
     <ClInclude Include="externals\minhook\MinHook.h" />
     <ClInclude Include="externals\minhook\src\buffer.h" />
     <ClInclude Include="externals\minhook\src\hde\hde32.h" />
