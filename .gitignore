@@ -15,3 +15,5 @@
 *.pdb
 /SimplesClient
 /x64
+/InternalCheatExample/x64
+/ExternalCheatExample/x64

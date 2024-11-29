@@ -24,6 +24,7 @@ public:
 	StringCrypt( ) { Init( ); }
 
 	CryptedString EncryptString( std::string STR);
+	CryptedString EncryptString( std::string * STR );
 	std::string * DecryptString( std::string hash);
 	std::string * DecryptString( CryptedString string );
 	bool CleanString( std::string * sPtr );

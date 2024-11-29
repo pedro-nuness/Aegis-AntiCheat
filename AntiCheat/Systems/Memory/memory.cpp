@@ -17,6 +17,7 @@
 #include <sddl.h>
 #include <unordered_map>
 #include <algorithm>
+#include <iomanip>
 
 #include "..\Utils\singleton.h"
 #include "..\Utils\utils.h"
@@ -193,6 +194,40 @@ std::vector<SYSTEM_HANDLE> Mem::Handle::EnumerateHandles( DWORD processID ) {
 
 
 
+// Função para salvar os bytes da memória em um arquivo de texto
+void Mem::SaveFunctionBytesToFile( void * funcAddress , size_t numBytes , std::string outputFileName ) {
+	std::vector<unsigned char> bytes( numBytes );
+	SIZE_T bytesRead = 0;
+
+	// Lê os bytes da função na memória
+	if ( !ReadProcessMemory( GetCurrentProcess( ) , funcAddress , bytes.data( ) , numBytes , &bytesRead ) ) {
+		std::cerr << "Erro ao ler a memória da função. Código de erro: " << GetLastError( ) << std::endl;
+		return;
+	}
+
+	// Abre o arquivo para escrita
+	std::ofstream outFile( outputFileName );
+	if ( !outFile ) {
+		std::cerr << "Erro ao criar o arquivo: " << outputFileName << std::endl;
+		return;
+	}
+
+	// Escreve os bytes no formato de array C++
+	outFile << "unsigned char functionBytes[] = {\n    ";
+	for ( size_t i = 0; i < bytesRead; ++i ) {
+		outFile << "0x" << std::hex << std::uppercase << std::setw( 2 ) << std::setfill( '0' ) << static_cast< int >( bytes[ i ] );
+		if ( i < bytesRead - 1 ) {
+			outFile << ", ";
+		}
+		if ( ( i + 1 ) % 16 == 0 ) {
+			outFile << "\n    ";
+		}
+	}
+	outFile << "\n};\n";
+
+	std::cout << "Bytes salvos com sucesso em: " << outputFileName << std::endl;
+}
+
 std::vector<_SYSTEM_HANDLE> Mem::Handle::DetectOpenHandlesToProcess( )
 {
 	DWORD currentProcessId = GetCurrentProcessId( );
@@ -277,7 +312,7 @@ std::vector<ProcessInfo> Mem::Process::EnumerateProcesses( ) {
 			CloseHandle( hProcess );
 		}
 
-		pInfo.threads = Mem::Thread::Get().EnumerateThreads( pInfo.processID );
+		pInfo.threads = Mem::Thread::Get( ).EnumerateThreads( pInfo.processID );
 		pInfo.modules = Mem::Module::Get( ).EnumerateModules( pInfo.processID );
 		pInfo.openhandles = Mem::Handle::Get( ).EnumerateHandles( pInfo.processID );
 
@@ -341,7 +376,7 @@ ProcessInfo Mem::Process::GetProcessInfo( DWORD Pid ) {
 }
 
 
-ProcessInfo Mem::Process::GetProcessInfo( std::string Name) {
+ProcessInfo Mem::Process::GetProcessInfo( std::string Name ) {
 	ProcessInfo processesInfo;
 
 	if ( Name.empty( ) )
@@ -624,10 +659,11 @@ std::string Mem::ConvertWchar( WCHAR inCharText[ 260 ] )
 BOOL CALLBACK Mem::EnumWindowsProc( HWND hwnd , LPARAM lParam ) {
 	std::vector<WindowInfo> * Windows = reinterpret_cast< std::vector<WindowInfo> * >( lParam );
 	DWORD processId;
+
 	GetWindowThreadProcessId( hwnd , &processId );
 
-
-	Windows->push_back( { hwnd, processId } );
+	if ( processId != Globals::Get( ).ProtectProcess )
+		Windows->push_back( { hwnd, processId } );
 	return TRUE;
 }
 
@@ -701,7 +737,7 @@ HANDLE Mem::GetProcessHandle( DWORD PID )
 		throw "Failed to open process";
 #endif
 		return NULL;
-	}
+}
 
 	return processHandle;
 }

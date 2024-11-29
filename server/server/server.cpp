@@ -834,43 +834,6 @@ void Server::threadfunction( ) {
 		WSACleanup( );
 		return;
 	}
-//
-//	std::vector<IN_ADDR> AvailableIP;
-//
-//	// Iterar pelas interfaces disponíveis e escolher o IP
-//	for ( struct addrinfo * ptr = res; ptr != nullptr; ptr = ptr->ai_next ) {
-//		sockaddr_in * sockaddr_ipv4 = reinterpret_cast< sockaddr_in * >( ptr->ai_addr );
-//		if ( sockaddr_ipv4 ) {
-//			AvailableIP.emplace_back( sockaddr_ipv4->sin_addr );
-//			continue;
-//		}
-//	}
-//	freeaddrinfo( res );
-//
-//	if ( AvailableIP.empty( ) ) {
-//		utils::Get( ).WarnMessage( _SERVER , xorstr_( "No available IP address found." ) , COLORS::RED );
-//		WSACleanup( );
-//		return;
-//	}
-//
-//	for ( int i = 0; i < AvailableIP.size( ); i++ ) {
-//		char ipStr[ INET_ADDRSTRLEN ];
-//		inet_ntop( AF_INET , &AvailableIP[ i ] , ipStr , sizeof( ipStr ) );
-//
-//		std::cout << "[" << i << "] " << ipStr << std::endl;
-//	}
-//
-//	int Option;
-//choose:
-//	std::cin >> Option;
-//	if ( Option >= 0 && Option < AvailableIP.size( ) ) {
-//		serverAddr.sin_addr = AvailableIP[ Option ];
-//	}
-//	else {
-//		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Invalid options!" ) , COLORS::RED );
-//		goto choose;
-//	}
-
 
 
 	// Criar socket para escutar conexões
@@ -937,13 +900,8 @@ void Server::handleClient( SOCKET clientSock ) {
 		return;
 	}
 	sizeBuffer[ received ] = '\0';
-	std::string prefix = "aegis";
 	std::string sizeString( sizeBuffer );
 
-	size_t pos = sizeString.find( prefix );
-	if ( pos != std::string::npos ) {
-		sizeString.erase( pos , prefix.length( ) );
-	}
 
 	if ( !isNumeric( sizeString ) ) {
 		closesocket( clientSock );
@@ -1006,11 +964,6 @@ void Server::handleClient( SOCKET clientSock ) {
 
 	std::string encryptedMessage( buffer , messageSize );
 	delete[ ] buffer;
-
-	pos = encryptedMessage.find( prefix );
-	if ( pos != std::string::npos ) {
-		encryptedMessage.erase( pos , prefix.length( ) );
-	}
 
 	if ( encryptedMessage.empty( ) ) {
 		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Empty message received." ) , COLORS::RED );

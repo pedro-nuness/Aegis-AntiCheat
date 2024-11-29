@@ -48,6 +48,8 @@ public:
 	void WarnMessage( COLORS color , std::string custom_text , std::string Message , COLORS _col );
 	bool isNumber( const std::string & str );
 
+	std::string GenerateHash( std::string msg );
+
 	bool encryptMessage( const std::string & plaintext , std::string & ciphertext , const std::string & key , const std::string & iv );
 	bool decryptMessage( const std::string & ciphertext , std::string & plaintext , const std::string & key , const std::string & iv );
 	std::string GenerateHash( const std::vector<BYTE> & input );

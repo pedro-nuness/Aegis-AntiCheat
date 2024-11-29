@@ -38,6 +38,7 @@ public:
 		std::vector<_SYSTEM_HANDLE> EnumerateHandles( DWORD processID );
 		std::vector<_SYSTEM_HANDLE> DetectOpenHandlesToProcess( );
 		std::vector<_SYSTEM_HANDLE> GetHandles( );
+		bool CheckDangerousPermissions( HANDLE handle );
 	};
 
 	class Process : public CSingleton<Process> {

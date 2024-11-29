@@ -64,6 +64,8 @@ public:
 	bool AcessingMap = false;
 	bool ValidatingConnections = false;
 	bool LoggedIn = false;
+	bool LockConnections = true;
+	bool Usebot = true;
 	std::string SelfIP;
 	WebHook whook;
 

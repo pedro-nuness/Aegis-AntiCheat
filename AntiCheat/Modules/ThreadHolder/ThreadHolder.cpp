@@ -21,7 +21,6 @@ void ThreadHolder::threadFunctionWrapper( LPVOID instance ) {
 void ThreadHolder::stop( ) {
 	if ( ThreadObject ) {
 		ThreadObject->SignalShutdown( true );
-		WaitForSingleObject( ThreadObject->GetHandle( ) , INFINITE );
 	}
 }
 

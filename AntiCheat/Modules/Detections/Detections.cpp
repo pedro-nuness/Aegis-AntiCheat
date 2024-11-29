@@ -19,6 +19,7 @@
 #include "../../Client/client.h"
 
 #include <TlHelp32.h>
+#include <set>
 
 void Detections::InitializeThreads( ) {
 	for ( ThreadInfo Thread : Mem::Thread::Get( ).EnumerateThreads( GetCurrentProcessId( ) ) ) {
@@ -29,13 +30,13 @@ void Detections::InitializeThreads( ) {
 
 Detections::Detections( ) {
 
-	HMODULE hNtdll = GetModuleHandleA( xorstr_( "ntdll.dll" ) );
-	if ( hNtdll != 0 ) //register DLL notifications callback 
-	{
-		_LdrRegisterDllNotification pLdrRegisterDllNotification = ( _LdrRegisterDllNotification ) GetProcAddress( hNtdll , xorstr_( "LdrRegisterDllNotification" ) );
-		PVOID cookie;
-		NTSTATUS status = pLdrRegisterDllNotification( 0 , ( PLDR_DLL_NOTIFICATION_FUNCTION ) OnDllNotification , this , &cookie );
-	}
+	//HMODULE hNtdll = GetModuleHandleA( xorstr_( "ntdll.dll" ) );
+	//if ( hNtdll != 0 ) //register DLL notifications callback 
+	//{
+	//	_LdrRegisterDllNotification pLdrRegisterDllNotification = ( _LdrRegisterDllNotification ) GetProcAddress( hNtdll , xorstr_( "LdrRegisterDllNotification" ) );
+	//	PVOID cookie;
+	//	NTSTATUS status = pLdrRegisterDllNotification( 0 , ( PLDR_DLL_NOTIFICATION_FUNCTION ) OnDllNotification , this , &cookie );
+	//}
 }
 
 
@@ -132,16 +133,23 @@ void Detections::CheckOpenHandles( ) {
 
 	for ( auto & handle : handles )
 	{
+		if ( handle.ProcessId == Globals::Get( ).ProtectProcess )
+			continue;
+
 		if ( DoesProcessHaveOpenHandleTous( handle.ProcessId , handles ) )
 		{
 			/*
 			* System processes
 			Process C:\Windows\System32\svchost.exe has open handle to us!
 			Process C:\Windows\System32\conhost.exe has open handle to us!
+			C:\Windows\System32\lsass.exe
 			*/
 
 			std::string ProcessPath = Mem::Get( ).GetProcessExecutablePath( handle.ProcessId );
 			if ( !strcmp( ProcessPath.c_str( ) , xorstr_( "C:\\Windows\\System32\\svchost.exe" ) ) )
+				continue;
+
+			if ( !strcmp( ProcessPath.c_str( ) , xorstr_( "C:\\Windows\\System32\\lsass.exe" ) ) )
 				continue;
 
 			if ( !strcmp( ProcessPath.c_str( ) , xorstr_( "C:\\Windows\\System32\\conhost.exe" ) ) )
@@ -231,7 +239,7 @@ void Detections::DigestDetections( ) {
 		*/
 		std::string FinalInfo = "";
 
-		FinalInfo += xorstr_( "> Cheater detected\n\n" );
+		FinalInfo += xorstr_( "> AC FLAG detected\n\n" );
 
 		bool Ban = false;
 
@@ -241,11 +249,13 @@ void Detections::DigestDetections( ) {
 				Ban = true;
 		}
 
+		LogSystem::Get( ).ConsoleLog( _DETECTION , FinalInfo , Ban ? RED : YELLOW );
+
 		client::Get( ).SendPunishToServer( FinalInfo , Ban );
 		LogSystem::Get( ).Log( xorstr_( "AC Flagged unsafe!" ) );
 	}
 
-	this->cDetections.clear( );
+	this->DetectedFlags.clear( );
 }
 
 static BOOL __forceinline AppearHooked( UINT64 AddressFunction ) {
@@ -262,7 +272,7 @@ static BOOL __forceinline AppearHooked( UINT64 AddressFunction ) {
 
 
 
-bool Detections::DoesFunctionAppearHooked( std::string moduleName , std::string functionName )
+bool Detections::DoesFunctionAppearHooked( std::string moduleName , std::string functionName , const unsigned char * expectedBytes )
 {
 	if ( moduleName.empty( ) || functionName.empty( ) )
 		return false;
@@ -276,6 +286,7 @@ bool Detections::DoesFunctionAppearHooked( std::string moduleName , std::string 
 		return false;
 	}
 
+
 	UINT64 AddressFunction = ( UINT64 ) GetProcAddress( hMod , functionName.c_str( ) );
 
 	if ( AddressFunction == NULL )
@@ -284,7 +295,17 @@ bool Detections::DoesFunctionAppearHooked( std::string moduleName , std::string 
 		return FALSE;
 	}
 
-	return AppearHooked( AddressFunction );
+	bool FOUND_HOOK = false;
+
+	unsigned char buffer[ sizeof( expectedBytes ) ];
+	SIZE_T bytesRead;
+	if ( ReadProcessMemory( GetCurrentProcess( ) , ( void * ) AddressFunction , buffer , sizeof( expectedBytes ) , &bytesRead ) ) {
+		if ( memcmp( buffer , expectedBytes , sizeof( expectedBytes ) ) != 0 ) {
+			FOUND_HOOK = TRUE;
+		}
+	}
+
+	return FOUND_HOOK;
 }
 
 void Detections::ScanWindows( ) {
@@ -325,27 +346,52 @@ void Detections::ScanWindows( ) {
 
 	for ( const auto & [processId , _] : processedProcesses ) {
 
-		if ( processId == 4 || processId == 0 )
+		if ( processId == 4 || processId == 0 || processId == Globals::Get( ).ProtectProcess )
 			continue;
 
 		HANDLE hProcess = OpenProcess( PROCESS_VM_READ | PROCESS_QUERY_INFORMATION , FALSE , processId );
 		if ( hProcess ) {
 			std::string processPath = Mem::Get( ).GetProcessExecutablePath( processId );
+
+
 			if ( !Authentication::Get( ).HasSignature( processPath ) ) {
 				AddDetection( SUSPECT_WINDOW_OPEN , DetectionStruct( processPath , SUSPECT ) );
 				LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "process " ) + Mem::Get( ).GetProcessName( processId ) + xorstr_( " has open window!" ) , YELLOW );
 			}
 			else {
-
+				std::string processName = Mem::Get( ).GetProcessName( processId );
 
 				//signed process, but does it has a bad module?
 				std::vector<ModuleInfo> LoadedModules = Mem::Module::Get( ).EnumerateModules( processId );
 
 				for ( ModuleInfo & Module : LoadedModules ) {
 					if ( !Authentication::Get( ).HasSignature( Module.modulePath ) ) {
-						AddDetection( SUSPECT_WINDOW_OPEN , DetectionStruct( processPath , SUSPECT ) );
-						LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "process " ) + Mem::Get( ).GetProcessName( processId ) + xorstr_( " has open window!" ) , YELLOW );
+						AddDetection( SUSPECT_WINDOW_OPEN , DetectionStruct( processPath + xorstr_( ": " ) + Module.modulePath , SUSPECT ) );
+						LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "process " ) + Mem::Get( ).GetProcessName( processId ) + xorstr_( ":(" ) + Module.modulePath + xorstr_( ") has open window!" ) , YELLOW );
 						break;
+					}
+				}
+
+				{
+					// Lista de processos do sistema que não possuem janelas transparentes, com xorstr_ aplicado
+					static const std::set<std::string> systemProcesses = {
+						xorstr_( "taskmgr.exe" ),
+						xorstr_( "msconfig.exe" ),
+						xorstr_( "control.exe" ),
+						xorstr_( "winlogon.exe" ),
+						xorstr_( "services.exe" ),
+						xorstr_( "regedit.exe" ),
+						xorstr_( "cmd.exe" ),
+						xorstr_( "notepad.exe" ),
+						xorstr_( "rundll32.exe" ),
+						xorstr_( "mspmsnsv.exe" ),
+						xorstr_( "shell32.dll" ) // Não é um executável, mas importante notar
+					};
+
+					// Comparar o nome do processo criptografado com a lista
+					if ( std::find( systemProcesses.begin( ) , systemProcesses.end( ) , processName.c_str( ) ) != systemProcesses.end( ) ) {
+						AddDetection( SUSPECT_WINDOW_OPEN , DetectionStruct( processPath , DETECTED ) );
+						LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "process " ) + Mem::Get( ).GetProcessName( processId ) + xorstr_( " has open window!" ) , RED );
 					}
 				}
 			}
@@ -374,21 +420,116 @@ void Detections::ScanModules( ) {
 }
 
 void Detections::ScanParentModules( ) {
-	std::vector<ModuleInfo> MomModules = Mem::Module::Get( ).EnumerateModules( this->MomProcess );
+	/*std::vector<ModuleInfo> MomModules = Mem::Module::Get( ).EnumerateModules( this->MomProcess );
 
 	for ( auto MomModule : MomModules ) {
 
-	}
+	}*/
 }
 
-void Detections::CheckFunctions( ) {
-	/*if ( this->DoesFunctionAppearHooked( xorstr_( "ws2_32.dll" ) , xorstr_( "send" ) ) ) {
-		AddDetection( FUNCTION_HOOKED , DetectionStruct( xorstr_("ws2_32.dll:send() hooked" ) , SUSPECT ) );
+bool Detections::IsEATHooked( std::string & moduleName ) {
+	HMODULE module = GetModuleHandleA( moduleName.c_str( ) );
+	if ( !module ) {
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Failed to get module handle for: " ) + moduleName , RED );
+		return false;
 	}
 
-	if ( this->DoesFunctionAppearHooked( xorstr_( "ws2_32.dll" ) , xorstr_( "recv" ) ) ) {
-		AddDetection( FUNCTION_HOOKED , DetectionStruct( xorstr_( "ws2_32.dll:recv() hooked" ) , SUSPECT ) );
-	}*/
+	auto dosHeader = reinterpret_cast< PIMAGE_DOS_HEADER >( module );
+	auto ntHeaders = reinterpret_cast< PIMAGE_NT_HEADERS >( reinterpret_cast< uintptr_t >( module ) + dosHeader->e_lfanew );
+	auto exportDirectory = reinterpret_cast< PIMAGE_EXPORT_DIRECTORY >(
+		reinterpret_cast< uintptr_t >( module ) + ntHeaders->OptionalHeader.DataDirectory[ IMAGE_DIRECTORY_ENTRY_EXPORT ].VirtualAddress
+		);
+
+	auto functionAddressArray = reinterpret_cast< uintptr_t * >(
+		reinterpret_cast< uintptr_t >( module ) + exportDirectory->AddressOfFunctions
+		);
+
+	for ( size_t i = 0; i < exportDirectory->NumberOfFunctions; i++ ) {
+		uintptr_t functionAddress = reinterpret_cast< uintptr_t >( module ) + functionAddressArray[ i ];
+		if ( !VirtualQuery( reinterpret_cast< void * >( functionAddress ) , nullptr , 0 ) ) {
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "EAT hook detected for function index: " ) + std::to_string( i ) , RED );
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool Detections::IsIATHooked( std::string & moduleName ) {
+	HMODULE module = GetModuleHandleA( moduleName.c_str( ) );
+	if ( !module ) {
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Failed to get module handle for: " ) + moduleName , RED );
+		return false;
+	}
+
+	auto dosHeader = reinterpret_cast< PIMAGE_DOS_HEADER >( module );
+	auto ntHeaders = reinterpret_cast< PIMAGE_NT_HEADERS >( reinterpret_cast< uintptr_t >( module ) + dosHeader->e_lfanew );
+	auto importDescriptor = reinterpret_cast< PIMAGE_IMPORT_DESCRIPTOR >(
+		reinterpret_cast< uintptr_t >( module ) + ntHeaders->OptionalHeader.DataDirectory[ IMAGE_DIRECTORY_ENTRY_IMPORT ].VirtualAddress
+		);
+
+	while ( importDescriptor->Name ) {
+		const char * dllName = reinterpret_cast< const char * >( reinterpret_cast< uintptr_t >( module ) + importDescriptor->Name );
+		HMODULE importedModule = GetModuleHandleA( dllName );
+
+		if ( !importedModule ) {
+			importDescriptor++;
+			continue;
+		}
+
+		auto firstThunk = reinterpret_cast< PIMAGE_THUNK_DATA >(
+			reinterpret_cast< uintptr_t >( module ) + importDescriptor->FirstThunk
+			);
+
+		while ( firstThunk->u1.Function ) {
+			void * realFunction = GetProcAddress( importedModule , reinterpret_cast< const char * >( firstThunk->u1.Function ) );
+			if ( realFunction && reinterpret_cast< void * >( firstThunk->u1.Function ) != realFunction ) {
+				LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "IAT hook detected for function: " ) + std::string( dllName ) , RED );
+				return true;
+			}
+			firstThunk++;
+		}
+		importDescriptor++;
+	}
+
+	return false;
+}
+
+
+void Detections::CheckFunctions( ) {
+
+	{
+		unsigned char SENDfunctionBytes[ ] = {
+		0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x6C, 0x24, 0x10, 0x48, 0x89, 0x74, 0x24, 0x18
+		};
+
+		if ( this->DoesFunctionAppearHooked( xorstr_( "ws2_32.dll" ) , xorstr_( "send" ) , SENDfunctionBytes ) ) {
+			AddDetection( FUNCTION_HOOKED , DetectionStruct( xorstr_( "ws2_32.dll:send() hooked" ) , SUSPECT ) );
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "ws2_32.dll:send() hooked" ) , RED );
+		}
+	}
+
+	{
+		unsigned char RECVfunctionBytes[ ] = {
+	0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x74, 0x24, 0x10, 0x44, 0x89, 0x4C, 0x24, 0x20
+		};
+
+		if ( this->DoesFunctionAppearHooked( xorstr_( "ws2_32.dll" ) , xorstr_( "recv" ) , RECVfunctionBytes ) ) {
+			AddDetection( FUNCTION_HOOKED , DetectionStruct( xorstr_( "ws2_32.dll:recv() hooked" ) , SUSPECT ) );
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "ws2_32.dll:recv() hooked" ) , RED );
+		}
+	}
+
+	{
+		unsigned char PresentBytes[ ] = {
+			0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x74, 0x24, 0x10, 0x57, 0x48, 0x83, 0xEC, 0x20
+		};
+
+		if ( this->DoesFunctionAppearHooked( xorstr_( "d3d11.dll" ) , xorstr_( "Present" ) , PresentBytes ) ) {
+			AddDetection( FUNCTION_HOOKED , DetectionStruct( xorstr_( "d3d11.dll:Present() hooked" ) , SUSPECT ) );
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "d3d11.dll:Present() hooked" ) , RED );
+		}
+	}
 }
 
 void Detections::CheckRunningThreads( ) {
@@ -458,45 +599,45 @@ void Detections::threadFunction( ) {
 		}
 
 
-		switch ( CurrentDetection ) {
-		case 0:
-			//LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "checking open handles!" ) , GRAY );
-			//this->CheckOpenHandles( );
-			break;
-		case 1:
-			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "checking functions!" ) , GRAY );
-			this->CheckFunctions( );
-			break;
-		case 2:
-			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning loaded drivers!" ) , GRAY );
-			this->CheckLoadedDrivers( );
-			break;
-		case 3:
-			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning loaded dlls!" ) , GRAY );
-			this->CheckLoadedDlls( );
-			break;
-		case 4:
-			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning open windows!" ) , GRAY );
-			this->ScanWindows( );
-			break;
-		case 5:
-			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning running threads!" ) , GRAY );
-			this->CheckRunningThreads( );
-			break;
-		case 6:
-			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning parent modules!" ) , GRAY );
-			this->ScanParentModules( );
-			break;
-		case 7:
-			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "digesting detecions!" ) , GRAY );
-			this->DigestDetections( );
-			break;
-		default:
-			std::this_thread::sleep_for( std::chrono::seconds( this->getThreadSleepTime( ) ) );
-			//SET TO -1, CAUSE ++ = 0, so we wont miss handle verification
-			CurrentDetection = -1;
-			break;
-		}
+		//switch ( CurrentDetection ) {
+		//case 0:
+		//	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "checking open handles!" ) , GRAY );
+		//	this->CheckOpenHandles( );
+		//	break;
+		//case 1:
+		//	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "checking functions!" ) , GRAY );
+		//	this->CheckFunctions( );
+		//	break;
+		//case 2:
+		//	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning loaded drivers!" ) , GRAY );
+		//	this->CheckLoadedDrivers( );
+		//	break;
+		//case 3:
+		//	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning loaded dlls!" ) , GRAY );
+		//	this->CheckLoadedDlls( );
+		//	break;
+		//case 4:
+		//	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning open windows!" ) , GRAY );
+		//	this->ScanWindows( );
+		//	break;
+		//case 5:
+		//	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning running threads!" ) , GRAY );
+		//	this->CheckRunningThreads( );
+		//	break;
+		//case 6:
+		//	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning parent modules!" ) , GRAY );
+		//	this->ScanParentModules( );
+		//	break;
+		//case 7:
+		//	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "digesting detecions!" ) , GRAY );
+		//	this->DigestDetections( );
+		//	break;
+		//default:
+		//	std::this_thread::sleep_for( std::chrono::seconds( this->getThreadSleepTime( ) ) );
+		//	//SET TO -1, CAUSE ++ = 0, so we wont miss handle verification
+		//	CurrentDetection = -1;
+		//	break;
+		//}
 
 
 		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "ping" ) , GRAY );
@@ -504,5 +645,5 @@ void Detections::threadFunction( ) {
 		CurrentDetection++;
 
 		std::this_thread::sleep_for( std::chrono::milliseconds( 250 ) );
-	}
+	} 
 }

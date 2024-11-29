@@ -26,7 +26,7 @@ class client : public CSingleton<client>{
 	//std::string iv = xorstr_( "ume9ugz3m7lgch1z");  // 16 bytes para AES
 	std::string ipaddres = xorstr_( "181.215.236.116");
 	int Port = 12345;
-
+	std::string IV = xorstr_("ume9ugz3m7lgch1z");
 
 	SOCKET CurrentSocket;
 	bool InitializeConnection( );
@@ -38,7 +38,7 @@ public:
 	~client( );
 
 
-
+	bool LoginToServer( );
 	bool SendMessageToServer( std::string Message );
 	bool SendPingToServer( );
 	bool SendPunishToServer( std::string Message , bool BAN);

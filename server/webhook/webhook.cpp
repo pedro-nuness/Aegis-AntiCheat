@@ -25,6 +25,9 @@ WebHook::WebHook( ) {
 
 
 void WebHook::SendWebHookPunishMent( std::string Message , std::string ScreenshotPath , std::string IP , bool already_banned ) {
+	if ( !BOT || !ServerPtr || !BotReady)
+		return;
+
 	try {
 		utils::Get( ).WarnMessage( WEBHOOK , xorstr_( "Sending webhook message" ) , LIGHTER_BLUE );
 
@@ -80,6 +83,9 @@ void WebHook::SendWebHookPunishMent( std::string Message , std::string Screensho
 }
 
 void WebHook::SendWebHookMessage( std::string Message , std::string TOPIC , uint32_t Color ) {
+	if ( !BOT || !ServerPtr || !BotReady )
+		return;
+
 	try {
 
 		utils::Get( ).WarnMessage( WEBHOOK , xorstr_( "Sending webhook message" ) , LIGHTER_BLUE );
@@ -132,6 +138,8 @@ void WebHook::SendWebHookMessage( std::string Message , std::string TOPIC , uint
 }
 
 void WebHook::SendWebHookMessageWithFile( std::string Message , std::string Filename , std::string IP , uint32_t Color ) {
+	if ( !BOT || !ServerPtr || !BotReady )
+		return;
 	try {
 
 		json js;

@@ -6,6 +6,8 @@
 #include "xorstr.hpp"
 #include <mutex>
 
+#include "SHA1/sha1.h"
+
 #include <openssl/sha.h>
 #include <openssl/evp.h>
 
@@ -206,6 +208,11 @@ void Utils::WarnMessage( MODULE_SENDER sender , std::string Message , COLORS _co
 #endif
 }
 
+std::string Utils::GenerateHash( std::string msg ) {
+	CUSTOM_SHA sha1;
+	sha1.add( msg.data( ) , msg.size( ) );
+	return sha1.getHash( );
+}
 
 
 

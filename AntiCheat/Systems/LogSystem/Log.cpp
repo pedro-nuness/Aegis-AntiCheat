@@ -145,6 +145,10 @@ void LogSystem::ConsoleLog( MODULE_SENDER sender , std::string Message , COLORS 
 		custom_text = xorstr_( "LOG" );
 		custom_col = RED;
 		break;
+	case _LISTENER:
+		custom_text = xorstr_( "LISTENER" );
+		custom_col = LIGHT_YELLOW;
+		break;
 	}
 
 #if true

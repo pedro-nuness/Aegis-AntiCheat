@@ -30,6 +30,8 @@ class Communication : public ThreadHolder {
 
 	void threadFunction( ) override;
 
+	bool ReceivedQueuedMessage(std::string );
+
 	void OpenRequestServer( );
 
 	static void SendPingToServer( LPVOID AD);

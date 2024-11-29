@@ -8,6 +8,7 @@
 #include <psapi.h>
 #include <unordered_map>
 #include <dbghelp.h>
+#include <tlhelp32.h>
 
 #pragma comment(lib, "dbghelp.lib")
 
@@ -31,7 +32,7 @@ bool Detections::isRunning( ) const {
 	}
 
 	if ( !this->ThreadObject->IsThreadRunning( this->ThreadObject->GetHandle( ) ) && !this->ThreadObject->IsShutdownSignalled( ) ) {
-	
+
 		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
 	}
 }
@@ -68,6 +69,9 @@ bool DoesProcessHaveOpenHandleTous( DWORD pid , std::vector <_SYSTEM_HANDLE> han
 	return false;
 }
 
+
+
+
 // Verifica handles suspeitos
 void Detections::CheckHandles( ) {
 	std::vector<_SYSTEM_HANDLE> handles = Mem::Handle::Get( ).DetectOpenHandlesToProcess( );
@@ -79,23 +83,61 @@ void Detections::CheckHandles( ) {
 			std::string ProcessPath = Mem::Get( ).GetProcessExecutablePath( handle.ProcessId );
 
 			//if ( !Authentication::Get( ).HasSignature( ProcessPath ) ) {
-				LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Process " ) + Mem::Get( ).GetProcessExecutablePath( handle.ProcessId ) + xorstr_( " has open handle to us!" ) , RED );
+			//LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Process " ) + Mem::Get( ).GetProcessExecutablePath( handle.ProcessId ) + xorstr_( " has open handle to us!" ) , RED );
 			//}
 
 			/*
 			* System processes
 			Process C:\Windows\System32\svchost.exe has open handle to us!
 			Process C:\Windows\System32\conhost.exe has open handle to us!
+			  Process D:\Program Files (x86)\Steam\steam.exe
+			  C:\\Windows\\System32\\audiodg.exe
+			  C:\\Windows\\System32\\lsass.exe
 			*/
 
-		/*
-			if ( !strcmp( ProcessPath.c_str( ) , xorstr_( "C:\\Windows\\System32\\svchost.exe" ) ) )
+			if ( !strcmp( ProcessPath.c_str() , xorstr_( "C:\\Windows\\System32\\audiodg.exe" ) ) ) {
 				continue;
+			}
+
+			if ( !strcmp( ProcessPath.c_str( ) , xorstr_( "C:\\Windows\\System32\\svchost.exe" ) ) ) {
+				continue;
+			}
+
+			if ( !strcmp( ProcessPath.c_str( ) , xorstr_( "C:\\Windows\\System32\\lsass.exe" ) ) ) {
+				continue;
+			}
 
 			if ( !strcmp( ProcessPath.c_str( ) , xorstr_( "C:\\Windows\\System32\\conhost.exe" ) ) )
-				continue;*/
+				continue;
 
-			// AddDetection( OPENHANDLE_TO_US , DetectionStruct( ProcessPath , SUSPECT ) );
+			HANDLE processHandle = OpenProcess( PROCESS_DUP_HANDLE , FALSE , handle.ProcessId );
+
+			if ( processHandle )
+			{
+				HANDLE duplicatedHandle = INVALID_HANDLE_VALUE;
+
+				if ( DuplicateHandle( processHandle , ( HANDLE ) handle.Handle , GetCurrentProcess( ) , &duplicatedHandle , 0 , FALSE , DUPLICATE_SAME_ACCESS ) )
+				{
+					if ( Mem::Handle::Get( ).CheckDangerousPermissions( duplicatedHandle ) ) {
+						LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Process " ) + Mem::Get( ).GetProcessExecutablePath( handle.ProcessId ) + xorstr_( " has open handle to us!" ) , RED );
+
+						//if ( InjectProcess( handle.ProcessId ) ) {
+
+						//}
+					}
+					else
+						LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Process " ) + Mem::Get( ).GetProcessExecutablePath( handle.ProcessId ) + xorstr_( " has open handle to us!" ) , YELLOW );
+				
+
+					if ( duplicatedHandle != INVALID_HANDLE_VALUE )
+						CloseHandle( duplicatedHandle );
+				}
+
+				CloseHandle( processHandle );
+			}
+			
+
+			// AddDetection( OPENHANDLE_TO_US , DetectionStruct( ProcessPath , SUSPECT  );
 
 			//LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Process " ) + Mem::Get( ).GetProcessExecutablePath( handle.ProcessId ) + xorstr_( " has open handle to us!" ) , RED );
 			//Logger::logfw( "UltimateAnticheat.log" , Detection , L"Process %s has open process handle to our process." , procName.c_str( ) );
@@ -120,7 +162,7 @@ bool Detections::InjectProcess( DWORD processId ) {
 	if ( Utils::Get( ).ExistsFile( filename ) ) {
 		this->InjectedProcesses[ processId ] = true;
 
-		if ( Injector::Get( ).Inject	( filename , processId ) == 1 )
+		if ( Injector::Get( ).Inject( filename , processId ) == 1 )
 			return true;
 	}
 	else {

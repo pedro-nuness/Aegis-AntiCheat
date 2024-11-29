@@ -3,6 +3,7 @@
 
 class Preventions : public CSingleton<Preventions>
 {
+	bool EnableApiHooks( );
 	bool RestrictProcessAccess( );
 	bool RandomizeModuleName( );
 	bool RemapProgramSections( );

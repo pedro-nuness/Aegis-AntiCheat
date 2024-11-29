@@ -12,6 +12,8 @@
 #include "../../Globals/Globals.h"
 #include "../../Systems/Utils/utils.h"
 
+#include <mutex>
+
 #pragma comment(lib, "Ws2_32.lib")
 
 
@@ -249,6 +251,13 @@ void Communication::UpdatePingTime( ) {
 	this->LastClientPing = now;
 }
 
+std::mutex QueueMessagesMutex;
+
+void Communication::AddMessageToQueue( std::string message ) {
+	std::lock_guard<std::mutex> lock( QueueMessagesMutex );
+	this->QueuedMessages.emplace_back( message );
+}
+
 
 void Communication::threadFunction( ) {
 	const char * ipAddress = "127.0.0.10";
@@ -277,9 +286,10 @@ void Communication::threadFunction( ) {
 	//Send the pasword + salt hash
 	sendMessage( ConnectSocket , this->ExpectedMessage );
 
-
 	Globals::Get( ).VerifiedSession = true;
 	bool m_running = true;
+
+	std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
 
 	while ( m_running ) {
 		std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
@@ -291,7 +301,7 @@ void Communication::threadFunction( ) {
 		std::string Message = receiveMessage( ConnectSocket , 10 );
 		if ( !Message.empty( ) ) {
 			if ( Message != this->ExpectedMessage ) {
-				LogSystem::Get( ).Log( xorstr_( "[client][802] client hash mismatch!\n" ) );
+				LogSystem::Get( ).Log( xorstr_( "[client][802] client hash mismatch, expected: \n" ) + this->ExpectedMessage + ", " + Message );
 			}
 			else {
 				LogSystem::Get( ).ConsoleLog( _COMMUNICATION , this->ExpectedMessage , GRAY );
@@ -303,8 +313,17 @@ void Communication::threadFunction( ) {
 			LogSystem::Get( ).Log( xorstr_( "[client][303] Can`t find server answer!" ) );
 		}
 
-		this->ExpectedMessage = Mem::Get( ).GenerateHash( this->ExpectedMessage + SALT );
-		sendMessage( ConnectSocket , this->ExpectedMessage );
+
+		{
+			std::lock_guard<std::mutex> lock( QueueMessagesMutex );
+			if ( QueuedMessages.empty( ) ) {
+				this->ExpectedMessage = Mem::Get( ).GenerateHash( this->ExpectedMessage + SALT );
+				sendMessage( ConnectSocket , this->ExpectedMessage );
+			}
+			else {
+				sendMessage( ConnectSocket , QueuedMessages.at( 0 ) );
+			}
+		}
 
 	}
 

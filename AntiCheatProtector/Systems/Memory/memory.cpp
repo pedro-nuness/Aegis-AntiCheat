@@ -17,6 +17,7 @@
 #include <sddl.h>
 #include <unordered_map>
 
+
 #include "..\Utils\singleton.h"
 #include "..\Utils\utils.h"
 #include "..\Utils\SHA1\sha1.h"
@@ -189,6 +190,73 @@ std::vector<SYSTEM_HANDLE> Mem::Handle::EnumerateHandles( DWORD processID ) {
 	return Handles;
 }
 
+
+bool Mem::Handle::CheckDangerousPermissions( HANDLE handle ) {
+	typedef NTSTATUS( WINAPI * NtQueryObjectFunc )(
+		HANDLE ,
+		OBJECT_INFORMATION_CLASS ,
+		PVOID ,
+		ULONG ,
+		PULONG
+		);
+
+	HMODULE ntdll = GetModuleHandle( "ntdll.dll" );
+	if ( !ntdll ) {
+		std::cerr << "Falha ao carregar ntdll.dll." << std::endl;
+		return false;
+	}
+
+	auto NtQueryObject = ( NtQueryObjectFunc ) GetProcAddress( ntdll , "NtQueryObject" );
+	if ( !NtQueryObject ) {
+		std::cerr << "Falha ao obter o endereço de NtQueryObject." << std::endl;
+		return false;
+	}
+
+	struct OBJECT_BASIC_INFORMATION {
+		ULONG Attributes;
+		ACCESS_MASK GrantedAccess;
+		ULONG HandleCount;
+		ULONG PointerCount;
+		ULONG Reserved[ 10 ];
+	};
+
+	OBJECT_BASIC_INFORMATION objectInfo;
+	ULONG returnLength = 0;
+
+	NTSTATUS status = NtQueryObject(
+		handle ,
+		ObjectBasicInformation ,
+		&objectInfo ,
+		sizeof( objectInfo ) ,
+		&returnLength
+	);
+
+	if ( status != 0 ) {
+		std::cerr << "NtQueryObject falhou. Status: 0x" << std::hex << status << std::endl;
+		return false;
+	}
+
+	DWORD dangerousFlags = PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_CREATE_THREAD |
+		PROCESS_DUP_HANDLE | PROCESS_QUERY_INFORMATION | PROCESS_ALL_ACCESS;
+
+	if ( objectInfo.GrantedAccess & dangerousFlags ) {
+		std::cout << "Permissões perigosas detectadas no handle: 0x"
+			<< std::hex << handle << std::endl;
+
+		if ( objectInfo.GrantedAccess & PROCESS_VM_READ ) std::cout << "- PROCESS_VM_READ" << std::endl;
+		if ( objectInfo.GrantedAccess & PROCESS_VM_WRITE ) std::cout << "- PROCESS_VM_WRITE" << std::endl;
+		if ( objectInfo.GrantedAccess & PROCESS_CREATE_THREAD ) std::cout << "- PROCESS_CREATE_THREAD" << std::endl;
+		if ( objectInfo.GrantedAccess & PROCESS_DUP_HANDLE ) std::cout << "- PROCESS_DUP_HANDLE" << std::endl;
+		if ( objectInfo.GrantedAccess & PROCESS_QUERY_INFORMATION ) std::cout << "- PROCESS_QUERY_INFORMATION" << std::endl;
+		if ( objectInfo.GrantedAccess & PROCESS_ALL_ACCESS ) std::cout << "- PROCESS_ALL_ACCESS" << std::endl;
+		return true;
+	}
+	else {
+		std::cout << "Handle seguro: 0x" << std::hex << handle << std::endl;
+	}
+
+	return false;
+}
 
 
 std::vector<_SYSTEM_HANDLE> Mem::Handle::DetectOpenHandlesToProcess( )

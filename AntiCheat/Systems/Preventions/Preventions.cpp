@@ -15,57 +15,129 @@
 #include "../LogSystem/Log.h"
 #include "../../Obscure/ntldr.h"
 
+#include "../../externals/minhook/MinHook.h"
+
+#include <Windows.h>
+#include <iostream>
 
 bool Preventions::RestrictProcessAccess( ) {
 	HANDLE hProcess = GetCurrentProcess( );
 	PSECURITY_DESCRIPTOR pSD = NULL;
-	PACL pOldDACL = NULL , pNewDACL = NULL;
-	EXPLICIT_ACCESS ea = { 0 };
-	PSID pEveryoneSID = NULL;
+	PACL pDacl = NULL;
+	EXPLICIT_ACCESSA ea = { 0 };
 	SID_IDENTIFIER_AUTHORITY SIDAuthWorld = SECURITY_WORLD_SID_AUTHORITY;
+	PSID pEveryoneSID = NULL;
+	PSID pAdminSID = NULL;
+	PSID pSystemSID = NULL;
 
+	// Criar SID para "Everyone".
+	if ( !AllocateAndInitializeSid(
+		&SIDAuthWorld , 1 , SECURITY_WORLD_RID ,
+		0 , 0 , 0 , 0 , 0 , 0 , 0 , &pEveryoneSID ) ) {
+		std::cerr << "Falha ao inicializar SID para Everyone.\n";
+		return false;
+	}
 
-	if ( GetSecurityInfo( hProcess , SE_KERNEL_OBJECT , DACL_SECURITY_INFORMATION ,
-		NULL , NULL , &pOldDACL , NULL , &pSD ) != ERROR_SUCCESS ) {
+	// Criar SID para administradores.
+	SID_IDENTIFIER_AUTHORITY SIDAuthNT = SECURITY_NT_AUTHORITY;
+	if ( !AllocateAndInitializeSid(
+		&SIDAuthNT , 2 , SECURITY_BUILTIN_DOMAIN_RID ,
+		DOMAIN_ALIAS_RID_ADMINS , 0 , 0 , 0 , 0 , 0 , 0 , &pAdminSID ) ) {
+		std::cerr << "Falha ao inicializar SID para Administradores.\n";
+		FreeSid( pEveryoneSID );
+		return false;
+	}
+
+	// Criar SID para SYSTEM.
+	if ( !AllocateAndInitializeSid(
+		&SIDAuthNT , 1 , SECURITY_LOCAL_SYSTEM_RID ,
+		0 , 0 , 0 , 0 , 0 , 0 , 0 , &pSystemSID ) ) {
+		std::cerr << "Falha ao inicializar SID para SYSTEM.\n";
+		FreeSid( pEveryoneSID );
+		FreeSid( pAdminSID );
 		return false;
 	}
 
 
-	if ( !AllocateAndInitializeSid( &SIDAuthWorld , 1 ,
-		SECURITY_WORLD_RID ,
-		0 , 0 , 0 , 0 , 0 , 0 , 0 ,
-		&pEveryoneSID ) ) {
-		if ( pSD ) LocalFree( pSD );
-		return false;
-	}
-
-	ea.grfAccessPermissions = PROCESS_CREATE_THREAD | PROCESS_VM_OPERATION | PROCESS_VM_WRITE;
+	// Configurar estrutura de acesso explícito para negar todas as permissões para cada SID.
+	ea.grfAccessPermissions = PROCESS_ALL_ACCESS;
 	ea.grfAccessMode = DENY_ACCESS;
 	ea.grfInheritance = NO_INHERITANCE;
+
+	// Negar para "Everyone"
 	ea.Trustee.TrusteeForm = TRUSTEE_IS_SID;
 	ea.Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
 	ea.Trustee.ptstrName = ( LPSTR ) pEveryoneSID;
 
-	if ( SetEntriesInAcl( 1 , &ea , pOldDACL , &pNewDACL ) != ERROR_SUCCESS ) {
-		if ( pSD ) LocalFree( pSD );
-		if ( pEveryoneSID ) FreeSid( pEveryoneSID );
+	// Criar ACL para negar "Everyone".
+	DWORD result = SetEntriesInAclA( 1 , &ea , NULL , &pDacl );
+	if ( result != ERROR_SUCCESS ) {
+		std::cerr << "Falha ao configurar entradas de ACL para Everyone. Erro: " << result << "\n";
+		FreeSid( pEveryoneSID );
+		FreeSid( pAdminSID );
+		FreeSid( pSystemSID );
 		return false;
 	}
 
-	if ( SetSecurityInfo( hProcess , SE_KERNEL_OBJECT , DACL_SECURITY_INFORMATION ,
-		NULL , NULL , pNewDACL , NULL ) != ERROR_SUCCESS ) {
-		if ( pSD ) LocalFree( pSD );
-		if ( pEveryoneSID ) FreeSid( pEveryoneSID );
-		if ( pNewDACL ) LocalFree( pNewDACL );
+	// Repetir para Administradores.
+	ea.Trustee.ptstrName = ( LPSTR ) pAdminSID;
+	result = SetEntriesInAclA( 1 , &ea , pDacl , &pDacl );
+	if ( result != ERROR_SUCCESS ) {
+		std::cerr << "Falha ao configurar entradas de ACL para Administradores. Erro: " << result << "\n";
+		FreeSid( pEveryoneSID );
+		FreeSid( pAdminSID );
+		FreeSid( pSystemSID );
 		return false;
 	}
 
-	if ( pSD ) LocalFree( pSD );
-	if ( pEveryoneSID ) FreeSid( pEveryoneSID );
-	if ( pNewDACL ) LocalFree( pNewDACL );
+	// Repetir para SYSTEM.
+	ea.Trustee.ptstrName = ( LPSTR ) pSystemSID;
+	result = SetEntriesInAclA( 1 , &ea , pDacl , &pDacl );
+	if ( result != ERROR_SUCCESS ) {
+		std::cerr << "Falha ao configurar entradas de ACL para SYSTEM. Erro: " << result << "\n";
+		FreeSid( pEveryoneSID );
+		FreeSid( pAdminSID );
+		FreeSid( pSystemSID );
+		return false;
+	}
+
+	// Criar um novo descritor de segurança.
+	pSD = ( PSECURITY_DESCRIPTOR ) LocalAlloc( LPTR , SECURITY_DESCRIPTOR_MIN_LENGTH );
+	if ( !pSD || !InitializeSecurityDescriptor( pSD , SECURITY_DESCRIPTOR_REVISION ) ) {
+		std::cerr << "Falha ao inicializar o descritor de segurança.\n";
+		FreeSid( pEveryoneSID );
+		FreeSid( pAdminSID );
+		FreeSid( pSystemSID );
+		return false;
+	}
+
+	// Configurar a nova ACL no descritor de segurança.
+	if ( !SetSecurityDescriptorDacl( pSD , TRUE , pDacl , FALSE ) ) {
+		std::cerr << "Falha ao configurar a DACL.\n";
+		FreeSid( pEveryoneSID );
+		FreeSid( pAdminSID );
+		FreeSid( pSystemSID );
+		return false;
+	}
+
+	// Aplicar o descritor de segurança ao processo.
+	if ( SetKernelObjectSecurity( hProcess , DACL_SECURITY_INFORMATION , pSD ) == 0 ) {
+		std::cerr << "Falha ao aplicar informações de segurança.\n";
+		FreeSid( pEveryoneSID );
+		FreeSid( pAdminSID );
+		FreeSid( pSystemSID );
+		return false;
+	}
+
+	// Liberar recursos.
+	FreeSid( pEveryoneSID );
+	FreeSid( pAdminSID );
+	FreeSid( pSystemSID );
+	LocalFree( pSD );
 
 	return true;
 }
+
 bool Preventions::RemapProgramSections( ) {
 	ULONG_PTR ImageBase = ( ULONG_PTR ) GetModuleHandle( NULL );
 	bool remap_succeeded = false;
@@ -208,11 +280,34 @@ bool Preventions::EnableProcessMitigations( bool useDEP , bool useASLR , bool us
 
 #endif
 
+std::string GetBaseModuleName( ) {
+	char moduleName[ MAX_PATH ] = { 0 };
+
+	// Obter o handle do módulo atual (NULL significa o módulo do processo atual)
+	if ( GetModuleFileNameA( NULL , moduleName , MAX_PATH ) ) {
+		// Converter para uma std::string
+		std::string fullPath( moduleName );
+
+		// Encontrar a posição do último separador de caminho
+		size_t pos = fullPath.find_last_of( "\\/" );
+		if ( pos != std::string::npos ) {
+			// Retornar apenas o nome do arquivo
+			return fullPath.substr( pos + 1 );
+		}
+
+		return fullPath; // Retorna o caminho completo se nenhum separador for encontrado
+	}
+
+	return "";
+}
+
 bool Preventions::RandomizeModuleName( )
 {
 	bool success = false;
 
-	std::string OriginalModuleName = xorstr_( "aegis.exe" );
+	std::string OriginalModuleName = GetBaseModuleName( );
+	if ( OriginalModuleName.empty( ) )
+		return false;
 
 	int moduleNameSize = OriginalModuleName.size( );
 
@@ -349,11 +444,109 @@ bool Preventions::DeployDllLoadNotifation( ) {
 	//}
 }
 
+BOOL SuspectThreadAddress( LPVOID lpStartAddress )
+{
+	MEMORY_BASIC_INFORMATION mbi;
+	// Obtemos a informação sobre a região de memória onde o thread foi alocado
+	if ( VirtualQuery( lpStartAddress , &mbi , sizeof( mbi ) ) == 0 )
+	{
+		return TRUE;  // Se a consulta falhar, o endereço é inválido
+	}
+
+	// Verifica se a região de memória é válida para threads (não deve ser uma área de código ou dados suspeitos)
+	// Por exemplo, vamos verificar se o endereço está no espaço de heap ou pilha
+	if ( mbi.State == MEM_COMMIT && ( mbi.Type == MEM_PRIVATE || mbi.Type == MEM_MAPPED ) )
+	{
+		return TRUE;
+	}
+
+	return FALSE;
+}
+
+typedef HANDLE( WINAPI * pCreateThread )(
+	LPSECURITY_ATTRIBUTES lpThreadAttributes ,
+	SIZE_T dwStackSize ,
+	LPTHREAD_START_ROUTINE lpStartAddress ,
+	LPVOID lpParameter ,
+	DWORD dwCreationFlags ,
+	LPDWORD lpThreadId
+	);
+
+pCreateThread originalCreateThread = nullptr;
+
+HANDLE WINAPI MyCreateThread(
+	LPSECURITY_ATTRIBUTES lpThreadAttributes ,
+	SIZE_T dwStackSize ,
+	LPTHREAD_START_ROUTINE lpStartAddress ,
+	LPVOID lpParameter ,
+	DWORD dwCreationFlags ,
+	LPDWORD lpThreadId
+) {
+
+	//somehow, this mf managed to get the createthread function pointer, and called it, so let's check
+
+	if ( SuspectThreadAddress( lpStartAddress ) ) {
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Blocked create thread attemp on suspect address!" ) , YELLOW );
+
+		//return nothing, no threads for you today
+		return NULL;
+	}
+
+	// Call the original CreateThread function
+	return originalCreateThread(
+		lpThreadAttributes ,
+		dwStackSize ,
+		lpStartAddress ,
+		lpParameter ,
+		dwCreationFlags ,
+		lpThreadId
+	);
+}
+
+// Function to unhook CreateThread
+bool UnhookApis( ) {
+	// Disable the hook
+	if ( MH_DisableHook( MH_ALL_HOOKS ) != MH_OK ) {
+		std::cerr << "Failed to disable hook!" << std::endl;
+		return false;
+	}
+
+	// Uninitialize MinHook
+	if ( MH_Uninitialize( ) != MH_OK ) {
+		std::cerr << "MinHook uninitialization failed!" << std::endl;
+		return false;
+	}
+	return true;
+}
+
+bool Preventions::EnableApiHooks() {
+	
+	if ( MH_Initialize( ) != MH_OK ) {
+		std::cerr << "MinHook initialization failed!" << std::endl;
+		return false;
+	}
+
+	if ( MH_CreateHookApi( L"kernel32.dll" , "CreateThread" , &MyCreateThread , reinterpret_cast< LPVOID * >( &originalCreateThread ) ) != MH_OK ) {
+		std::cerr << "Failed to create hook for CreateThread!" << std::endl;
+		return false;
+	}
+
+	if ( MH_EnableHook( MH_ALL_HOOKS ) != MH_OK ) {
+		std::cerr << "Failed to enable hooks!" << std::endl;
+		return false;
+	}
+
+	return true;
+}
+
 void Preventions::Deploy( ) {
 
 	if ( !Preventions::Get( ).RestrictProcessAccess( ) )
-		LogSystem::Get( ).Log( xorstr_( "[1] Failed to protect process" ) );
+		LogSystem::Get( ).Log( xorstr_( "[0] Failed to protect process" ) );
 
+	if ( !Preventions::Get().EnableApiHooks( ) ) 
+		LogSystem::Get( ).Log( xorstr_( "[1] Failed to protect process" ) );
+	
 	if ( !Preventions::Get( ).RandomizeModuleName( ) )
 		LogSystem::Get( ).Log( xorstr_( "[2] Failed to protect process" ) );
 
@@ -362,6 +555,7 @@ void Preventions::Deploy( ) {
 
 	if(!Preventions::Get().PreventThreadCreation() )
 		LogSystem::Get( ).Log( xorstr_( "[4] Failed to protect process" ) );
+
 
 	/*if ( !Preventions::Get( ).RemapProgramSections( ) ) {
 		LogSystem::Get( ).Log( xorstr_( "[0] Failed to protect process" ) );

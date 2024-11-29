@@ -31,7 +31,7 @@ client::~client( ) {}
 
 
 #define key xorstr_("ib33o5m8zsqlcgys3w46cfmtn8ztg1kn")
-#define iv xorstr_("ume9ugz3m7lgch1z")
+#define salt xorstr_("8d88db7a1cc2512169bc970c2e2e7498")
 
 bool client::InitializeConnection( ) {
 	WSADATA wsaData;
@@ -101,7 +101,7 @@ bool client::GetResponse( CommunicationResponse * response ) {
 
 	std::string encryptedMessage( sizeBuffer , sizeof( sizeBuffer ) );
 
-	if ( !Utils::Get( ).decryptMessage( encryptedMessage , encryptedMessage , key , iv ) ) {
+	if ( !Utils::Get( ).decryptMessage( encryptedMessage , encryptedMessage , key , this->IV ) ) {
 		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to decrypt message" ) , RED );
 		return false;
 	}
@@ -133,7 +133,7 @@ bool client::SendData( std::string data , CommunicationType type , bool encrypt 
 
 	std::string encryptedMessage;
 	if ( encrypt ) {
-		if ( !Utils::Get( ).encryptMessage( data , encryptedMessage , key , iv ) ) {
+		if ( !Utils::Get( ).encryptMessage( data , encryptedMessage , key , this->IV ) ) {
 			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to encrypt the message." ) , RED );
 			return false;
 		}
@@ -142,16 +142,15 @@ bool client::SendData( std::string data , CommunicationType type , bool encrypt 
 		encryptedMessage = data;
 	}
 
-	encryptedMessage = xorstr_( "aegis" ) + std::to_string( static_cast< int >( type ) ) + encryptedMessage;
+	encryptedMessage = std::to_string( static_cast< int >( type ) ) + encryptedMessage;
 	long int messageSize = encryptedMessage.size( );
 
 
-	std::string messageSizeStr = xorstr_( "aegis" ) + std::to_string( messageSize );
+	std::string messageSizeStr = std::to_string( messageSize );
 	int SizeBackup = messageSizeStr.size( );
-	//message_size bufer = char * 35 - 1 ( end of the strin \0 )
-	//skip 5, prefix
-	messageSizeStr.insert( 5 , 34 - SizeBackup , '0' );  // Insere 'quantidade_zeros' zeros no início
-	// aegis0000001348
+	//message_size bufer = char * 35 - 1 ( end of the string \0 )
+	messageSizeStr.insert( 0 , 34 - SizeBackup , '0' );  // Insere 'quantidade_zeros' zeros no início
+	// 000000..001348
 	if ( send( this->CurrentSocket , messageSizeStr.c_str( ) , messageSizeStr.size( ) , 0 ) == SOCKET_ERROR ) {
 		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to send message size." ) , RED );
 		return false;

@@ -3,12 +3,15 @@
 #include <Windows.h>
 #include <chrono>
 #include <string>
+#include <vector>
 #include "../ThreadHolder/ThreadHolder.h"
 
 class Communication : public ThreadHolder
 {
 	std::string ReceiveHash;
 	std::string ExpectedMessage;
+
+	std::vector<std::string> QueuedMessages;
 
 	int PingLimit = 25;
 	std::chrono::steady_clock::time_point LastClientPing;
@@ -28,6 +31,8 @@ public:
 
 	Communication( );
 	~Communication( );
+
+	void AddMessageToQueue( std::string );
 
 	
 

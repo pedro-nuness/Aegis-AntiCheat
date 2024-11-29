@@ -14,11 +14,10 @@ struct Trigger {
 	DETECTION_STATUS Status;
 };
 
+
 class Triggers : public ThreadHolder {
 
 	DWORD MomProcess , ProtectProcess;
-	std::vector<std::string> BlackListedProcesses;
-	std::vector<std::string> BlackListedWindows;
 	std::vector<std::string> AllowedModules;
 
 	void SetupFiles( );
@@ -42,6 +41,7 @@ class Triggers : public ThreadHolder {
 
 public:
 	Triggers ( DWORD _MomProcess , DWORD _ProtectProcess ) {
+		SetupFiles( );
 		this->MomProcess = _MomProcess;
 		this->ProtectProcess = _ProtectProcess;
 	}

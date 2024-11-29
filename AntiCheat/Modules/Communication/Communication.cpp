@@ -400,6 +400,36 @@ void Communication::OpenRequestServer( ) {
 }
 
 
+enum CLIENT_REQUEST_TYPE {
+	REQUEST_BAN,
+	REQUEST_WARN
+};
+
+bool Communication::ReceivedQueuedMessage( std::string Message ) {
+	json js;
+	try {
+		js = json::parse( Message );
+	}
+	catch ( json::parse_error error ) {
+		return false;
+	}
+
+	if ( !js.contains( xorstr_( "request_type" ) ) || js[ xorstr_( "request_type" ) ].empty( ) ) {
+		return false;
+	}
+
+	if ( !js.contains( xorstr_( "message" ) ) || js[ xorstr_( "message" ) ].empty( ) ) {
+		return false;
+	}
+
+	CLIENT_REQUEST_TYPE ReceivedRequest = js[ xorstr_( "request_type" ) ];
+	std::string Msg = js[ xorstr_("message") ];
+
+	client::Get( ).SendPunishToServer( Msg , ReceivedRequest == REQUEST_BAN ? true : false );
+
+	return true;
+}
+
 
 void Communication::threadFunction( ) {
 
@@ -470,11 +500,12 @@ void Communication::threadFunction( ) {
 		std::string message = this->receiveMessage( this->ClientSocket , 20 );
 
 		if ( !message.empty( ) ) {
-			if ( message != this->ExpectedMessage ) {
+			if ( message != this->ExpectedMessage) {
 				this->closeconnection( this->ClientSocket );
 				this->closeconnection( this->ListenSocket );
 
 				LogSystem::Get( ).Log( xorstr_( "[802] client hash mismatch!\n" ) );
+				this->~Communication( );
 			}
 			else {
 				LogSystem::Get( ).ConsoleLog( _COMMUNICATION , this->ExpectedMessage , GRAY );

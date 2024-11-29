@@ -26,7 +26,7 @@ void LogSystem::LogWithMessageBox( std::string Message , std::string BoxMessage 
 	//LogFile.Write( Message );
 
 
-	std::cout << Message << "\n";
+	// std::cout << Message << "\n";
 
 	exit( 0 );
 }

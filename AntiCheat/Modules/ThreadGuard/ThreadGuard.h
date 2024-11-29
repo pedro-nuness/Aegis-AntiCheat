@@ -13,7 +13,8 @@ enum THREADS {
 	COMMUNICATION ,
 	DETECTIONS ,
 	TRIGGERS ,
-	ANTIDEBUGGER
+	ANTIDEBUGGER,
+	LISTENER
 };
 
 class ThreadGuard : public ThreadHolder {

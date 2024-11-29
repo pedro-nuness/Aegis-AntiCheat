@@ -12,6 +12,7 @@
 #include "Modules/ThreadGuard/ThreadGuard.h"
 #include "Modules/Detections/Detections.h"
 #include "Modules/AntiDebugger/AntiDebugger.h"
+#include "Modules/Listener/Listener.h"
 
 #include "Systems/LogSystem/Log.h"
 #include "Systems/Preventions/Preventions.h"
@@ -32,12 +33,15 @@ void Startup( ) {
 	Communication CommunicationEvent( Globals::Get( ).OriginalProcess , Globals::Get( ).ProtectProcess );
 	Triggers TriggerEvent( Globals::Get( ).OriginalProcess , Globals::Get( ).ProtectProcess );
 	AntiDebugger AntiDbg;
+	Listener ListenEvent;
+
 	DetectionEvent.SetupPid( Globals::Get( ).OriginalProcess , Globals::Get( ).ProtectProcess );
 
 	CommunicationEvent.start( );
 	DetectionEvent.start( );
 	TriggerEvent.start( );
 	AntiDbg.start( );
+	ListenEvent.start( );
 
 	DetectionEvent.InitializeThreads( );
 
@@ -45,7 +49,8 @@ void Startup( ) {
 		std::make_pair( &DetectionEvent, DETECTIONS ),
 		std::make_pair( &AntiDbg, ANTIDEBUGGER ),
 		std::make_pair( &TriggerEvent, TRIGGERS ) ,
-		std::make_pair( &CommunicationEvent, COMMUNICATION )
+		std::make_pair( &CommunicationEvent, COMMUNICATION ),
+		std::make_pair( &ListenEvent,  LISTENER )
 	};
 
 	ThreadGuard monitor( threads );
@@ -75,16 +80,20 @@ void Startup( ) {
 	}
 }
 
+
+
 int main( int argc , char * argv[ ] ) {
 	//Ignore load library missing msgbox
-	SetErrorMode( SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX );
-	LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Hello world!" ) , GREEN );
+
+	// LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Hello world!" ) , GREEN );
 	hardware::Get( ).GenerateCache( );
 	Preventions::Get( ).Deploy( );
+	SetErrorMode( SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX );
+
 
 	::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
 
-#if false
+#if true
 	//FreeConsole( );
 	//::ShowWindow( ::GetConsoleWindow( ) , SW_HIDE );
 	if ( argc < 3 ) {
@@ -100,25 +109,29 @@ int main( int argc , char * argv[ ] ) {
 	Globals::Get( ).OriginalProcess = stoi( ( std::string ) argv[ 1 ] );
 	Globals::Get( ).ProtectProcess = stoi( ( std::string ) argv[ 2 ] );
 
-	//Start client module
-	Communication::InitializeClient( );
-
-	TerminateProcess( Mem::Get( ).GetProcessHandle( Globals::Get( ).OriginalProcess ), 1);
+	if ( !Communication::InitializeClient( ) ) {
+		LogSystem::Get( ).Log( xorstr_( "Can't init client" ) );
+	}
+	else {
+		//Start client module
+		TerminateProcess( Mem::Get( ).GetProcessHandle( Globals::Get( ).OriginalProcess ) , 1 );
 
 #else
 	Globals::Get( ).OriginalProcess = Mem::Get( ).GetProcessID( "explorer.exe" );
 	Globals::Get( ).ProtectProcess = Mem::Get( ).GetProcessID( "notepad.exe" );
 
-	Communication::InitializeClient( );
-
-	::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
+	if ( !Communication::InitializeClient( ) ) {
+		LogSystem::Get( ).Log( xorstr_( "Can't init client" ) );
+	}
+	else {
+		::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
 #endif // !DEBUG
 
-	Globals::Get( ).SelfID = ::_getpid( );
-	FileChecking::Get( ).ValidateFiles( );
+		Globals::Get( ).SelfID = ::_getpid( );
+		FileChecking::Get( ).ValidateFiles( );
 
-	Startup( );
-
+		Startup( );
+	}
 	//if ( client::Get( ).SendPingToServer( ) ) {
 	//	
 	//}

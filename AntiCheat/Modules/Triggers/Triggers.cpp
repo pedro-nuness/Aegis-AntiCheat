@@ -21,181 +21,131 @@
 #include "../../Globals/Globals.h"
 
 
+#include "../../Systems/Utils/StringCrypt/StringCrypt.h"
 
-void Triggers::CleanFiles( ) {
-	std::fill( this->BlackListedProcesses.begin( ) , this->BlackListedProcesses.end( ) , "" );
-	this->BlackListedProcesses.clear( );
 
-	std::fill( this->BlackListedProcesses.begin( ) , this->BlackListedProcesses.end( ) , "" );
-	this->BlackListedProcesses.clear( );
-}
+std::vector<CryptedString> BlackListedProcesses;
+std::vector<CryptedString> BlackListedWindows;
+
 
 void Triggers::SetupFiles( ) {
-	this->BlackListedWindows = {
-			xorstr_( "!xSpeed" ),
-			xorstr_( "!xSpeed.net" ),
-			xorstr_( "!xSpeedPro" ),
-			xorstr_( "!xpeed.net" ),
-			xorstr_( "99QJ MU Bot" ),
-			xorstr_( "AE Bot v1.0 beta" ),
-			xorstr_( "AIO Bots" ),
-			xorstr_( "Add address" ),
-			xorstr_( "ArtMoney PRO" ),
-			xorstr_( "ArtMoney SE " ),
-			xorstr_( "Auto Combo" ),
-			xorstr_( "Auto-Repairer" ),
-			xorstr_( "AutoBuff" ),
-			xorstr_( "AutoCombo" ),
-			xorstr_( "Autoprision" ),
-			xorstr_( "Bot MG-DK-ELF" ),
-			xorstr_( "Capotecheat" ),
-			xorstr_( "Capotecheat(deltacholl)" ),
-			xorstr_( "Catastrophe" ),
-			xorstr_( "Chaos Bot" ),
-			xorstr_( "CharBlaster" ),
-			xorstr_( "CharEditor" ),
-			xorstr_( "Cheat Engine" ),
-			xorstr_( "Cheat Happens " ),
-			xorstr_( "Cheat Master" ),
-			xorstr_( "Cheat4Fun" ),
-			xorstr_( "Codehitcz" ),
-			xorstr_( "Created processes" ),
-			xorstr_( "D-C Bypass" ),
-			xorstr_( "D-C DupeHack" ),
-			xorstr_( "D-C Master Inject" ),
-			xorstr_( "DC Mu" ),
-			xorstr_( "DC-BYPASS" ),
-			xorstr_( "DK(AE)MultiStrikeByDude" ),
-			xorstr_( "DarkCheats Mu Ar" ),
-			xorstr_( "DarkLord Bot" ),
-			xorstr_( "DarkyStats (www.darkhacker.com.ar)" ),
-			xorstr_( "Dizzys Auto Buff" ),
-			xorstr_( "Dupe-Full" ),
-			xorstr_( "Easy As MuPie" ),
-			xorstr_( "Esperando Mu Online" ),
-			xorstr_( "FunnyZhyper" ),
-			xorstr_( "Game Speed Adjuster" ),
-			xorstr_( "Game Speed Changer" ),
-			xorstr_( "GodMode" ),
-			xorstr_( "Godlike" ),
-			xorstr_( "HahaMu" ) ,
-			xorstr_( "Hasty MU" ) ,
-			xorstr_( "HastyMU" ) ,
-			xorstr_( "HideToolz" ) ,
-			xorstr_( "Hit Count" ) ,
-			xorstr_( "Hit Hack" ) ,
-			xorstr_( "Injector" ) ,
-			xorstr_( "Janopn Mini Multi Cheat" ) ,
-			xorstr_( "Jewel Drop Beta" ) ,
-			xorstr_( "JoyToKey" ) ,
-			xorstr_( "Lipsum" ) ,
-			xorstr_( "Load File" ) ,
-			xorstr_( "MJB Perfect DL Bot" ) ,
-			xorstr_( "MLEngine" ) ,
-			xorstr_( "MU Lite Trainer" ) ,
-			xorstr_( "MU Utilidades" ) ,
-			xorstr_( "MU-SS4 Speed Hack" ) ,
-			xorstr_( "MUSH" ) ,
-			xorstr_( "Minimize" ) ,
-			xorstr_( "ModzMu" ) ,
-			xorstr_( "MoonLight" ) ,
-			xorstr_( "Mu Cheater 16" ) ,
-			xorstr_( "Mu Philiphinas Cheat II" ) ,
-			xorstr_( "Mu Pie Beta" ) ,
-			xorstr_( "Mu Pirata MMHack" ) ,
-			xorstr_( "Mu proxy" ) ,
-			xorstr_( "MuBot" ) ,
-			xorstr_( "MuCheat" ) ,
-			xorstr_( "MuHackRm" ) ,
-			xorstr_( "MuOnline Speed Hack" ) ,
-			xorstr_( "MuPie HG" ) ,
-			xorstr_( "MuPieHG" ) ,
-			xorstr_( "MuPieX" ) ,
-			xorstr_( "MuPie_v2Beta" ) ,
-			xorstr_( "MuProxy" ) ,
-			xorstr_( "Mugster Bot" ) ,
-			xorstr_( "Mupie Minimizer" ) ,
-			xorstr_( "Mush" ) ,
-			xorstr_( "NoNameMini" ) ,
-			xorstr_( "Olly Debugger" ) ,
-			xorstr_( "Overclock Menu" ) ,
-			xorstr_( "Perfect AutoPotion" ) ,
-			xorstr_( "Permit" ) ,
-			xorstr_( "PeruCheats" ) ,
-			xorstr_( "ProxCheatsX 2.0 - Acacias" ) ,
-			xorstr_( "Razor Code Only" ) ,
-			xorstr_( "Razor Code" ) ,
-			xorstr_( "Snd Bot" ) ,
-			xorstr_( "Speed Gear" ) ,
-			xorstr_( "Speed Hack" ) ,
-			xorstr_( "Speed Hacker" ) ,
-			xorstr_( "SpeedGear" ) ,
-			xorstr_( "SpeedMUVN" ) ,
-			xorstr_( "SpiffsAutobot" ) ,
-			xorstr_( "SpotHack" ) ,
-			xorstr_( "Super Bot" ) ,
-			xorstr_( "T Search" ) ,
-			xorstr_( "Tablet 2" ) ,
-			xorstr_( "The following opcodes accessed the selected address" ) ,
-			xorstr_( "Trade HACK" ) ,
-			xorstr_( "Ultimate Cheat" ) ,
-			xorstr_( "UoPilot" ) ,
-			xorstr_( "VaultBlaster" ) ,
-			xorstr_( "VaultEditor (www.darkhacker.com.ar)" ) ,
-			xorstr_( "WPE PRO" ) ,
-			xorstr_( "WPePro" ) ,
-			xorstr_( "WildProxy" ) ,
-			xorstr_( "Xelerator" ) ,
-			xorstr_( "ZhyperMu Packet Editor" ) ,
-			xorstr_( "[Dark-Cheats]" ) ,
-			xorstr_( "eXpLoRer" ) ,
-			xorstr_( "hacker" ) ,
-			xorstr_( "rPE - rEdoX Packet Editor" ) ,
-			xorstr_( "razorcode" ) ,
-			xorstr_( "speednet" ) ,
-			xorstr_( "speednet2" ) ,
-			xorstr_( "www.55xp.com" ) ,
-			xorstr_( "BVKHEX" ) ,
-			xorstr_( "OllyDbg" ) ,
-			xorstr_( "HxD" ) ,
-			xorstr_( "BY DARKTERRO" ) ,
-			xorstr_( "Tim Geimi Jaks - DarkTerro" ) ,
-			xorstr_( "PROCEXPL" ) ,             // Process explorer
-			xorstr_( "ProcessHacker" ) ,        // Process Hacker	
-			xorstr_( "PhTreeNew" ) ,            // Process Hacker (Process windows)
-			xorstr_( "RegEdit_RegEdit" ) ,      // Regedit
-			xorstr_( "0x150114 (1376532)" ) ,   // Win 7 - System configuration
-			xorstr_( "SysListView32" ) ,        // Lista de processos do process explorer
-			xorstr_( "TformSettings" ) ,
-			xorstr_( "Afx:400000:8:10011:0:20575" ) ,
-			xorstr_( "TWildProxyMain" ) ,
-			xorstr_( "TUserdefinedform" ) ,
-			xorstr_( "TformAddressChange" ) ,
-			xorstr_( "TMemoryBrowser" ) ,
-			xorstr_( "TFoundCodeDialog" ) ,
-			xorstr_( "IDA" ),
-			xorstr_( "DnSpy" ),
-			xorstr_( "cheat" )
-	};
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "!xSpeed" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "!xSpeed.net" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "!xSpeedPro" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "!xpeed.net" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "99QJ MU Bot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "AE Bot v1.0 beta" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "AIO Bots" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "Add address" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "ArtMoney PRO" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "ArtMoney SE" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "AutoKey" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "AVBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "AutoHack" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "BanList" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "BattleEye" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "Blackhawk Cheats" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "BotNet" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "Chams" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "Cheat Engine" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "CheatHelper" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "Cheatster" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "ChronicBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "ClubDark Bot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "CopyCat" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "CPUAwareBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "CraftBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "DarkBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "Darkhook" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "DBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "EasyBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "ESP Tools" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "FakeCheat" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "FinalBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "FreeBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "GameHax" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "GamerBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "Hack Pro" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "Hacknet" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "Hackster" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "Injector" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "InternalBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "KillerBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "NoCheat" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "OBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "PerfectCheat" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "PopBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "QuickHack" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "QuickInjector" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "RageBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "SpeedHack" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "StealthBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "StenCheat" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "SuperBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "TBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "TestBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "UltimateBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "UndetectedBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "UnlimitedBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "VIPBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "X-Bot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "XpertBot" ) ) );
+	BlackListedWindows.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "ZBot" ) ) );
 
-	this->BlackListedProcesses = {
-		xorstr_( "ahk.exe" ),
-		xorstr_( "ida.exe" ),
-		xorstr_( "ollydbg" ),
-		xorstr_( "bvkhex.exe" ),
-		xorstr_( "cheat" ),
-		xorstr_( "HxD.exe" ),
-		xorstr_( "procexp2.exe" ),
-		xorstr_( "Hide Toolz3.3.3.exe" ),
-		xorstr_( "SbieSvc.exe" ),    // < sandbox 
-		xorstr_( "SbieSvc*32.exe" ), // < sandbox 
-		xorstr_( "SbieSvc*32.exe" ), // < sandbox 
-		xorstr_( "SbieCtrl.exe" ),
-		xorstr_( "ProcessHacker.exe" ),
-		xorstr_( "injector" ),
-		xorstr_( "hack" ),
-		xorstr_( "wireshark" ),
-	};
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "ahk.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "ida.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "ollydbg" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "bvkhex.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "cheat" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "HxD.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "procexp2.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "Hide Toolz3.3.3.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "SbieSvc.exe" ) ) );  // < sandbox
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "SbieSvc*32.exe" ) ) ); // < sandbox
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "ProcessHacker.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "injector" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "hack" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "wireshark" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "cmd.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "powershell.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "wireshark" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "fiddler.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "charles.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "mitmproxy.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "mbot.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "x32dbg.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "x64dbg.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "UnrealCheat.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "PSExec.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "injector" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "Antivirus" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "keylogger.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "vncviewer.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "TeamViewer.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "VmWare.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "Sandboxie.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "spybot.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "Wireshark.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "fiddler.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "charles.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "mitmproxy.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "mbot.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "x32dbg.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "x64dbg.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "UnrealCheat.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "PSExec.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "injector" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "Antivirus" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "keylogger.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "vncviewer.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "TeamViewer.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "remoteexplorer.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "VmWare.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "Sandboxie.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "NoCheatExe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "GenericBot.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "CheatProcessor.exe" ) ) );
+	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "DebugBot.exe" ) ) );
 }
 
 
@@ -286,8 +236,8 @@ void Triggers::DigestTriggers( ) {
 	std::vector<Trigger> NewTriggers = GetDifferent( this->LastTriggers , this->FoundTriggers );
 
 	if ( !NewTriggers.empty( ) ) {
-		client::Get( ).SendPunishToServer( GenerateWarningStatus( NewTriggers ) , false );
-		LogSystem::Get( ).LogWithMessageBox( xorstr_( "Unsafe" ) , xorstr_( "unsafe session" ) );
+		//client::Get( ).SendPunishToServer( GenerateWarningStatus( NewTriggers ) , false );
+		// LogSystem::Get( ).LogWithMessageBox( xorstr_( "Unsafe" ) , xorstr_( "unsafe session" ) );
 	}
 
 	this->LastTriggers = this->FoundTriggers;
@@ -302,19 +252,21 @@ void Triggers::CheckBlackListedProcesses( ) {
 
 		std::transform( Process.begin( ) , Process.end( ) , Process.begin( ) , &Mem::asciitolower );
 
-		this->SetupFiles( );
 
-		for ( std::string BLProcess : this->BlackListedProcesses ) {
+		for ( auto & BLProcess : BlackListedProcesses ) {
 
-			std::transform( BLProcess.begin( ) , BLProcess.end( ) , BLProcess.begin( ) , &Mem::asciitolower );
+			std::string * DecryptedString = StringCrypt::Get( ).DecryptString( BLProcess );
 
-			if ( Utils::Get( ).CheckStrings( BLProcess , Process ) ) {
-				AddTrigger( Trigger { xorstr_( "BlackListedProcess" ) , Process, BLProcess, SUSPECT } );
+			std::transform( DecryptedString->begin( ) , DecryptedString->end( ) , DecryptedString->begin( ) , &Mem::asciitolower );
+
+			if ( Utils::Get( ).CheckStrings( *DecryptedString , Process ) ) {
+				AddTrigger( Trigger { xorstr_( "BlackListedProcess" ) , Process, *DecryptedString, SUSPECT } );
 				LogSystem::Get( ).ConsoleLog( _TRIGGERS , xorstr_( "found black listed process: " ) + Process , YELLOW );
 			}
-		}
 
-		this->CleanFiles( );
+			StringCrypt::Get( ).CleanString( DecryptedString );
+
+		}
 	}
 }
 
@@ -324,19 +276,19 @@ void Triggers::CheckBlackListedWindows( ) {
 		std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
 		std::transform( Window.begin( ) , Window.end( ) , Window.begin( ) , &Mem::asciitolower );
 
-		this->SetupFiles( );
+		for ( auto & BLWindow : BlackListedWindows ) {
 
-		for ( std::string BLWindow : this->BlackListedWindows ) {
+			std::string * DecryptedString = StringCrypt::Get( ).DecryptString( BLWindow );
 
-			std::transform( BLWindow.begin( ) , BLWindow.end( ) , BLWindow.begin( ) , &Mem::asciitolower );
+			std::transform( DecryptedString->begin( ) , DecryptedString->end( ) , DecryptedString->begin( ) , &Mem::asciitolower );
 
-			if ( Utils::Get( ).CheckStrings( Window , BLWindow ) ) {
-				AddTrigger( Trigger { xorstr_( "BlackListedWindows" ) ,Window, BLWindow, SUSPECT } );
+			if ( Utils::Get( ).CheckStrings( Window , *DecryptedString ) ) {
+				AddTrigger( Trigger { xorstr_( "BlackListedWindows" ) ,Window, *DecryptedString, SUSPECT } );
 				LogSystem::Get( ).ConsoleLog( _TRIGGERS , xorstr_( "found black listed window: " ) + Window , YELLOW );
 			}
-		}
 
-		this->CleanFiles( );
+			StringCrypt::Get( ).CleanString( DecryptedString );
+		}
 	}
 }
 
@@ -349,7 +301,7 @@ std::string Triggers::GenerateWarningStatus( std::vector<Trigger> Triggers ) {
 	return STR;
 }
 
-void Triggers::threadFunction(  ) {
+void Triggers::threadFunction( ) {
 
 	bool Run = true;
 	LogSystem::Get( ).ConsoleLog( _TRIGGERS , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );

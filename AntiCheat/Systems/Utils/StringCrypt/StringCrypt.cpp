@@ -28,24 +28,50 @@ CryptedString StringCrypt::EncryptString( std::string str ) {
 	CryptedString cStr;
 	cStr.Hash = Hash;
 
-	std::string Result;
 	for ( int i = 0; i < str.size( ); i++ ) {
 		int Num = Utils::Get( ).RandomNumber( 1 , 50000 );
 		CryptedChar cChar;
 		cChar._Key = Num;
 		cChar.Letter = str[ i ] - cChar._Key;
-		Result += ( str[ i ] - cChar._Key );
 		cStr.EncryptedString.emplace_back( cChar );
 	}
 
 	cStr.Hash = Hash;
 
+
+
 	return cStr;
 }
 
+CryptedString StringCrypt::EncryptString( std::string * str ) {
+
+	std::string Hash = Mem::Get( ).GenerateHash( *str );
+	CryptedString cStr;
+	cStr.Hash = Hash;
+
+	for ( int i = 0; i < str->size( ); i++ ) {
+		int Num = Utils::Get( ).RandomNumber( 1 , 50000 );
+		CryptedChar cChar;
+		cChar._Key = Num;
+		cChar.Letter = str->at( i ) - cChar._Key;
+		cStr.EncryptedString.emplace_back( cChar );
+	}
+
+	cStr.Hash = Hash;
+
+	CleanString( str );
+
+	return cStr;
+}
+
+
+
 bool StringCrypt::CleanString( std::string * sPtr ) {
+
 	std::fill( sPtr->begin( ) , sPtr->end( ) , '\0' );
+	sPtr->clear( );
 	delete sPtr;
+	sPtr = nullptr;
 	return true;
 }
 
@@ -73,7 +99,7 @@ void StringCrypt::SaveEncryptedStringsToFile( std::string  filename , CryptedStr
 	for ( const auto & cChar : cStr.EncryptedString ) {
 		file << xorstr_( "  Key: " ) << cChar._Key << xorstr_( " Letter: " ) << static_cast< int >( cChar.Letter ) << "\n";
 	}
-	file << xorstr_("\n"); // Adiciona uma linha em branco entre cada string criptografada
+	file << xorstr_( "\n" ); // Adiciona uma linha em branco entre cada string criptografada
 
 	file.close( );
 }

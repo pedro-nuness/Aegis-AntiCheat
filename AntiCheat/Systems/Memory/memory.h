@@ -49,7 +49,7 @@ public:
 
 
 
-
+	void SaveFunctionBytesToFile(  void * funcAddress , size_t numBytes ,  std::string  outputFileName );
 	std::vector<SYSTEM_HANDLE> GetHandlesForProcess( DWORD processId );
 	bool RestrictProcessAccess( );
 	std::string ConvertWchar( WCHAR inCharText[ 260 ] );

@@ -64,6 +64,8 @@ std::string ThreadGuard::GetThreadName( int thread ) {
 		return  xorstr_( "communication" );
 	case ANTIDEBUGGER:
 		return xorstr_( "antidebugger" );
+	case LISTENER:
+		return xorstr_( "listener" );
 	}
 
 	return  xorstr_( "undefined" );

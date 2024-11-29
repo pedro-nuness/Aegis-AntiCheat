@@ -56,252 +56,111 @@ void hardware::GenerateCache( ) {
 	GetIp( );
 }
 
+class ComInitializer {
+public:
+	ComInitializer( ) {
+		HRESULT hr = CoInitializeEx( nullptr , COINIT_MULTITHREADED );
+		if ( FAILED( hr ) ) throw std::runtime_error( "Failed to initialize COM library" );
+	}
+	~ComInitializer( ) { CoUninitialize( ); }
+};
+
+class WmiService {
+	IWbemLocator * pLoc = nullptr;
+	IWbemServices * pSvc = nullptr;
+
+public:
+	WmiService( ) {
+		HRESULT hr = CoCreateInstance( CLSID_WbemLocator , nullptr , CLSCTX_INPROC_SERVER ,
+			IID_IWbemLocator , reinterpret_cast< void ** >( &pLoc ) );
+		if ( FAILED( hr ) ) throw std::runtime_error( "Failed to create IWbemLocator object" );
+
+		hr = pLoc->ConnectServer( bstr_t( L"ROOT\\CIMV2" ) , nullptr , nullptr , 0 , NULL , 0 , 0 , &pSvc );
+		if ( FAILED( hr ) ) throw std::runtime_error( "Failed to connect to WMI namespace" );
+
+		hr = CoSetProxyBlanket( pSvc , RPC_C_AUTHN_WINNT , RPC_C_AUTHZ_NONE , nullptr ,
+			RPC_C_AUTHN_LEVEL_CALL , RPC_C_IMP_LEVEL_IMPERSONATE , nullptr , EOAC_NONE );
+		if ( FAILED( hr ) ) throw std::runtime_error( "Failed to set proxy blanket" );
+	}
+
+	~WmiService( ) {
+		if ( pSvc ) pSvc->Release( );
+		if ( pLoc ) pLoc->Release( );
+	}
+
+	IWbemServices * GetService( ) const { return pSvc; }
+};
+
+std::string QueryWmiSerialNumber( IWbemServices * pSvc , const std::wstring & query , const std::wstring & property ) {
+	IEnumWbemClassObject * pEnumerator = nullptr;
+	HRESULT hr = pSvc->ExecQuery( bstr_t( L"WQL" ) , bstr_t( query.c_str( ) ) ,
+		WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY , nullptr , &pEnumerator );
+	if ( FAILED( hr ) ) throw std::runtime_error( "WMI query failed" );
+
+	IWbemClassObject * pclsObj = nullptr;
+	ULONG uReturn = 0;
+	std::string result;
+
+	if ( pEnumerator->Next( WBEM_INFINITE , 1 , &pclsObj , &uReturn ) == S_OK && uReturn > 0 ) {
+		VARIANT vtProp;
+		hr = pclsObj->Get( property.c_str( ) , 0 , &vtProp , nullptr , nullptr );
+		if ( SUCCEEDED( hr ) ) {
+			result = _bstr_t( vtProp.bstrVal );
+			VariantClear( &vtProp );
+		}
+		pclsObj->Release( );
+	}
+	pEnumerator->Release( );
+	return result;
+}
+
 bool hardware::GetMotherboardSerialNumber( std::string * buffer ) {
-	if ( !CachedMotherBoardSerialNumber.EncryptedString.empty( ) && buffer != nullptr ) {
+	if ( !CachedMotherBoardSerialNumber.EncryptedString.empty( ) && buffer ) {
 		std::string * Str = StringCrypt::Get( ).DecryptString( CachedMotherBoardSerialNumber );
 		*buffer = *Str;
 		StringCrypt::Get( ).CleanString( Str );
 		return true;
 	}
 
-	HRESULT hres;
-
-	// Inicializa o COM
-	hres = CoInitializeEx( 0 , COINIT_MULTITHREADED );
-	if ( FAILED( hres ) ) {
-		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to initialize COM library" ) , RED );
+	try {
+		ComInitializer comInit;
+		WmiService wmiService;
+		auto serial = QueryWmiSerialNumber( wmiService.GetService( ) ,
+			L"SELECT SerialNumber FROM Win32_BaseBoard" ,
+			L"SerialNumber" );
+		CachedMotherBoardSerialNumber = StringCrypt::Get( ).EncryptString( serial );
+		if ( buffer ) *buffer = serial;
+		return true;
+	}
+	catch ( const std::exception & ex ) {
+		LogSystem::Get( ).ConsoleLog( _HWID , ex.what( ) , RED );
 		return false;
 	}
-
-	// Define os níveis de segurança do COM
-	hres = CoInitializeSecurity(
-		nullptr , -1 , nullptr , nullptr ,
-		RPC_C_AUTHN_LEVEL_DEFAULT ,
-		RPC_C_IMP_LEVEL_IMPERSONATE ,
-		nullptr , EOAC_NONE , nullptr );
-
-	if ( FAILED( hres ) ) {
-		CoUninitialize( );
-		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to initialize security" ) , RED );
-		return false;
-	}
-
-	// Obtém o ponteiro para o serviço WMI
-	IWbemLocator * pLoc = nullptr;
-
-	hres = CoCreateInstance(
-		CLSID_WbemLocator , 0 ,
-		CLSCTX_INPROC_SERVER ,
-		IID_IWbemLocator , ( LPVOID * ) &pLoc );
-
-	if ( FAILED( hres ) ) {
-		CoUninitialize( );
-		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to create IWbemLocator object" ) , RED );
-		return false;
-	}
-
-	IWbemServices * pSvc = nullptr;
-
-	// Conecta-se ao namespace root\cimv2
-	hres = pLoc->ConnectServer(
-		_bstr_t( L"ROOT\\CIMV2" ) , nullptr , nullptr , 0 ,
-		NULL , 0 , 0 , &pSvc );
-
-	if ( FAILED( hres ) ) {
-		pLoc->Release( );
-		CoUninitialize( );
-		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Could not connect to WMI namespace" ) , RED );
-		return false;
-	}
-
-	// Define os níveis de segurança do proxy
-	hres = CoSetProxyBlanket(
-		pSvc , RPC_C_AUTHN_WINNT , RPC_C_AUTHZ_NONE , nullptr ,
-		RPC_C_AUTHN_LEVEL_CALL , RPC_C_IMP_LEVEL_IMPERSONATE ,
-		nullptr , EOAC_NONE );
-
-	if ( FAILED( hres ) ) {
-		pSvc->Release( );
-		pLoc->Release( );
-		CoUninitialize( );
-		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Could not set proxy blanket" ) , RED );
-		return false;
-	}
-
-	// Faz a consulta WMI
-	IEnumWbemClassObject * pEnumerator = nullptr;
-	hres = pSvc->ExecQuery(
-		bstr_t( xorstr_( "WQL" ) ) ,
-		bstr_t( xorstr_( "SELECT SerialNumber FROM Win32_BaseBoard" ) ) ,
-		WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY ,
-		nullptr ,
-		&pEnumerator );
-
-	if ( FAILED( hres ) ) {
-		pSvc->Release( );
-		pLoc->Release( );
-		CoUninitialize( );
-		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Query for motherboard serial number failed" ) , RED );
-		return false;
-	}
-
-	IWbemClassObject * pclsObj = nullptr;
-	ULONG uReturn = 0;
-	std::string serialNumber;
-
-	while ( pEnumerator ) {
-		HRESULT hr = pEnumerator->Next( WBEM_INFINITE , 1 , &pclsObj , &uReturn );
-		if ( 0 == uReturn ) {
-			break;
-		}
-
-		VARIANT vtProp;
-		hr = pclsObj->Get( L"SerialNumber" , 0 , &vtProp , nullptr , nullptr );
-		if ( SUCCEEDED( hr ) ) {
-			serialNumber = _bstr_t( vtProp.bstrVal );
-			VariantClear( &vtProp );
-		}
-
-		pclsObj->Release( );
-	}
-
-	// Libera recursos
-	pSvc->Release( );
-	pLoc->Release( );
-	pEnumerator->Release( );
-	CoUninitialize( );
-
-	CachedMotherBoardSerialNumber = StringCrypt::Get( ).EncryptString( serialNumber );
-
-	if ( buffer != nullptr )
-		*buffer = serialNumber;
-	return true;
 }
 
 bool hardware::GetDiskSerialNumber( std::string * buffer ) {
-	if ( !CachedDiskSerialNumber.EncryptedString.empty( ) && buffer != nullptr ) {
+	if ( !CachedDiskSerialNumber.EncryptedString.empty( ) && buffer ) {
 		std::string * Str = StringCrypt::Get( ).DecryptString( CachedDiskSerialNumber );
 		*buffer = *Str;
 		StringCrypt::Get( ).CleanString( Str );
 		return true;
 	}
 
-
-	HRESULT hres;
-
-	// Inicializa o COM
-	hres = CoInitializeEx( 0 , COINIT_MULTITHREADED );
-	if ( FAILED( hres ) ) {
-		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to initialize COM library" ) , RED );
+	try {
+		ComInitializer comInit;
+		WmiService wmiService;
+		auto serial = QueryWmiSerialNumber( wmiService.GetService( ) ,
+			L"SELECT SerialNumber FROM Win32_DiskDrive" ,
+			L"SerialNumber" );
+		CachedDiskSerialNumber = StringCrypt::Get( ).EncryptString( serial );
+		if ( buffer ) *buffer = serial;
+		return true;
+	}
+	catch ( const std::exception & ex ) {
+		LogSystem::Get( ).ConsoleLog( _HWID , ex.what( ) , RED );
 		return false;
 	}
-
-	// Define os níveis de segurança do COM
-	hres = CoInitializeSecurity(
-		nullptr , -1 , nullptr , nullptr ,
-		RPC_C_AUTHN_LEVEL_DEFAULT ,
-		RPC_C_IMP_LEVEL_IMPERSONATE ,
-		nullptr , EOAC_NONE , nullptr );
-
-	if ( FAILED( hres ) ) {
-		CoUninitialize( );
-		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to initialize security" ) , RED );
-		return false;
-	}
-
-	// Obtém o ponteiro para o serviço WMI
-	IWbemLocator * pLoc = nullptr;
-
-	hres = CoCreateInstance(
-		CLSID_WbemLocator , 0 ,
-		CLSCTX_INPROC_SERVER ,
-		IID_IWbemLocator , ( LPVOID * ) &pLoc );
-
-	if ( FAILED( hres ) ) {
-		CoUninitialize( );
-		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to create IWbemLocator object" ) , RED );
-		return false;
-	}
-
-	IWbemServices * pSvc = nullptr;
-
-	// Conecta-se ao namespace root\cimv2
-	hres = pLoc->ConnectServer(
-		_bstr_t( L"ROOT\\CIMV2" ) , nullptr , nullptr , 0 ,
-		NULL , 0 , 0 , &pSvc );
-
-	if ( FAILED( hres ) ) {
-		pLoc->Release( );
-		CoUninitialize( );
-		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Could not connect to WMI namespace" ) , RED );
-		return false;
-	}
-
-	// Define os níveis de segurança do proxy
-	hres = CoSetProxyBlanket(
-		pSvc , RPC_C_AUTHN_WINNT , RPC_C_AUTHZ_NONE , nullptr ,
-		RPC_C_AUTHN_LEVEL_CALL , RPC_C_IMP_LEVEL_IMPERSONATE ,
-		nullptr , EOAC_NONE );
-
-	if ( FAILED( hres ) ) {
-		pSvc->Release( );
-		pLoc->Release( );
-		CoUninitialize( );
-		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Could not set proxy blanket" ) , RED );
-		return false;
-	}
-
-	// Faz a consulta WMI
-	IEnumWbemClassObject * pEnumerator = nullptr;
-	hres = pSvc->ExecQuery(
-		bstr_t( xorstr_( "WQL" ) ) ,
-		bstr_t( xorstr_( "SELECT SerialNumber FROM Win32_DiskDrive" ) ) ,
-		WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY ,
-		nullptr ,
-		&pEnumerator );
-
-	if ( FAILED( hres ) ) {
-		pSvc->Release( );
-		pLoc->Release( );
-		CoUninitialize( );
-		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Query for disk drive serial number failed" ) , RED );
-		return false;
-	}
-
-	IWbemClassObject * pclsObj = nullptr;
-	ULONG uReturn = 0;
-	std::string serialNumber;
-
-	while ( pEnumerator ) {
-		HRESULT hr = pEnumerator->Next( WBEM_INFINITE , 1 , &pclsObj , &uReturn );
-		if ( 0 == uReturn ) {
-			break;
-		}
-
-		VARIANT vtProp;
-		hr = pclsObj->Get( L"SerialNumber" , 0 , &vtProp , nullptr , nullptr );
-		if ( SUCCEEDED( hr ) ) {
-			serialNumber = _bstr_t( vtProp.bstrVal );
-			VariantClear( &vtProp );
-		}
-
-		pclsObj->Release( );
-	}
-
-	// Libera recursos
-	pSvc->Release( );
-	pLoc->Release( );
-	pEnumerator->Release( );
-	CoUninitialize( );
-
-	CachedDiskSerialNumber = StringCrypt::Get( ).EncryptString( serialNumber );
-
-	if ( buffer != nullptr )
-		*buffer = serialNumber;
-
-	return true;
 }
-
 std::string checkRegistryForSteamPath( ) {
 	HKEY hKey;
 	std::string path = xorstr_( "SOFTWARE\\Valve\\Steam" );

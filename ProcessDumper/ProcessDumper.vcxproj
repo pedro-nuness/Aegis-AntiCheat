@@ -157,20 +157,20 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="client\sender.cpp" />
+    <ClCompile Include="Client\client.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="externals\minhook\src\buffer.c" />
     <ClCompile Include="externals\minhook\src\hde\hde32.c" />
     <ClCompile Include="externals\minhook\src\hde\hde64.c" />
     <ClCompile Include="externals\minhook\src\hook.c" />
     <ClCompile Include="externals\minhook\src\trampoline.c" />
-    <ClCompile Include="hardware\hardware.cpp" />
     <ClCompile Include="monitoring\monitoring.cpp" />
+    <ClCompile Include="utils\SHA1\sha1.cpp" />
     <ClCompile Include="utils\utils.cpp" />
     <ClCompile Include="utils\File\File.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="client\sender.h" />
+    <ClInclude Include="Client\client.h" />
     <ClInclude Include="externals\minhook\include\MinHook.h" />
     <ClInclude Include="externals\minhook\MinHook.h" />
     <ClInclude Include="externals\minhook\src\buffer.h" />
@@ -181,10 +181,10 @@
     <ClInclude Include="externals\minhook\src\hde\table64.h" />
     <ClInclude Include="externals\minhook\src\trampoline.h" />
     <ClInclude Include="globals.h" />
-    <ClInclude Include="hardware\hardware.h" />
     <ClInclude Include="internal\hooks.hpp" />
     <ClInclude Include="imports.h" />
     <ClInclude Include="monitoring\monitoring.h" />
+    <ClInclude Include="utils\SHA1\sha1.h" />
     <ClInclude Include="utils\utils.h" />
     <ClInclude Include="utils\File\File.h" />
     <ClInclude Include="utils\security.h" />

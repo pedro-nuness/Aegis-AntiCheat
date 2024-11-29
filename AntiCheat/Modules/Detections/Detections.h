@@ -37,7 +37,6 @@ class Detections : public ThreadHolder {
 	std::mutex AccessGuard;
 
 	DWORD MomProcess = 0 , ProtectProcess = 0;
-	std::vector<DetectionStruct> cDetections;
 	std::vector<std::string> LoadedDlls;
 	std::vector<std::string> PendingLoadedDlls;
 
@@ -46,7 +45,10 @@ class Detections : public ThreadHolder {
 	std::vector<DWORD> AllowedThreads;
 	bool RegisteredThreads = false;
 
-	bool DoesFunctionAppearHooked( std::string moduleName , std::string functionName );
+	bool DoesFunctionAppearHooked( std::string moduleName , std::string functionName, const unsigned char * expectedBytes );
+
+	bool IsIATHooked( std::string & moduleName );
+	bool IsEATHooked( std::string & moduleName );
 
 	void CheckLoadedDrivers( );
 	void CheckLoadedDlls( );

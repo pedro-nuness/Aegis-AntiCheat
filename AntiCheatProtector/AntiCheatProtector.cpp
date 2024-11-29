@@ -23,7 +23,7 @@
 DWORD WINAPI main( PVOID base )
 {
 	SetErrorMode( SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX );
-	Preventions::Get( ).Deploy( );
+	
 
 #ifdef  _DEBUG
 	AllocConsole( );
@@ -60,19 +60,18 @@ DWORD WINAPI main( PVOID base )
 	Detections DetectionsEvents;
 
 	CommunicationEvents.start( );
-
-	while ( !Globals::Get( ).VerifiedSession )
-		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
-
-
 	std::vector<std::pair<ThreadHolder * , int>> threads = {
 		std::make_pair( &CommunicationEvents, COMMUNICATION ) ,
 		std::make_pair( &DetectionsEvents, DETECTIONS )
 	};
 
+	Globals::Get( ).CommunicationObjectPointer = &CommunicationEvents;
+
 	DetectionsEvents.start( );
 	ThreadGuard monitor( threads );
 	monitor.start( );
+
+	Preventions::Get( ).Deploy( );
 
 	while ( true ) {
 		std::this_thread::sleep_for( std::chrono::seconds( 10 ) );
