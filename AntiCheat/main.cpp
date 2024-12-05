@@ -6,6 +6,7 @@
 #include <winternl.h>
 #include <iostream>
 #include <cassert>
+#include <tlhelp32.h>
 
 #include "Modules/Triggers/Triggers.h"
 #include "Modules/Communication/Communication.h"
@@ -81,8 +82,29 @@ void Startup( ) {
 	}
 }
 
+// Function to get the parent process ID
+DWORD GetParentProcessId( DWORD processId ) {
+	HANDLE hSnapshot = CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS , 0 );
+	if ( hSnapshot == INVALID_HANDLE_VALUE ) {
+		return 0;
+	}
 
+	PROCESSENTRY32 processEntry;
+	processEntry.dwSize = sizeof( PROCESSENTRY32 );
 
+	if ( Process32First( hSnapshot , &processEntry ) ) {
+		do {
+			if ( processEntry.th32ProcessID == processId ) {
+				DWORD parentPid = processEntry.th32ParentProcessID;
+				CloseHandle( hSnapshot );
+				return parentPid;
+			}
+		} while ( Process32Next( hSnapshot , &processEntry ) );
+	}
+
+	CloseHandle( hSnapshot );
+	return 0;
+}
 
 
 int main( int argc , char * argv[ ] ) {
@@ -93,27 +115,73 @@ int main( int argc , char * argv[ ] ) {
 	Preventions::Get( ).Deploy( );
 	SetErrorMode( SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX );
 
-
 	::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
 
+	Globals::Get( ).SelfID = ::_getpid( );
+	FileChecking::Get( ).ValidateFiles( );
 #if true
+	DWORD ParentProcessId = GetParentProcessId( GetCurrentProcessId( ) );
+
+	if ( !ParentProcessId || ParentProcessId == GetCurrentProcessId() ) {
+		LogSystem::Get( ).Log( xorstr_( "[401] Initialization failed no parent"), false );
+		return 0;
+	}
+
 	//FreeConsole( );
 	//::ShowWindow( ::GetConsoleWindow( ) , SW_HIDE );
 	if ( argc < 3 ) {
-		LogSystem::Get( ).Log( xorstr_( "[401] Initialization failed" ) );
+		LogSystem::Get( ).Log( xorstr_( "[401] Initialization failed" ) , false );
 		return 0;
 	}
 
 	if ( !Utils::Get( ).isNumber( argv[ 1 ] ) || !Utils::Get( ).isNumber( argv[ 2 ] ) ) {
-		LogSystem::Get( ).Log( xorstr_( "[401] Invalid Input" ) );
+		LogSystem::Get( ).Log( xorstr_( "[401] Invalid Input" ) , false );
 		return 0;
 	}
-
 	Globals::Get( ).OriginalProcess = stoi( ( std::string ) argv[ 1 ] );
 	Globals::Get( ).ProtectProcess = stoi( ( std::string ) argv[ 2 ] );
 
+	/*std::string OriginalProcessPath = Mem::Get( ).GetProcessExecutablePath( Globals::Get( ).OriginalProcess );
+
+	if ( OriginalProcessPath.empty( ) ) {
+		LogSystem::Get( ).Log( xorstr_( "[401] Can't get original process path!" ) );
+		return 0;
+	}
+	system( "pause" );
+	std::string OriginalProcessHash = Mem::Get( ).GetFileHash( OriginalProcessPath );
+	if ( OriginalProcessHash.empty( ) ) {
+		LogSystem::Get( ).Log( xorstr_( "[401] Can't get original process hash!" ) );
+		return 0;
+	}
+	Globals::Get( ).OriginalProcessHash = OriginalProcessHash;
+	{
+		std::cout << "trying to download!\n";
+		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
+
+		std::vector<char> OriginalLauncherMemory;
+		if ( !Utils::Get( ).DownloadToBuffer( xorstr_( "https://download1076.mediafire.com/c9yznmvqavegRUmomfayh0JMiTBzWAsOUn44K-_gOI8HbrQeZe-4rV8QtMpVxWwOneIdBGltMzL4t_PmETpe8ygwzhuXwc8UJBA2CK1gEVvj4md6SGLjLhnfTSWRBla-sfAkt4ZtYGXDRHiJwn1Y66571g8xw7Pl2jYGYAvMRxnuGQ/oqngyfw6l8fd1s1/LauncherApocalypse_1.0.0.exe" ) , OriginalLauncherMemory ) ) {
+			LogSystem::Get( ).Log( xorstr_( "[401] Failed to require file!" ) );
+			return 0;
+		}
+
+		std::cout << "downloaded!\n";
+		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
+
+		std::string AuthenticLauncherHash = Mem::Get( ).GenerateVecCharHash( OriginalLauncherMemory );
+		if ( AuthenticLauncherHash.empty( ) ) {
+			LogSystem::Get( ).Log( xorstr_( "[401] Failed to get required file hash!" ) );
+			return 0;
+		}
+
+		if ( AuthenticLauncherHash != OriginalProcessHash ) {
+			LogSystem::Get( ).Log( xorstr_( "[401] Failed initialize!" ) );
+			return 0;
+		}
+
+	}*/
+
 	if ( !Communication::InitializeClient( ) ) {
-		LogSystem::Get( ).Log( xorstr_( "Can't init client" ) );
+		LogSystem::Get( ).Log( xorstr_( "Can't init client" ) , false );
 	}
 	else {
 		if ( !client::Get( ).SendPingToServer( ) ) {
@@ -134,8 +202,7 @@ int main( int argc , char * argv[ ] ) {
 		::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
 #endif // !DEBUG
 
-		Globals::Get( ).SelfID = ::_getpid( );
-		FileChecking::Get( ).ValidateFiles( );
+	
 
 		Startup( );
 	}

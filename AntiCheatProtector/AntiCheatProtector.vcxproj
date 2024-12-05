@@ -145,6 +145,7 @@
     <ClCompile Include="externals\minhook\src\hde\hde64.c" />
     <ClCompile Include="externals\minhook\src\hook.c" />
     <ClCompile Include="externals\minhook\src\trampoline.c" />
+    <ClCompile Include="Modules\AntiDebugger\AntiDebugger.cpp" />
     <ClCompile Include="Modules\Detections\Detections.cpp" />
     <ClCompile Include="Modules\Communication\Communication.cpp" />
     <ClCompile Include="Modules\ThreadGuard\ThreadGuard.cpp" />
@@ -176,6 +177,7 @@
     <ClInclude Include="externals\minhook\src\hde\table32.h" />
     <ClInclude Include="externals\minhook\src\hde\table64.h" />
     <ClInclude Include="externals\minhook\src\trampoline.h" />
+    <ClInclude Include="Modules\AntiDebugger\AntiDebugger.h" />
     <ClInclude Include="Modules\Detections\Detections.h" />
     <ClInclude Include="Modules\Communication\Communication.h" />
     <ClInclude Include="Modules\ThreadGuard\ThreadGuard.h" />

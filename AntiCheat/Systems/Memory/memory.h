@@ -38,6 +38,7 @@ public:
 		std::vector<_SYSTEM_HANDLE> EnumerateHandles( DWORD processID );
 		std::vector<_SYSTEM_HANDLE> DetectOpenHandlesToProcess( );
 		std::vector<_SYSTEM_HANDLE> GetHandles( );
+		bool CheckDangerousPermissions( HANDLE handle , DWORD * buffer );
 	};
 
 	class Process : public CSingleton<Process> {
@@ -74,6 +75,7 @@ public:
 	bool ReadFileToMemory( const std::string & file_path , std::vector<uint8_t> * out_buffer );
 	std::string  GetFileHash( std::string path );
 	std::string  GenerateHash( std::string str );
+	std::string  GenerateVecCharHash( std::vector<char> msg );
 	bool IsPIDRunning( DWORD PID );
 	std::string GetProcessName( DWORD PID );
 	bool DumpProcessMemory( HANDLE hProcess , std::vector<MemoryRegion> & memoryDump );

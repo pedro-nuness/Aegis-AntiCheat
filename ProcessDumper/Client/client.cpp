@@ -49,7 +49,6 @@ bool client::InitializeConnection( ) {
 	serverAddr.sin_addr.s_addr = inet_addr( this->ipaddres.c_str( ) );
 
 	if ( connect( sock , ( sockaddr * ) &serverAddr , sizeof( serverAddr ) ) == SOCKET_ERROR ) {
-		std::cout << "connect failed\n";
 		//LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Connection to server failed. Error code: " ) + std::to_string( WSAGetLastError( ) ) , RED );
 		closesocket( sock );
 		WSACleanup( );
@@ -132,7 +131,6 @@ bool client::SendData( std::string data , CommunicationType type , bool encrypt 
 
 	if ( encrypt ) {
 		if(!Utils::Get( ).encryptMessage( encryptedMessage , encryptedMessage , key , this->iv )){
-			std::cout << "encrypt failed!\n";
 			return false;
 		}
 	}
@@ -189,7 +187,6 @@ bool client::SendMessageToServer( std::string Message, CommunicationType type ) 
 	js[ xorstr_( "key" ) ] = _key;
 	js[ xorstr_( "password" ) ] = Utils::Get( ).GenerateHash( _key + salt );
 	if ( !InitializeConnection( ) ) {
-		std::cout << "Initialing failed!\n";
 		//LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to initialize connection!" ) , RED );
 		return false;
 	}

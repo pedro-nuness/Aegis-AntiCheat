@@ -32,6 +32,7 @@ client::~client( ) {}
 
 #define key xorstr_("ib33o5m8zsqlcgys3w46cfmtn8ztg1kn")
 #define salt xorstr_("8d88db7a1cc2512169bc970c2e2e7498")
+#define IV xorstr_("ume9ugz3m7lgch1z")
 
 bool client::InitializeConnection( ) {
 	WSADATA wsaData;
@@ -101,7 +102,7 @@ bool client::GetResponse( CommunicationResponse * response ) {
 
 	std::string encryptedMessage( sizeBuffer , sizeof( sizeBuffer ) );
 
-	if ( !Utils::Get( ).decryptMessage( encryptedMessage , encryptedMessage , key , this->IV ) ) {
+	if ( !Utils::Get( ).decryptMessage( encryptedMessage , encryptedMessage , key , IV ) ) {
 		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to decrypt message" ) , RED );
 		return false;
 	}
@@ -133,7 +134,7 @@ bool client::SendData( std::string data , CommunicationType type , bool encrypt 
 
 	std::string encryptedMessage;
 	if ( encrypt ) {
-		if ( !Utils::Get( ).encryptMessage( data , encryptedMessage , key , this->IV ) ) {
+		if ( !Utils::Get( ).encryptMessage( data , encryptedMessage , key , IV ) ) {
 			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to encrypt the message." ) , RED );
 			return false;
 		}
@@ -175,6 +176,51 @@ bool client::SendData( std::string data , CommunicationType type , bool encrypt 
 	return true;
 }
 
+bool client::SendDataToServer( std::string str , CommunicationType type ) {
+	json js;
+	try {
+		js = json::parse( str );
+	}
+	catch ( json::parse_error error ) {
+		LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "failed to parse message to json!" ) , YELLOW );
+		return false;
+	}
+
+	bool success = false;
+
+	if ( !InitializeConnection( ) ) {
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to initialize connection!" ) , RED );
+		return false;
+	}
+
+	success = SendData( str , type , type == WARN || type == BAN ? false : true );
+
+	if ( success ) {
+		CommunicationResponse response;
+		GetResponse( &response );
+
+		switch ( response ) {
+		case RECEIVED:
+			break;
+		case RECEIVE_ERROR:
+			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Ping failed!" ) , RED );
+			success = false;
+			break;
+		case RECEIVE_BANNED:
+			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "You have been banned!" ) , RED );
+			LogSystem::Get( ).LogWithMessageBox( xorstr_( "Server denied ping" ) , xorstr_( "You have been banned!" ) );
+			success = false;
+			break;
+		}
+	}
+
+	CloseConnection( );
+
+
+	return success;
+}
+
+
 bool GetHWIDJson( json & js ) {
 
 	std::vector<std::string> MacAddress = hardware::Get( ).getMacAddress( );
@@ -204,7 +250,7 @@ bool GetHWIDJson( json & js ) {
 	js[ xorstr_( "mb" ) ] = MotherboardID;
 
 
-	std::string Ip = hardware::Get( ).GetIp(  );
+	std::string Ip = hardware::Get( ).GetIp( );
 
 	if ( Ip.empty( ) ) {
 		return false;
@@ -217,6 +263,7 @@ bool GetHWIDJson( json & js ) {
 		js[ xorstr_( "warn_message" ) ] = xorstr_( "Nickname hash corrupted, user may have changed its user!" );
 	}
 	js[ xorstr_( "nickname" ) ] = Nickname;
+
 
 	std::vector<std::string> LoggedUsers;
 	if ( !hardware::Get( ).GetLoggedUsers( &LoggedUsers ) ) {
@@ -240,32 +287,7 @@ bool client::SendPingToServer( ) {
 		return false;
 	}
 
-	if ( !InitializeConnection( ) ) {
-		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to initialize connection!" ) , RED );
-		return false;
-	}
-
-	bool success = SendData( js.dump( ) , CommunicationType::PING );
-	CommunicationResponse Response;
-	GetResponse( &Response );
-
-	switch ( Response ) {
-	case RECEIVED:
-		break;
-	case RECEIVE_ERROR:
-		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Ping failed!" ) , RED );
-		success = false;
-		break;
-	case RECEIVE_BANNED:
-		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "You have been banned!" ) , RED );
-		LogSystem::Get( ).LogWithMessageBox( xorstr_( "Server denied ping" ) , xorstr_( "You have been banned!" ) );
-		success = false;
-		break;
-	}
-
-	CloseConnection( );
-
-	return success;
+	return SendDataToServer( js.dump( ) , CommunicationType::PING );
 }
 
 bool client::SendMessageToServer( std::string Message ) {
@@ -281,37 +303,10 @@ bool client::SendMessageToServer( std::string Message ) {
 	}
 
 	js[ xorstr_( "message" ) ] = Message;
-	if ( !InitializeConnection( ) ) {
-		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to initialize connection!" ) , RED );
-		return false;
-	}
-
-	bool success = SendData( js.dump( ) , CommunicationType::MESSAGE );
-
-	CommunicationResponse Response;
-	GetResponse( &Response );
-
-	switch ( Response ) {
-	case RECEIVED:
-		break;
-	case RECEIVE_ERROR:
-		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Ping failed!" ) , RED );
-		success = false;
-		break;
-	case RECEIVE_BANNED:
-		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "You have been banned!" ) , RED );
-		LogSystem::Get( ).LogWithMessageBox( xorstr_( "Server denied ping" ) , xorstr_( "You have been banned!" ) );
-		success = false;
-		break;
-	}
-
-	CloseConnection( );
-
-	return success;
+	return SendDataToServer( js.dump( ) , CommunicationType::MESSAGE );
 }
 
 bool client::SendPunishToServer( std::string Message , bool Ban ) {
-
 	if ( !Ban )
 		PunishSystem::Get( ).UnsafeSession( );
 
@@ -347,34 +342,5 @@ bool client::SendPunishToServer( std::string Message , bool Ban ) {
 	js[ xorstr_( "image_hash" ) ] = hash;
 	js[ xorstr_( "message" ) ] = Message;
 
-	if ( !InitializeConnection( ) ) {
-		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to initialize connection!" ) , RED );
-		return false;
-	}
-
-	bool success = SendData( js.dump( ) , Ban ? CommunicationType::BAN : CommunicationType::WARN , false );
-
-	CommunicationResponse Response;
-	GetResponse( &Response );
-
-	switch ( Response ) {
-	case RECEIVED:
-		break;
-	case RECEIVE_ERROR:
-		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Ping failed!" ) , RED );
-		success = false;
-		break;
-	case RECEIVE_BANNED:
-		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "You have been banned!" ) , RED );
-		LogSystem::Get( ).LogWithMessageBox( xorstr_( "Server denied ping" ) , xorstr_( "You have been banned!" ) );
-		success = false;
-		break;
-	}
-
-	if ( !CloseConnection( ) ) {
-		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to close connection!" ) , RED );
-		return false;
-	}
-
-	return success;
+	return SendDataToServer( js.dump( ) , Ban ? CommunicationType::BAN : CommunicationType::WARN );
 }

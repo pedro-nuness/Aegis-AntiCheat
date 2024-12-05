@@ -177,7 +177,7 @@ void Listener::threadFunction( ) {
 	// Converter o endereço IP para string e imprimir
 	char ipStr[ INET_ADDRSTRLEN ];
 	inet_ntop( AF_INET , &serverAddr.sin_addr , ipStr , sizeof( ipStr ) );
-	LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Server listening on port " ) + std::string( ipStr ) + std::to_string( serverPort ) , COLORS::GREEN );
+	LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Server listening on port " ) + std::to_string( serverPort ) , COLORS::GREEN );
 
 
 	std::thread( &Listener::ProcessMessages , this ).detach( );

@@ -300,6 +300,38 @@ std::string Utils::ConvertLPCWSTRToString( LPCWSTR wideString ) {
 	return convertedString;
 }
 
+
+bool Utils::DownloadToBuffer( const std::string & URL , std::vector<char> & buffer ) {
+	HINTERNET interwebs = InternetOpenA( "Mozilla/5.0" , INTERNET_OPEN_TYPE_DIRECT , NULL , NULL , NULL );
+	if ( !interwebs ) {
+		return false;
+	}
+
+	HINTERNET urlFile = InternetOpenUrlA( interwebs , URL.c_str( ) , NULL , NULL , NULL , NULL );
+	if ( !urlFile ) {
+		InternetCloseHandle( interwebs );
+		return false;
+	}
+
+	const DWORD chunkSize = 4096; // Tamanho do bloco a ser lido a cada operação
+	std::vector<char> tempBuffer( chunkSize ); // Buffer temporário
+	DWORD bytesRead;
+	buffer.clear( );
+
+	do {
+		if ( !InternetReadFile( urlFile , tempBuffer.data( ) , tempBuffer.size( ) , &bytesRead ) ) {
+			InternetCloseHandle( urlFile );
+			InternetCloseHandle( interwebs );
+			return false; // Falha ao ler
+		}
+		buffer.insert( buffer.end( ) , tempBuffer.begin( ) , tempBuffer.begin( ) + bytesRead );
+	} while ( bytesRead > 0 );
+
+	InternetCloseHandle( urlFile );
+	InternetCloseHandle( interwebs );
+	return true;
+}
+
 std::string Utils::DownloadString( std::string URL ) {
 	HINTERNET interwebs = InternetOpenA( "Mozilla/5.0" , INTERNET_OPEN_TYPE_DIRECT , NULL , NULL , NULL );
 	HINTERNET urlFile;

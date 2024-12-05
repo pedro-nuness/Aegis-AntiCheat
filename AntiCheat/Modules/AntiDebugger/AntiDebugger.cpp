@@ -474,39 +474,39 @@ void AntiDebugger::threadFunction( ) {
 
 		std::string log;
 
-		//if ( _IsDebuggerPresent( ) ) {
-		//	log += xorstr_( "Debugger present\n" );
-		//}
-		//if ( _IsDebuggerPresent_HeapFlags( ) ) {
-		//	log += xorstr_( "Debugger detected via heap flags\n" );
-		//}
-		//if ( _IsDebuggerPresent_CloseHandle( ) ) {
-		//	log += xorstr_( "Debugger detected via CloseHandle\n" );
-		//}
-		//if ( _IsDebuggerPresent_RemoteDebugger( ) ) {
-		//	log += xorstr_( "Remote debugger detected\n" );
-		//}
-		//if ( _IsDebuggerPresent_VEH( ) ) {
-		//	log += xorstr_( "Debugger detected via VEH\n" );
-		//}
-		//if ( _IsDebuggerPresent_DbgBreak( ) ) {
-		//	log += xorstr_( "Debugger detected via DbgBreak\n" );
-		//}
-		//if ( _IsDebuggerPresent_PEB( ) ) {
-		//	log += xorstr_( "Debugger detected via PEB\n" );
-		//}
-		//if ( _IsDebuggerPresent_DebugPort( ) ) {
-		//	log += xorstr_( "Debugger detected via DebugPort\n" );
-		//}
-		//if ( _IsDebuggerPresent_ProcessDebugFlags( ) ) {
-		//	log += xorstr_( "Debugger detected via ProcessDebugFlags\n" );
-		//}
-		//if ( _IsKernelDebuggerPresent( ) ) {
-		//	log += xorstr_( "Kernel debugger present\n" );
-		//}
-		//if ( _IsKernelDebuggerPresent_SharedKData( ) ) {
-		//	log += xorstr_( "Kernel debugger detected via SharedKData\n" );
-		//}
+		if ( _IsDebuggerPresent( ) ) {
+			log += xorstr_( "Debugger present\n" );
+		}
+		if ( _IsDebuggerPresent_HeapFlags( ) ) {
+			log += xorstr_( "Debugger detected via heap flags\n" );
+		}
+		if ( _IsDebuggerPresent_CloseHandle( ) ) {
+			log += xorstr_( "Debugger detected via CloseHandle\n" );
+		}
+		if ( _IsDebuggerPresent_RemoteDebugger( ) ) {
+			log += xorstr_( "Remote debugger detected\n" );
+		}
+		if ( _IsDebuggerPresent_VEH( ) ) {
+			log += xorstr_( "Debugger detected via VEH\n" );
+		}
+		if ( _IsDebuggerPresent_DbgBreak( ) ) {
+			log += xorstr_( "Debugger detected via DbgBreak\n" );
+		}
+		if ( _IsDebuggerPresent_PEB( ) ) {
+			log += xorstr_( "Debugger detected via PEB\n" );
+		}
+		if ( _IsDebuggerPresent_DebugPort( ) ) {
+			log += xorstr_( "Debugger detected via DebugPort\n" );
+		}
+		if ( _IsDebuggerPresent_ProcessDebugFlags( ) ) {
+			log += xorstr_( "Debugger detected via ProcessDebugFlags\n" );
+		}
+		if ( _IsKernelDebuggerPresent( ) ) {
+			log += xorstr_( "Kernel debugger present\n" );
+		}
+		if ( _IsKernelDebuggerPresent_SharedKData( ) ) {
+			log += xorstr_( "Kernel debugger detected via SharedKData\n" );
+		}
 
 		LogSystem::Get( ).ConsoleLog( _ANTIDEBUGGER , log , GRAY );
 

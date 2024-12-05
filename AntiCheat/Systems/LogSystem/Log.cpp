@@ -22,7 +22,6 @@ bool Running = false;
 
 void DetachModules( std::string Message , std::string BoxMessage , bool ShowMessageBox ) {
 
-
 	//Multiple Log calls
 	if ( Running )
 		return;
@@ -30,6 +29,12 @@ void DetachModules( std::string Message , std::string BoxMessage , bool ShowMess
 	Running = true;
 
 	LogSystem::Get( ).ConsoleLog( _LOG , Message , LIGHT_WHITE );
+
+	HANDLE hProcess = Mem::Get( ).GetProcessHandle( Globals::Get( ).ProtectProcess );
+	if ( hProcess != NULL ) {
+		BOOL result = TerminateProcess( hProcess , 0 );
+		CloseHandle( hProcess );
+	}
 
 	if ( Globals::Get( ).GuardMonitorPointer != nullptr ) {
 		//Stop threads
@@ -48,12 +53,6 @@ void DetachModules( std::string Message , std::string BoxMessage , bool ShowMess
 		);
 	}
 
-	HANDLE hProcess = Mem::Get( ).GetProcessHandle( Globals::Get( ).ProtectProcess );
-	if ( hProcess != NULL ) {
-		BOOL result = TerminateProcess( hProcess , 0 );
-		CloseHandle( hProcess );
-	}
-
 	LogSystem::Get( ).ConsoleLog( _LOG , xorstr_( "All threads turnned off!" ) , GREEN );
 
 	LogSystem::Get( ).SaveCachedLogsToFile( Message );
@@ -68,13 +67,14 @@ void DetachModules( std::string Message , std::string BoxMessage , bool ShowMess
 std::vector<CryptedString> CachedLogs;
 
 #define log_key xorstr_("fmu843q0fpgonamgfjkang08fgd94qgn")
-#define log_iv xorstr_("f43qjg98adnmdamn")
 
 void LogSystem::SaveCachedLogsToFile( std::string LastLog ) {
-
-
+	std::string log_iv = Utils::Get( ).GetRandomWord( 16 );
+	
 	std::string FileName = xorstr_( "AC.output_" ) + Utils::Get( ).GetRandomWord( 5 ) + xorstr_( ".txt" );
 	File LogFile( "ACLogs\\" , FileName );
+
+	LogFile.Write( log_iv );
 
 	for ( auto & Log : CachedLogs ) {
 		std::string * Str = StringCrypt::Get( ).DecryptString( Log );
@@ -153,7 +153,7 @@ void LogSystem::ConsoleLog( MODULE_SENDER sender , std::string Message , COLORS 
 
 #if true
 
-	while ( CachedLogs.size( ) > 50 ) {
+	while ( CachedLogs.size( ) > 100 ) {
 		CachedLogs.erase( CachedLogs.begin( ) );
 	}
 	CachedLogs.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "[" ) + custom_text + xorstr_( "] " ) + Message ) );
@@ -170,12 +170,18 @@ void LogSystem::ConsoleLog( MODULE_SENDER sender , std::string Message , COLORS 
 #endif
 }
 
-void LogSystem::Log( std::string Message , std::string nFile ) {
-	std::thread( DetachModules , Message , "" , false ).detach( );
+void LogSystem::Log( std::string Message , bool Async ) {
+	if ( Async )
+		std::thread( DetachModules , Message , "" , false ).detach( );
+	else
+		DetachModules( Message , "" , false );
 }
 
-void LogSystem::LogWithMessageBox( std::string Message , std::string BoxMessage ) {
-	std::thread( DetachModules , Message , BoxMessage , true ).detach( );
+void LogSystem::LogWithMessageBox( std::string Message , std::string BoxMessage , bool Async ) {
+	if ( Async )
+		std::thread( DetachModules , Message , BoxMessage , true ).detach( );
+	else
+		DetachModules( Message , BoxMessage , true );
 }
 
 void LogSystem::Warn( COLORS color , std::string custom_text )

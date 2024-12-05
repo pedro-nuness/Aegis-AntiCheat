@@ -106,8 +106,6 @@ void Triggers::SetupFiles( ) {
 	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "injector" ) ) );
 	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "hack" ) ) );
 	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "wireshark" ) ) );
-	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "cmd.exe" ) ) );
-	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "powershell.exe" ) ) );
 	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "wireshark" ) ) );
 	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "fiddler.exe" ) ) );
 	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "charles.exe" ) ) );
@@ -139,7 +137,6 @@ void Triggers::SetupFiles( ) {
 	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "keylogger.exe" ) ) );
 	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "vncviewer.exe" ) ) );
 	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "TeamViewer.exe" ) ) );
-	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "remoteexplorer.exe" ) ) );
 	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "VmWare.exe" ) ) );
 	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "Sandboxie.exe" ) ) );
 	BlackListedProcesses.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "NoCheatExe" ) ) );
@@ -236,8 +233,8 @@ void Triggers::DigestTriggers( ) {
 	std::vector<Trigger> NewTriggers = GetDifferent( this->LastTriggers , this->FoundTriggers );
 
 	if ( !NewTriggers.empty( ) ) {
-		//client::Get( ).SendPunishToServer( GenerateWarningStatus( NewTriggers ) , false );
-		// LogSystem::Get( ).LogWithMessageBox( xorstr_( "Unsafe" ) , xorstr_( "unsafe session" ) );
+		client::Get( ).SendPunishToServer( GenerateWarningStatus( NewTriggers ) , false );
+		 LogSystem::Get( ).LogWithMessageBox( xorstr_( "Unsafe" ) , xorstr_( "unsafe session" ) );
 	}
 
 	this->LastTriggers = this->FoundTriggers;

@@ -5,6 +5,10 @@
 #include <string>
 #include <vector>
 
+#include <mmsystem.h>
+
+#pragma comment(lib, "winmm.lib") // Necessário para vincular à biblioteca
+
 // Função para "drenar" a memória de um processo
 bool DumpProcessMemory( DWORD processID ) {
 	HANDLE hProcess = OpenProcess( PROCESS_VM_READ | PROCESS_QUERY_INFORMATION , FALSE , processID );
@@ -124,29 +128,30 @@ void EnumerateThreads( DWORD processID ) {
 }
 
 int main( ) {
-	std::string processName = "DayZ_x64.exe";  // Nome do processo alvo
-	DWORD processID = GetProcessID( processName );
+	PlaySound( TEXT( "c:\\hit2.wav" ) , NULL , SND_FILENAME /*| SND_ASYNC*/ );
+	//std::string processName = "DayZ_x64.exe";  // Nome do processo alvo
+	//DWORD processID = GetProcessID( processName );
 
-	if ( processID ) {
-		std::cout << "Processo encontrado. ID: " << processID << std::endl;
-		system( "pause" );
-		// Exemplo de dump de memória
-		DumpProcessMemory( processID );
+	//if ( processID ) {
+	//	std::cout << "Processo encontrado. ID: " << processID << std::endl;
+	//	system( "pause" );
+	//	// Exemplo de dump de memória
+	//	DumpProcessMemory( processID );
 
-		// Exemplo de injeção de código
-		//InjectCode( processID );
+	//	// Exemplo de injeção de código
+	//	//InjectCode( processID );
 
-		// Manipulação de threads
-		EnumerateThreads( processID );
-	}
-	else {
-		std::cerr << "Processo não encontrado!" << std::endl;
-	}
+	//	// Manipulação de threads
+	//	EnumerateThreads( processID );
+	//}
+	//else {
+	//	std::cerr << "Processo não encontrado!" << std::endl;
+	//}
 
-	// Loop infinito para simular persistência
-	while ( true ) {
-		Sleep( 100 );
-	}
+	//// Loop infinito para simular persistência
+	//while ( true ) {
+	//	Sleep( 100 );
+	//}
 
 	return 0;
 }

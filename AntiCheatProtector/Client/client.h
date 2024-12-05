@@ -1,7 +1,6 @@
 #pragma once
 #include <Windows.h>
 #include <string>
-#include "../Systems/Utils/singleton.h"
 #include "../Systems/Utils/xorstr.h"
 
 
@@ -20,11 +19,11 @@ enum CommunicationType {
 	MESSAGE
 };
 
-class client : public CSingleton<client>{
+class client {
 
 	//std::string key = xorstr_("ib33o5m8zsqlcgys3w46cfmtn8ztg1kn"); // 32 bytes para AES-256
-	std::string iv = xorstr_( "vbDRxXb3ObIZeVSN");  // 16 bytes para AES
-	std::string ipaddres = xorstr_( "127.0.0.10");
+	std::string iv = xorstr_( "vbDRxXb3ObIZeVSN" );  // 16 bytes para AES
+	std::string ipaddres = xorstr_( "127.0.0.10" );
 	int Port = 9669;
 
 	SOCKET CurrentSocket;
@@ -36,5 +35,5 @@ public:
 	client( );
 	~client( );
 
-	bool SendMessageToServer( std::string Message, CommunicationType );
+	bool SendMessageToServer( std::string Message , CommunicationType );
 };

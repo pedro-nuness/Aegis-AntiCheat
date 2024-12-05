@@ -18,6 +18,7 @@ class FileChecking : public CSingleton<FileChecking>
 	bool SearchFiles( );
 	bool GetNickname( );
 	bool GetSteamID( std::string * Buffer = nullptr );
+	bool CheckWindowsDumpSetting( );
 public:
 	bool CheckFile( F_CHECKER File );
 	bool ValidateFiles( );

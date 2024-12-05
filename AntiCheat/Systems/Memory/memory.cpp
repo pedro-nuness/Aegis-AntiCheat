@@ -16,14 +16,14 @@
 #include <aclapi.h>
 #include <sddl.h>
 #include <unordered_map>
-#include <algorithm>
-#include <iomanip>
+
 
 #include "..\Utils\singleton.h"
 #include "..\Utils\utils.h"
 #include "..\Utils\SHA1\sha1.h"
 #include "..\Utils\xorstr.h"
-#include "..\..\Globals\Globals.h"
+
+#include "..\LogSystem\Log.h"
 
 
 
@@ -55,7 +55,7 @@ std::vector<ThreadInfo> Mem::Thread::EnumerateThreads( DWORD processID ) {
 
 	HANDLE hThreadSnap = CreateToolhelp32Snapshot( TH32CS_SNAPTHREAD , 0 );
 	if ( hThreadSnap == INVALID_HANDLE_VALUE ) {
-		std::cerr << "Error: Unable to create snapshot of threads." << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Error: Unable to create snapshot of threads." ) , YELLOW );
 		return threadsInfo;
 	}
 
@@ -63,7 +63,7 @@ std::vector<ThreadInfo> Mem::Thread::EnumerateThreads( DWORD processID ) {
 	te32.dwSize = sizeof( THREADENTRY32 );
 
 	if ( !Thread32First( hThreadSnap , &te32 ) ) {
-		std::cerr << "Error: Unable to get first thread." << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Error: Unable to get first thread." ) , YELLOW );
 		CloseHandle( hThreadSnap );
 		return threadsInfo;
 	}
@@ -94,7 +94,7 @@ std::vector<ThreadInfo> Mem::Thread::EnumerateThreads( DWORD processID ) {
 #endif
 				}
 				else {
-					std::cerr << "Erro ao obter o contexto da thread." << std::endl;
+					LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Erro ao obter o contexto da thread." ) , YELLOW );
 				}
 
 
@@ -117,7 +117,7 @@ std::vector<ModuleInfo> Mem::Module::EnumerateModules( DWORD processID ) {
 
 	HANDLE hModuleSnap = CreateToolhelp32Snapshot( TH32CS_SNAPMODULE , processID );
 	if ( hModuleSnap == INVALID_HANDLE_VALUE ) {
-		std::cerr << "Error: Unable to create snapshot of modules for process ID " << processID << "." << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Error: Unable to create snapshot of modules for process ID " ) + std::to_string( processID ) , YELLOW );
 		return modulesInfo;
 	}
 
@@ -125,7 +125,7 @@ std::vector<ModuleInfo> Mem::Module::EnumerateModules( DWORD processID ) {
 	me32.dwSize = sizeof( MODULEENTRY32 );
 
 	if ( !Module32First( hModuleSnap , &me32 ) ) {
-		std::cerr << "Error: Unable to get first module." << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Error: Unable to get first module." ) , YELLOW );
 		CloseHandle( hModuleSnap );
 		return modulesInfo;
 	}
@@ -151,7 +151,7 @@ std::vector<SYSTEM_HANDLE> Mem::Handle::EnumerateHandles( DWORD processID ) {
 		GetModuleHandle( "ntdll.dll" ) , "NtQuerySystemInformation" );
 
 	if ( !NtQuerySystemInformation ) {
-		std::cerr << "Não foi possível obter NtQuerySystemInformation." << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Não foi possível obter NtQuerySystemInformation." ) , YELLOW );
 		return {};
 	}
 
@@ -166,7 +166,6 @@ std::vector<SYSTEM_HANDLE> Mem::Handle::EnumerateHandles( DWORD processID ) {
 			bufferSize *= 2;
 		}
 		else if ( !NT_SUCCESS( status ) ) {
-			std::cerr << "NtQuerySystemInformation falhou com status: 0x" << std::hex << status << std::endl;
 			free( handleInfo );
 			return {};
 		}
@@ -193,40 +192,66 @@ std::vector<SYSTEM_HANDLE> Mem::Handle::EnumerateHandles( DWORD processID ) {
 }
 
 
+bool Mem::Handle::CheckDangerousPermissions( HANDLE handle , DWORD * buffer ) {
+	typedef NTSTATUS( WINAPI * NtQueryObjectFunc )(
+		HANDLE ,
+		OBJECT_INFORMATION_CLASS ,
+		PVOID ,
+		ULONG ,
+		PULONG
+		);
 
-// Função para salvar os bytes da memória em um arquivo de texto
-void Mem::SaveFunctionBytesToFile( void * funcAddress , size_t numBytes , std::string outputFileName ) {
-	std::vector<unsigned char> bytes( numBytes );
-	SIZE_T bytesRead = 0;
-
-	// Lê os bytes da função na memória
-	if ( !ReadProcessMemory( GetCurrentProcess( ) , funcAddress , bytes.data( ) , numBytes , &bytesRead ) ) {
-		std::cerr << "Erro ao ler a memória da função. Código de erro: " << GetLastError( ) << std::endl;
-		return;
+	HMODULE ntdll = GetModuleHandle( "ntdll.dll" );
+	if ( !ntdll ) {
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Falha ao carregar ntdll.dll." ) , YELLOW );
+		return false;
 	}
 
-	// Abre o arquivo para escrita
-	std::ofstream outFile( outputFileName );
-	if ( !outFile ) {
-		std::cerr << "Erro ao criar o arquivo: " << outputFileName << std::endl;
-		return;
+	auto NtQueryObject = ( NtQueryObjectFunc ) GetProcAddress( ntdll , "NtQueryObject" );
+	if ( !NtQueryObject ) {
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Falha ao obter o endereço de NtQueryObject." ) , YELLOW );
+		return false;
 	}
 
-	// Escreve os bytes no formato de array C++
-	outFile << "unsigned char functionBytes[] = {\n    ";
-	for ( size_t i = 0; i < bytesRead; ++i ) {
-		outFile << "0x" << std::hex << std::uppercase << std::setw( 2 ) << std::setfill( '0' ) << static_cast< int >( bytes[ i ] );
-		if ( i < bytesRead - 1 ) {
-			outFile << ", ";
-		}
-		if ( ( i + 1 ) % 16 == 0 ) {
-			outFile << "\n    ";
-		}
-	}
-	outFile << "\n};\n";
+	struct OBJECT_BASIC_INFORMATION {
+		ULONG Attributes;
+		ACCESS_MASK GrantedAccess;
+		ULONG HandleCount;
+		ULONG PointerCount;
+		ULONG Reserved[ 10 ];
+	};
 
-	std::cout << "Bytes salvos com sucesso em: " << outputFileName << std::endl;
+	OBJECT_BASIC_INFORMATION objectInfo;
+	ULONG returnLength = 0;
+
+	NTSTATUS status = NtQueryObject(
+		handle ,
+		ObjectBasicInformation ,
+		&objectInfo ,
+		sizeof( objectInfo ) ,
+		&returnLength
+	);
+
+	if ( status != 0 ) {
+		return false;
+	}
+
+	DWORD dangerousFlags = PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_CREATE_THREAD |
+		PROCESS_DUP_HANDLE | PROCESS_QUERY_INFORMATION | PROCESS_ALL_ACCESS;
+
+	if ( buffer != nullptr )
+		*buffer = objectInfo.GrantedAccess;
+
+	if ( objectInfo.GrantedAccess & dangerousFlags ) {
+		return true;
+	}
+	else {
+		//std::cout << "Handle seguro: 0x" << std::hex << handle << std::endl;
+	}
+
+	return false;
 }
+
 
 std::vector<_SYSTEM_HANDLE> Mem::Handle::DetectOpenHandlesToProcess( )
 {
@@ -285,7 +310,7 @@ std::vector<ProcessInfo> Mem::Process::EnumerateProcesses( ) {
 
 	HANDLE hProcessSnap = CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS , 0 );
 	if ( hProcessSnap == INVALID_HANDLE_VALUE ) {
-		std::cerr << "Error: Unable to create snapshot of processes." << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Error: Unable to create snapshot of processes." ) , YELLOW );
 		return processesInfo;
 	}
 
@@ -293,7 +318,7 @@ std::vector<ProcessInfo> Mem::Process::EnumerateProcesses( ) {
 	pe32.dwSize = sizeof( PROCESSENTRY32 );
 
 	if ( !Process32First( hProcessSnap , &pe32 ) ) {
-		std::cerr << "Error: Unable to get first process." << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Error: Unable to get first process." ) , YELLOW );
 		CloseHandle( hProcessSnap );
 		return processesInfo;
 	}
@@ -333,7 +358,7 @@ ProcessInfo Mem::Process::GetProcessInfo( DWORD Pid ) {
 
 	HANDLE hProcessSnap = CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS , 0 );
 	if ( hProcessSnap == INVALID_HANDLE_VALUE ) {
-		std::cerr << "Error: Unable to create snapshot of processes." << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Error: Unable to create snapshot of processes." ) , YELLOW );
 		return processesInfo;
 	}
 
@@ -341,7 +366,7 @@ ProcessInfo Mem::Process::GetProcessInfo( DWORD Pid ) {
 	pe32.dwSize = sizeof( PROCESSENTRY32 );
 
 	if ( !Process32First( hProcessSnap , &pe32 ) ) {
-		std::cerr << "Error: Unable to get first process." << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Error: Unable to get first process." ) , YELLOW );
 		CloseHandle( hProcessSnap );
 		return processesInfo;
 	}
@@ -384,7 +409,7 @@ ProcessInfo Mem::Process::GetProcessInfo( std::string Name ) {
 
 	HANDLE hProcessSnap = CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS , 0 );
 	if ( hProcessSnap == INVALID_HANDLE_VALUE ) {
-		std::cerr << "Error: Unable to create snapshot of processes." << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Error: Unable to create snapshot of processes." ) , YELLOW );
 		return processesInfo;
 	}
 
@@ -392,7 +417,7 @@ ProcessInfo Mem::Process::GetProcessInfo( std::string Name ) {
 	pe32.dwSize = sizeof( PROCESSENTRY32 );
 
 	if ( !Process32First( hProcessSnap , &pe32 ) ) {
-		std::cerr << "Error: Unable to get first process." << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Error: Unable to get first process." ) , YELLOW );
 		CloseHandle( hProcessSnap );
 		return processesInfo;
 	}
@@ -436,7 +461,7 @@ std::vector<SYSTEM_HANDLE> Mem::GetHandlesForProcess( DWORD processId )
 		GetModuleHandle( "ntdll.dll" ) , "NtQuerySystemInformation" );
 
 	if ( !NtQuerySystemInformation ) {
-		std::cerr << "Não foi possível obter NtQuerySystemInformation." << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Não foi possível obter NtQuerySystemInformation." ) , YELLOW );
 		return {};
 	}
 
@@ -451,7 +476,6 @@ std::vector<SYSTEM_HANDLE> Mem::GetHandlesForProcess( DWORD processId )
 			bufferSize *= 2;
 		}
 		else if ( !NT_SUCCESS( status ) ) {
-			std::cerr << "NtQuerySystemInformation falhou com status: 0x" << std::hex << status << std::endl;
 			free( handleInfo );
 			return {};
 		}
@@ -532,8 +556,10 @@ std::string Mem::GetProcessExecutablePath( DWORD processID ) {
 
 bool Mem::ProcessIsOnSystemFolder( int pid ) {
 	std::string Path = GetProcessExecutablePath( pid );
-	std::transform( Path.begin( ) , Path.end( ) , Path.begin( ) , &Mem::asciitolower );
-	return Utils::Get( ).CheckStrings( Path , xorstr_( "c:\\windows\\" ) );
+
+	return Utils::Get( ).CheckStrings( Path , xorstr_( "\\System32\\" ) ) ||
+		Utils::Get( ).CheckStrings( Path , xorstr_( "\\SysWOW64\\" ) ) ||
+		Utils::Get( ).CheckStrings( Path , xorstr_( "\\system32\\" ) );
 }
 
 
@@ -644,6 +670,12 @@ std::string Mem::GenerateHash( std::string msg ) {
 	return sha1.getHash( );
 }
 
+std::string Mem::GenerateVecCharHash( std::vector<char> msg ) {
+	SHA1 sha1;
+	sha1.add( msg.data( ) , msg.size( ) );
+	return sha1.getHash( );
+}
+
 std::string Mem::ConvertWchar( WCHAR inCharText[ 260 ] )
 {
 	//convert from wide char to narrow char array
@@ -659,11 +691,10 @@ std::string Mem::ConvertWchar( WCHAR inCharText[ 260 ] )
 BOOL CALLBACK Mem::EnumWindowsProc( HWND hwnd , LPARAM lParam ) {
 	std::vector<WindowInfo> * Windows = reinterpret_cast< std::vector<WindowInfo> * >( lParam );
 	DWORD processId;
-
 	GetWindowThreadProcessId( hwnd , &processId );
 
-	if ( processId != Globals::Get( ).ProtectProcess )
-		Windows->push_back( { hwnd, processId } );
+
+	Windows->push_back( { hwnd, processId } );
 	return TRUE;
 }
 
@@ -692,7 +723,7 @@ bool Mem::IsSystemProcess( HANDLE hProcess ) {
 	HANDLE hToken;
 	if ( !OpenProcessToken( hProcess , TOKEN_QUERY , &hToken ) )
 	{
-		std::cerr << "Could not open process token." << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Could not open process token." ) , YELLOW );
 		CloseHandle( hProcess );
 		return false;
 	}
@@ -732,12 +763,12 @@ HANDLE Mem::GetProcessHandle( DWORD PID )
 	auto processHandle = OpenProcess( PROCESS_ALL_ACCESS , FALSE , PID );
 	if ( processHandle == INVALID_HANDLE_VALUE || processHandle == NULL ) {
 #ifdef _DEBUG
-		std::cerr << "Failed to open process -- invalid handle" << std::endl;
-		std::cerr << "Error code: " << GetLastError( ) << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Failed to open process -- invalid handle" ) , YELLOW );
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Error code: " << GetLastError( ) << std::endl;
 		throw "Failed to open process";
 #endif
 		return NULL;
-}
+	}
 
 	return processHandle;
 }
@@ -757,7 +788,7 @@ bool Mem::IsPIDRunning( DWORD dwPid ) {
 }
 
 
-#include "../../Process/Handles.hpp"
+#include "../../../AntiCheat/Process/Handles.hpp"
 
 std::vector<_SYSTEM_HANDLE> Mem::Handle::GetHandles( )
 {

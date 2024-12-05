@@ -4,6 +4,9 @@
 #include <vector>
 #include <windows.h>
 #include <unordered_map>
+#include <mutex>
+
+#include "../../Obscure/ntldr.h"
 
 enum DETECTION_STATUS {
 	NOTHING_DETECTED ,
@@ -34,8 +37,15 @@ enum FLAG_DETECTION {
 
 class Detections:  public ThreadHolder
 {
+	std::mutex AccessGuard;
+
+	std::vector<std::string> LoadedDlls;
+	std::vector<std::string> PendingLoadedDlls;
+
 	void threadFunction( ) override;	
 	
+
+
 	std::vector<std::pair<FLAG_DETECTION , DetectionStruct>> DetectedFlags;
 	bool DoesFunctionAppearHooked( std::string moduleName , std::string functionName , const unsigned char * expectedBytes );
 	void CheckFunctions( );
@@ -46,9 +56,10 @@ class Detections:  public ThreadHolder
 
 	void AddDetection( FLAG_DETECTION flag , DetectionStruct Detect );
 	void DigestDetections( );
+	void CheckLoadedDlls( );
 
 	std::string GenerateDetectionStatus( FLAG_DETECTION flag , DetectionStruct _detection );
-
+	static VOID CALLBACK OnDllNotification( ULONG NotificationReason , const PLDR_DLL_NOTIFICATION_DATA NotificationData , PVOID Context );
 	std::unordered_map<int, bool> InjectedProcesses;
 public:
 	Detections( );

@@ -2,6 +2,7 @@
 #include <string>
 #include <winsock2.h>
 #include <iphlpapi.h>
+#include <ws2tcpip.h>
 
 #include "client.h"
 #include <intrin.h>
@@ -13,34 +14,46 @@
 
 #include "../Systems/Utils/utils.h"
 #include "../Systems/Memory/memory.h"
+#include "../Systems/LogSystem/Log.h"
 
 #pragma comment(lib, "wbemuuid.lib")
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "iphlpapi.lib")
 
 #include <nlohmann/json.hpp>
-
+#include <regex>
 using json = nlohmann::json;
 
-client::client( ) {}
+client::client( ) { this->CurrentSocket = INVALID_SOCKET; }
 client::~client( ) {}
 
 
 #define key xorstr_("W86ztLe5cLYZUDRBK61cVTJONv4IlivA")
 #define salt xorstr_("pJWjN6fCSfJmfL92vRnkdHUgzVSSYSks")
 
+
+
+
 bool client::InitializeConnection( ) {
 	WSADATA wsaData;
 	if ( WSAStartup( MAKEWORD( 2 , 2 ) , &wsaData ) != 0 ) {
 		return false;
 	}
+	
 
 	SOCKET sock = socket( AF_INET , SOCK_STREAM , 0 );
 	if ( sock == INVALID_SOCKET ) {
-		//LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Socket creation failed." ) , RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Socket creation failed." ) , RED );
 		WSACleanup( );
 		return false;
 	}
+
+
+	//if ( this->ipaddres.empty( ) )
+		//GetNetworkAdapterIPs( this->ipaddres );
+	this->ipaddres = xorstr_("127.0.0.10");
+
+	LogSystem::Get( ).ConsoleLog( _SERVER , this->ipaddres , GREEN );
 
 	sockaddr_in serverAddr;
 	const int serverPort = this->Port;
@@ -49,9 +62,13 @@ bool client::InitializeConnection( ) {
 	serverAddr.sin_port = htons( serverPort );
 	serverAddr.sin_addr.s_addr = inet_addr( this->ipaddres.c_str( ) );
 
+	if ( serverAddr.sin_addr.s_addr == INADDR_NONE ) {
+		closesocket( sock );
+		WSACleanup( );
+		return false;
+	}
+
 	if ( connect( sock , ( sockaddr * ) &serverAddr , sizeof( serverAddr ) ) == SOCKET_ERROR ) {
-		std::cout << "connect failed\n";
-		//LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Connection to server failed. Error code: " ) + std::to_string( WSAGetLastError( ) ) , RED );
 		closesocket( sock );
 		WSACleanup( );
 		return false;
@@ -133,7 +150,6 @@ bool client::SendData( std::string data , CommunicationType type , bool encrypt 
 
 	if ( encrypt ) {
 		if(!Utils::Get( ).encryptMessage( encryptedMessage , encryptedMessage , key , this->iv )){
-			std::cout << "encrypt failed!\n";
 			return false;
 		}
 	}
@@ -156,7 +172,7 @@ bool client::SendData( std::string data , CommunicationType type , bool encrypt 
 	std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
 
 	int totalSent = 0;
-	while ( totalSent < messageSize ) {
+	while ( totalSent < messageSize  ) {
 		int sent = send( this->CurrentSocket , encryptedMessage.c_str( ) + totalSent , messageSize - totalSent , 0 );
 		if ( sent == SOCKET_ERROR ) {
 			//LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to send encrypted message." ) , RED );
@@ -177,7 +193,7 @@ bool client::SendData( std::string data , CommunicationType type , bool encrypt 
 
 bool client::SendMessageToServer( std::string Message, CommunicationType type ) {
 	if ( Message.empty( ) ) {
-		//LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Empty message!" ) , YELLOW );
+		//LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Empty message!" ) ), YELLOW );
 		return false;
 	}
 
@@ -190,7 +206,6 @@ bool client::SendMessageToServer( std::string Message, CommunicationType type ) 
 	js[ xorstr_( "key" ) ] = _key;
 	js[ xorstr_( "password" ) ] = Mem::Get( ).GenerateHash( _key + salt );
 	if ( !InitializeConnection( ) ) {
-		std::cout << "Initialing failed!\n";
 		//LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to initialize connection!" ) , RED );
 		return false;
 	}

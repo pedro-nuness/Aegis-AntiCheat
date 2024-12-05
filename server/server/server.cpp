@@ -504,7 +504,8 @@ CommunicationResponse Server::receiveping( const std::string & encryptedMessage 
 			);
 
 			globals::Get( ).ConnectionMap[ Ip ] = NewConnection;
-			utils::Get( ).WarnMessage( _SERVER , xorstr_( "IP " ) + ( Ip ) +xorstr_( " logged in." ) , GRAY );
+			utils::Get( ).WarnMessage( _SERVER , xorstr_( "Player " ) + ( Nick ) + xorstr_( ": " ) + Ip + xorstr_( " logged in." ) , GRAY );
+			return RECEIVE_LOGGEDIN;
 		}
 		else {
 			globals::Get( ).ConnectionMap[ ( Ip ) ].Ping( );
@@ -541,7 +542,7 @@ std::string Server::AppendHWIDToString( const std::string & str , const std::str
 			HWID += xorstr_( "**SteamID[" ) + std::to_string( i ) + xorstr_( "]:** `" ) + Steam[ i ] + xorstr_( "`\n" );
 		}
 
-		HWID += xorstr_( "**IP:** `" ) + Ip + xorstr_( "`\n" );
+		HWID += xorstr_( "**IP:** `" ) + Ip + xorstr_( " `\n" );
 		HWID += xorstr_( "**Motherboard:** `" ) + Player.GetMotherboard( ) + xorstr_( "`\n" );
 		HWID += xorstr_( "**Disk:** `" ) + Player.GetDiskID( ) + xorstr_( "`\n" );
 		std::vector<std::string> Mac = Player.GetMac( );
@@ -776,6 +777,8 @@ void Server::ProcessMessages( ) {
 				break;
 			}
 
+
+
 			if ( !SendData( std::to_string( Response ) , message.Socket ) ) {
 				utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to send answer to client" ) , RED );
 			}
@@ -879,7 +882,7 @@ void Server::threadfunction( ) {
 			utils::Get( ).WarnMessage( _SERVER , xorstr_( "Accept failed." ) , COLORS::RED );
 			continue;
 		}
-		
+
 		//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Received new connection" ) , COLORS::GREEN );
 
 		// Criar uma nova thread para lidar com a conexão do cliente

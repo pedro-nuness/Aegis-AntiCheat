@@ -20,8 +20,9 @@ void LogSystem::Log( std::string Message , std::string nFile ) {
 std::mutex PrintMutex;
 
 void LogSystem::ConsoleLog( MODULE_SENDER sender , std::string Message , COLORS _col ) {
-	std::lock_guard<std::mutex> lock( PrintMutex );
 
+#if true
+	std::lock_guard<std::mutex> lock( PrintMutex );
 	std::string custom_text = xorstr_( "undefined" );
 	COLORS custom_col = RED;
 
@@ -80,7 +81,7 @@ void LogSystem::ConsoleLog( MODULE_SENDER sender , std::string Message , COLORS 
 		break;
 	}
 
-#if true
+
 
 
 	Warn( custom_col , custom_text );
@@ -89,9 +90,6 @@ void LogSystem::ConsoleLog( MODULE_SENDER sender , std::string Message , COLORS 
 #else
 
 
-
-	Warn( custom_col , custom_text );
-	ColoredText( xorstr_( " " ) + Message + xorstr_( "\n" ) , _col );
 #endif
 }
 

@@ -20,12 +20,16 @@
 #include "Modules/ThreadGuard/ThreadGuard.h"
 
 
+#define ALLOCCONSOLE 1
+
+Detections DetectionsEvents;
+
 DWORD WINAPI main( PVOID base )
 {
 	SetErrorMode( SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX );
 	
 
-#ifdef  _DEBUG
+#if ALLOCCONSOLE
 	AllocConsole( );
 
 	if ( !freopen( ( "CONOUT$" ) , ( "w" ) , stdout ) )
@@ -37,15 +41,7 @@ DWORD WINAPI main( PVOID base )
 
 #endif //  _DEBUG
 
-	AllocConsole( );
-
-	if ( !freopen( ( "CONOUT$" ) , ( "w" ) , stdout ) )
-	{
-		FreeConsole( );
-		return EXIT_SUCCESS;
-	}
-
-
+	
 	LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Sucessfully attached :)" ) , WHITE );
 
 	/*if ( Mem::Get( ).RestrictProcessAccess( ) ) {
@@ -57,7 +53,7 @@ DWORD WINAPI main( PVOID base )
 	}*/
 
 	Communication CommunicationEvents;
-	Detections DetectionsEvents;
+
 
 	CommunicationEvents.start( );
 	std::vector<std::pair<ThreadHolder * , int>> threads = {
@@ -77,9 +73,7 @@ DWORD WINAPI main( PVOID base )
 		std::this_thread::sleep_for( std::chrono::seconds( 10 ) );
 	}
 
-	FreeConsole( );
-
-#ifdef _DEBUG
+#if ALLOCCONSOLE
 	FreeConsole( );
 #endif
 	return EXIT_SUCCESS;

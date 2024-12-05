@@ -20,6 +20,7 @@
 #include <Windows.h>
 #include <iostream>
 
+
 bool Preventions::RestrictProcessAccess( ) {
 	HANDLE hProcess = GetCurrentProcess( );
 	PSECURITY_DESCRIPTOR pSD = NULL;
@@ -34,7 +35,7 @@ bool Preventions::RestrictProcessAccess( ) {
 	if ( !AllocateAndInitializeSid(
 		&SIDAuthWorld , 1 , SECURITY_WORLD_RID ,
 		0 , 0 , 0 , 0 , 0 , 0 , 0 , &pEveryoneSID ) ) {
-		std::cerr << "Falha ao inicializar SID para Everyone.\n";
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Falha ao inicializar SID para Everyone." ) , YELLOW );
 		return false;
 	}
 
@@ -43,7 +44,7 @@ bool Preventions::RestrictProcessAccess( ) {
 	if ( !AllocateAndInitializeSid(
 		&SIDAuthNT , 2 , SECURITY_BUILTIN_DOMAIN_RID ,
 		DOMAIN_ALIAS_RID_ADMINS , 0 , 0 , 0 , 0 , 0 , 0 , &pAdminSID ) ) {
-		std::cerr << "Falha ao inicializar SID para Administradores.\n";
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Falha ao inicializar SID para Administradores" ) , YELLOW );
 		FreeSid( pEveryoneSID );
 		return false;
 	}
@@ -52,7 +53,7 @@ bool Preventions::RestrictProcessAccess( ) {
 	if ( !AllocateAndInitializeSid(
 		&SIDAuthNT , 1 , SECURITY_LOCAL_SYSTEM_RID ,
 		0 , 0 , 0 , 0 , 0 , 0 , 0 , &pSystemSID ) ) {
-		std::cerr << "Falha ao inicializar SID para SYSTEM.\n";
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Falha ao inicializar SID para SYSTEM" ) , YELLOW );
 		FreeSid( pEveryoneSID );
 		FreeSid( pAdminSID );
 		return false;
@@ -72,7 +73,7 @@ bool Preventions::RestrictProcessAccess( ) {
 	// Criar ACL para negar "Everyone".
 	DWORD result = SetEntriesInAclA( 1 , &ea , NULL , &pDacl );
 	if ( result != ERROR_SUCCESS ) {
-		std::cerr << "Falha ao configurar entradas de ACL para Everyone. Erro: " << result << "\n";
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Falha ao configurar entradas de ACL para Everyone" ) , YELLOW );
 		FreeSid( pEveryoneSID );
 		FreeSid( pAdminSID );
 		FreeSid( pSystemSID );
@@ -83,7 +84,7 @@ bool Preventions::RestrictProcessAccess( ) {
 	ea.Trustee.ptstrName = ( LPSTR ) pAdminSID;
 	result = SetEntriesInAclA( 1 , &ea , pDacl , &pDacl );
 	if ( result != ERROR_SUCCESS ) {
-		std::cerr << "Falha ao configurar entradas de ACL para Administradores. Erro: " << result << "\n";
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Falha ao configurar entradas de ACL para Administradores" ) , YELLOW );
 		FreeSid( pEveryoneSID );
 		FreeSid( pAdminSID );
 		FreeSid( pSystemSID );
@@ -94,7 +95,7 @@ bool Preventions::RestrictProcessAccess( ) {
 	ea.Trustee.ptstrName = ( LPSTR ) pSystemSID;
 	result = SetEntriesInAclA( 1 , &ea , pDacl , &pDacl );
 	if ( result != ERROR_SUCCESS ) {
-		std::cerr << "Falha ao configurar entradas de ACL para SYSTEM. Erro: " << result << "\n";
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Falha ao configurar entradas de ACL para SYSTEM" ) , YELLOW );
 		FreeSid( pEveryoneSID );
 		FreeSid( pAdminSID );
 		FreeSid( pSystemSID );
@@ -104,7 +105,7 @@ bool Preventions::RestrictProcessAccess( ) {
 	// Criar um novo descritor de segurança.
 	pSD = ( PSECURITY_DESCRIPTOR ) LocalAlloc( LPTR , SECURITY_DESCRIPTOR_MIN_LENGTH );
 	if ( !pSD || !InitializeSecurityDescriptor( pSD , SECURITY_DESCRIPTOR_REVISION ) ) {
-		std::cerr << "Falha ao inicializar o descritor de segurança.\n";
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Falha ao inicializar o descritor de segurança" ) , YELLOW );
 		FreeSid( pEveryoneSID );
 		FreeSid( pAdminSID );
 		FreeSid( pSystemSID );
@@ -113,7 +114,7 @@ bool Preventions::RestrictProcessAccess( ) {
 
 	// Configurar a nova ACL no descritor de segurança.
 	if ( !SetSecurityDescriptorDacl( pSD , TRUE , pDacl , FALSE ) ) {
-		std::cerr << "Falha ao configurar a DACL.\n";
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Falha ao configurar a DACL" ) , YELLOW );
 		FreeSid( pEveryoneSID );
 		FreeSid( pAdminSID );
 		FreeSid( pSystemSID );
@@ -122,7 +123,7 @@ bool Preventions::RestrictProcessAccess( ) {
 
 	// Aplicar o descritor de segurança ao processo.
 	if ( SetKernelObjectSecurity( hProcess , DACL_SECURITY_INFORMATION , pSD ) == 0 ) {
-		std::cerr << "Falha ao aplicar informações de segurança.\n";
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Falha ao aplicar informações de segurança" ) , YELLOW );
 		FreeSid( pEveryoneSID );
 		FreeSid( pAdminSID );
 		FreeSid( pSystemSID );
@@ -486,7 +487,7 @@ HANDLE WINAPI MyCreateThread(
 	//somehow, this mf managed to get the createthread function pointer, and called it, so let's check
 
 	if ( SuspectThreadAddress( lpStartAddress ) ) {
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Blocked create thread attemp on suspect address!" ) , YELLOW );
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Blocked create thread attemp on suspect address!" ), YELLOW );
 
 		//return nothing, no threads for you today
 		return NULL;
@@ -507,32 +508,32 @@ HANDLE WINAPI MyCreateThread(
 bool UnhookApis( ) {
 	// Disable the hook
 	if ( MH_DisableHook( MH_ALL_HOOKS ) != MH_OK ) {
-		std::cerr << "Failed to disable hook!" << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Failed to disable hook!" ) , YELLOW );
 		return false;
 	}
 
 	// Uninitialize MinHook
 	if ( MH_Uninitialize( ) != MH_OK ) {
-		std::cerr << "MinHook uninitialization failed!" << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "MinHook uninitialization failed!" ) , YELLOW );
 		return false;
 	}
 	return true;
 }
 
-bool Preventions::EnableApiHooks() {
-	
+bool Preventions::EnableApiHooks( ) {
+
 	if ( MH_Initialize( ) != MH_OK ) {
-		std::cerr << "MinHook initialization failed!" << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "MinHook initialization failed!" ) , YELLOW );
 		return false;
 	}
 
 	if ( MH_CreateHookApi( L"kernel32.dll" , "CreateThread" , &MyCreateThread , reinterpret_cast< LPVOID * >( &originalCreateThread ) ) != MH_OK ) {
-		std::cerr << "Failed to create hook for CreateThread!" << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Failed to create hook for CreateThread!" ) , YELLOW );
 		return false;
 	}
 
 	if ( MH_EnableHook( MH_ALL_HOOKS ) != MH_OK ) {
-		std::cerr << "Failed to enable hooks!" << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Failed to enable hooks!" ) , YELLOW );
 		return false;
 	}
 

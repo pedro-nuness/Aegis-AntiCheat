@@ -26,6 +26,8 @@ public:
 
 	std::string Nickname;
 	std::string NicknameHash;
+	std::string OriginalProcessHash;
+
 
 	std::string CLIENT_NAME;
 	std::string DUMPER_NAME;

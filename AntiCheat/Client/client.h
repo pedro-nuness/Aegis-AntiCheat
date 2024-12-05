@@ -26,18 +26,18 @@ class client : public CSingleton<client>{
 	//std::string iv = xorstr_( "ume9ugz3m7lgch1z");  // 16 bytes para AES
 	std::string ipaddres = xorstr_( "181.215.236.116");
 	int Port = 12345;
-	std::string IV = xorstr_("ume9ugz3m7lgch1z");
 
 	SOCKET CurrentSocket;
 	bool InitializeConnection( );
 	bool GetResponse( CommunicationResponse * response );
 	bool CloseConnection( );
 	bool SendData( std::string Data , CommunicationType Type , bool encrypt = true );
+	bool SendDataToServer(  std::string js , CommunicationType type );
 public:
 	client( );
 	~client( );
 
-
+	
 	bool LoginToServer( );
 	bool SendMessageToServer( std::string Message );
 	bool SendPingToServer( );

@@ -279,7 +279,6 @@ std::string Communication::receiveMessage( SOCKET ClientSocket , int time ) {
 	return encryptedMessage;
 }
 
-
 #define now std::chrono::high_resolution_clock::now()
 
 bool Communication::PingInTime( ) {
@@ -399,7 +398,6 @@ void Communication::OpenRequestServer( ) {
 	}
 }
 
-
 enum CLIENT_REQUEST_TYPE {
 	REQUEST_BAN,
 	REQUEST_WARN
@@ -429,7 +427,6 @@ bool Communication::ReceivedQueuedMessage( std::string Message ) {
 
 	return true;
 }
-
 
 void Communication::threadFunction( ) {
 
@@ -473,7 +470,6 @@ void Communication::threadFunction( ) {
 		ThreadGuard * Guard = reinterpret_cast< ThreadGuard * >( Globals::Get( ).GuardMonitorPointer );
 		Guard->AddThreadToList( PingThread->GetId( ) );
 	}
-
 
 	//Unlock all threads
 	Globals::Get( ).VerifiedSession = true;

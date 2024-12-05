@@ -72,6 +72,7 @@ class Detections : public ThreadHolder {
 	static VOID OnDllNotification( ULONG NotificationReason , const PLDR_DLL_NOTIFICATION_DATA NotificationData , PVOID Context );
 
 
+
 public:
 	void InitializeThreads( );
 	void AddThreadToWhitelist( DWORD PID );

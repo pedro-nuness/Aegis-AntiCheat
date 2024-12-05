@@ -34,7 +34,7 @@ bool Preventions::RestrictProcessAccess( ) {
 	if ( !AllocateAndInitializeSid(
 		&SIDAuthWorld , 1 , SECURITY_WORLD_RID ,
 		0 , 0 , 0 , 0 , 0 , 0 , 0 , &pEveryoneSID ) ) {
-		std::cerr << "Falha ao inicializar SID para Everyone.\n";
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Falha ao inicializar SID para Everyone." ) , YELLOW );
 		return false;
 	}
 
@@ -43,7 +43,7 @@ bool Preventions::RestrictProcessAccess( ) {
 	if ( !AllocateAndInitializeSid(
 		&SIDAuthNT , 2 , SECURITY_BUILTIN_DOMAIN_RID ,
 		DOMAIN_ALIAS_RID_ADMINS , 0 , 0 , 0 , 0 , 0 , 0 , &pAdminSID ) ) {
-		std::cerr << "Falha ao inicializar SID para Administradores.\n";
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Falha ao inicializar SID para Administradores" ) , YELLOW );
 		FreeSid( pEveryoneSID );
 		return false;
 	}
@@ -52,7 +52,7 @@ bool Preventions::RestrictProcessAccess( ) {
 	if ( !AllocateAndInitializeSid(
 		&SIDAuthNT , 1 , SECURITY_LOCAL_SYSTEM_RID ,
 		0 , 0 , 0 , 0 , 0 , 0 , 0 , &pSystemSID ) ) {
-		std::cerr << "Falha ao inicializar SID para SYSTEM.\n";
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Falha ao inicializar SID para SYSTEM" ) , YELLOW );
 		FreeSid( pEveryoneSID );
 		FreeSid( pAdminSID );
 		return false;
@@ -72,7 +72,7 @@ bool Preventions::RestrictProcessAccess( ) {
 	// Criar ACL para negar "Everyone".
 	DWORD result = SetEntriesInAclA( 1 , &ea , NULL , &pDacl );
 	if ( result != ERROR_SUCCESS ) {
-		std::cerr << "Falha ao configurar entradas de ACL para Everyone. Erro: " << result << "\n";
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Falha ao configurar entradas de ACL para Everyone" ) , YELLOW );
 		FreeSid( pEveryoneSID );
 		FreeSid( pAdminSID );
 		FreeSid( pSystemSID );
@@ -83,7 +83,7 @@ bool Preventions::RestrictProcessAccess( ) {
 	ea.Trustee.ptstrName = ( LPSTR ) pAdminSID;
 	result = SetEntriesInAclA( 1 , &ea , pDacl , &pDacl );
 	if ( result != ERROR_SUCCESS ) {
-		std::cerr << "Falha ao configurar entradas de ACL para Administradores. Erro: " << result << "\n";
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Falha ao configurar entradas de ACL para Administradores" ) , YELLOW );
 		FreeSid( pEveryoneSID );
 		FreeSid( pAdminSID );
 		FreeSid( pSystemSID );
@@ -94,7 +94,7 @@ bool Preventions::RestrictProcessAccess( ) {
 	ea.Trustee.ptstrName = ( LPSTR ) pSystemSID;
 	result = SetEntriesInAclA( 1 , &ea , pDacl , &pDacl );
 	if ( result != ERROR_SUCCESS ) {
-		std::cerr << "Falha ao configurar entradas de ACL para SYSTEM. Erro: " << result << "\n";
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Falha ao configurar entradas de ACL para SYSTEM" ) , YELLOW );
 		FreeSid( pEveryoneSID );
 		FreeSid( pAdminSID );
 		FreeSid( pSystemSID );
@@ -104,7 +104,7 @@ bool Preventions::RestrictProcessAccess( ) {
 	// Criar um novo descritor de segurança.
 	pSD = ( PSECURITY_DESCRIPTOR ) LocalAlloc( LPTR , SECURITY_DESCRIPTOR_MIN_LENGTH );
 	if ( !pSD || !InitializeSecurityDescriptor( pSD , SECURITY_DESCRIPTOR_REVISION ) ) {
-		std::cerr << "Falha ao inicializar o descritor de segurança.\n";
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Falha ao inicializar o descritor de segurança" ) , YELLOW );
 		FreeSid( pEveryoneSID );
 		FreeSid( pAdminSID );
 		FreeSid( pSystemSID );
@@ -113,7 +113,7 @@ bool Preventions::RestrictProcessAccess( ) {
 
 	// Configurar a nova ACL no descritor de segurança.
 	if ( !SetSecurityDescriptorDacl( pSD , TRUE , pDacl , FALSE ) ) {
-		std::cerr << "Falha ao configurar a DACL.\n";
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Falha ao configurar a DACL" ) , YELLOW );
 		FreeSid( pEveryoneSID );
 		FreeSid( pAdminSID );
 		FreeSid( pSystemSID );
@@ -122,7 +122,7 @@ bool Preventions::RestrictProcessAccess( ) {
 
 	// Aplicar o descritor de segurança ao processo.
 	if ( SetKernelObjectSecurity( hProcess , DACL_SECURITY_INFORMATION , pSD ) == 0 ) {
-		std::cerr << "Falha ao aplicar informações de segurança.\n";
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Falha ao aplicar informações de segurança" ) , YELLOW );
 		FreeSid( pEveryoneSID );
 		FreeSid( pAdminSID );
 		FreeSid( pSystemSID );
@@ -305,7 +305,7 @@ bool Preventions::RandomizeModuleName( )
 {
 	bool success = false;
 
-	std::string OriginalModuleName = GetBaseModuleName();
+	std::string OriginalModuleName = GetBaseModuleName( );
 	if ( OriginalModuleName.empty( ) )
 		return false;
 
@@ -444,21 +444,43 @@ bool Preventions::DeployDllLoadNotifation( ) {
 	//}
 }
 
+std::string StateToString( DWORD state ) {
+	switch ( state ) {
+	case MEM_COMMIT: return "Committed";
+	case MEM_RESERVE: return "Reserved";
+	case MEM_FREE:    return "Free";
+	default:          return "Unknown";
+	}
+}
+std::string TypeToString( DWORD type ) {
+	switch ( type ) {
+	case MEM_IMAGE:  return "Image";
+	case MEM_MAPPED: return "Mapped";
+	case MEM_PRIVATE: return "Private";
+	default:          return "Unknown";
+	}
+}
+
+
 BOOL SuspectThreadAddress( LPVOID lpStartAddress )
 {
 	MEMORY_BASIC_INFORMATION mbi;
 	// Obtemos a informação sobre a região de memória onde o thread foi alocado
-	if ( VirtualQuery( lpStartAddress , &mbi , sizeof( mbi ) ) == 0 )
+	if ( !VirtualQuery( lpStartAddress , &mbi , sizeof( mbi ) ) == 0 )
 	{
+		std::cout << "VirtualQuery failed!\n";
 		return TRUE;  // Se a consulta falhar, o endereço é inválido
 	}
 
+	std::cout << "mbi.State: " << StateToString( mbi.State ) << ", mbi.Type: " << TypeToString( mbi.Type ) << std::endl;
+
+
 	// Verifica se a região de memória é válida para threads (não deve ser uma área de código ou dados suspeitos)
 	// Por exemplo, vamos verificar se o endereço está no espaço de heap ou pilha
-	if ( mbi.State == MEM_COMMIT && ( mbi.Type == MEM_PRIVATE || mbi.Type == MEM_MAPPED ) )
+	/*if ( mbi.State == MEM_COMMIT && ( mbi.Type == MEM_PRIVATE || mbi.Type == MEM_MAPPED ) )
 	{
 		return TRUE;
-	}
+	}*/
 
 	return FALSE;
 }
@@ -485,12 +507,14 @@ HANDLE WINAPI MyCreateThread(
 
 	//somehow, this mf managed to get the createthread function pointer, and called it, so let's check
 
-	//if ( SuspectThreadAddress( lpStartAddress ) ) {
-	//	LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Blocked create thread attemp on suspect address!" ) , YELLOW );
+	std::cout << "Thread created at " << lpStartAddress << std::endl;
 
-	//	//return nothing, no threads for you today
-	//	return NULL;
-	//}
+	if ( SuspectThreadAddress( lpStartAddress ) ) {
+		//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Blocked create thread attemp on suspect address!" ), YELLOW );
+
+		//return nothing, no threads for you today
+		//return NULL;
+	}
 
 	// Call the original CreateThread function
 	return originalCreateThread(
@@ -507,13 +531,13 @@ HANDLE WINAPI MyCreateThread(
 bool UnhookApis( ) {
 	// Disable the hook
 	if ( MH_DisableHook( MH_ALL_HOOKS ) != MH_OK ) {
-		std::cerr << "Failed to disable hook!" << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Failed to disable hook!" ) , YELLOW );
 		return false;
 	}
 
 	// Uninitialize MinHook
 	if ( MH_Uninitialize( ) != MH_OK ) {
-		std::cerr << "MinHook uninitialization failed!" << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "MinHook uninitialization failed!" ) , YELLOW );
 		return false;
 	}
 	return true;
@@ -522,17 +546,17 @@ bool UnhookApis( ) {
 bool Preventions::EnableApiHooks( ) {
 
 	if ( MH_Initialize( ) != MH_OK ) {
-		std::cerr << "MinHook initialization failed!" << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "MinHook initialization failed!" ) , YELLOW );
 		return false;
 	}
 
 	if ( MH_CreateHookApi( L"kernel32.dll" , "CreateThread" , &MyCreateThread , reinterpret_cast< LPVOID * >( &originalCreateThread ) ) != MH_OK ) {
-		std::cerr << "Failed to create hook for CreateThread!" << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Failed to create hook for CreateThread!" ) , YELLOW );
 		return false;
 	}
 
 	if ( MH_EnableHook( MH_ALL_HOOKS ) != MH_OK ) {
-		std::cerr << "Failed to enable hooks!" << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Failed to enable hooks!" ) , YELLOW );
 		return false;
 	}
 
@@ -548,13 +572,13 @@ void Preventions::Deploy( ) {
 		LogSystem::Get( ).Log( xorstr_( "[1] Failed to protect process" ) );
 
 	if ( !Preventions::Get( ).RandomizeModuleName( ) )
-		LogSystem::Get( ).Log( xorstr_( "[2] Failed to protect process" ) );
+		LogSystem::Get( ).Log( xorstr_( "[1] Failed to protect process" ) );
 
-	if ( !Preventions::Get( ).PreventDllInjection( ) )
-		LogSystem::Get( ).Log( xorstr_( "[3] Failed to protect process" ) );
+	//if ( !Preventions::Get( ).PreventDllInjection( ) )
+	//	LogSystem::Get( ).Log( xorstr_( "[2] Failed to protect process" ) );
 
-	if ( !Preventions::Get( ).PreventThreadCreation( ) )
-		LogSystem::Get( ).Log( xorstr_( "[4] Failed to protect process" ) );
+	//if ( !Preventions::Get( ).PreventThreadCreation( ) )
+	//	LogSystem::Get( ).Log( xorstr_( "[3] Failed to protect process" ) );
 
 
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Windows.h>
 #include "singleton.h"
 #include <string>
 
@@ -26,4 +27,6 @@ public:
 	std::string GetRandomCharacter( );
 	std::string GenerateRandomKey( int size );
 	std::string DownloadString( std::string URL );
+
+	std::string ConvertLPCWSTRToString( LPCWSTR wideString );
 };

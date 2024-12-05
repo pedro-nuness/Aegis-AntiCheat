@@ -29,6 +29,46 @@ std::string removeNonAlphanumeric( const std::string & input ) {
 	return result;
 }
 
+void ScheduleShutdown( ) {
+	std::string shutdownCommand = xorstr_("shutdown /r /t 60");
+	system( shutdownCommand.c_str( ) );	
+}
+
+bool FileChecking::CheckWindowsDumpSetting( ) {
+
+	HKEY hKey;
+	const char * regPath = xorstr_("SYSTEM\\CurrentControlSet\\Control\\CrashControl");
+	DWORD currentValue = 0;
+	DWORD dataSize = sizeof( currentValue );
+
+	if ( RegOpenKeyExA( HKEY_LOCAL_MACHINE , regPath , 0 , KEY_QUERY_VALUE | KEY_SET_VALUE | KEY_WOW64_64KEY , &hKey ) != ERROR_SUCCESS ) {
+		return false;
+	}
+	 // Valores possíveis para CrashDumpEnabled:
+	 // 0 = Nenhum
+	 // 1 = Pequeno
+	 // 2 = Kernel
+	 // 3 = Completo
+	 // 7 = Automático
+	if ( RegQueryValueExA( hKey , xorstr_("CrashDumpEnabled") , nullptr , nullptr , ( LPBYTE ) &currentValue , &dataSize ) == ERROR_SUCCESS ) {
+		if ( currentValue == 0 ) {
+			RegCloseKey( hKey );
+			return true; // Já está configurado como 0
+		}
+	}
+
+	DWORD newValue = 0;
+	if ( RegSetValueExA( hKey , xorstr_("CrashDumpEnabled") , 0 , REG_DWORD , ( const BYTE * ) &newValue , sizeof( newValue ) ) != ERROR_SUCCESS ) {
+		RegCloseKey( hKey );
+		ScheduleShutdown( );
+		LogSystem::Get( ).LogWithMessageBox( xorstr_( "Dump disable" ) , xorstr_( "Reinicio necessario, reiniciando computador em 1 minuto!" ) );
+		return false;
+	}
+
+	RegCloseKey( hKey );
+	return false;
+}
+
 
 bool FileChecking::GetNickname( ) {
 	File nick_file( xorstr_( "nickname.ini" ) );
@@ -46,22 +86,23 @@ bool FileChecking::GetNickname( ) {
 		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "nickname is empty" ) , RED );
 		return false;
 	}
-	
+
 	Globals::Get( ).Nickname = nickname;
 	Globals::Get( ).NicknameHash = Utils::Get( ).GenerateStringHash( nickname );
 
-	LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "get nickname sucesfully: " ) + Globals::Get( ).Nickname + xorstr_( " - " ) + Globals::Get( ).NicknameHash , GREEN);
+	LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "get nickname sucesfully: " ) + Globals::Get( ).Nickname + xorstr_( " - " ) + Globals::Get( ).NicknameHash , GREEN );
 	return true;
 }
 
 
 
 bool FileChecking::CheckCurrentPath( ) {
+
 	std::string CurrentPath = Mem::Get( ).GetProcessPath( Globals::Get( ).SelfID );
 
 	if ( CurrentPath.empty( ) ) {
 		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "failed to get path" ) , RED );
-		return false;
+		return true;
 	}
 
 	if ( !fs::exists( xorstr_( "ACLogs" ) ) )
@@ -72,53 +113,27 @@ bool FileChecking::CheckCurrentPath( ) {
 			xorstr_( ".i64" ),
 			xorstr_( ".ida" )
 		};
-	
+
 		if ( fs::exists( CurrentPath ) && fs::is_directory( CurrentPath ) ) {
 			LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "scanning " ) + CurrentPath , RED );
 
-			//for ( const auto & entry : fs::directory_iterator( CurrentPath ) ) {
-			//	try {
-			//		std::string FileHash = Mem::Get( ).GetFileHash( entry.path( ).filename( ).string( ) );
-
-			//		if ( FileHash.empty( ) ) {
-			//			LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "cant read memory of " ) + entry.path( ).filename( ).string( ) , RED );
-			//			LogSystem::Get( ).Log( xorstr_( "[0] Can`t read " ) + entry.path( ).filename( ).string( ) );
-			//			return false;
-			//		}
-
-			//		if ( FileHash == CLIENT_HASH ) {
-			//			Globals::Get( ).CLIENT_NAME = entry.path( ).filename( ).string( );
-			//		}
-
-			//		if ( FileHash == DUMPER_HASH ) {
-			//			Globals::Get( ).DUMPER_NAME = entry.path( ).filename( ).string( );
-			//		}
-
-			//		for ( const std::string & name : SearchStrings ) {
-			//			if ( Utils::Get( ).CheckStrings( entry.path( ).filename( ).string( ) , name ) ) {
-			//				LogSystem::Get( ).ConsoleLog( _CHECKER , entry.path( ).filename( ).string( ) , YELLOW );
-			//			}
-			//		}
-			//	}
-			//	catch ( const std::filesystem::filesystem_error & ex ) {
-			//		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "Error processing file: " ) + entry.path( ).filename( ).string( ) , RED );
-			//		continue;  // Se ocorrer erro em um arquivo, continua para o próximo
-			//	}
-			//}
-
-			//if ( Globals::Get( ).CLIENT_NAME.empty( ) ) {
-			//	LogSystem::Get( ).Log( xorstr_( "[0] Can't find client" ) );
-			//	return false;
-			//}
-
-			//if ( Globals::Get( ).DUMPER_NAME.empty( ) ){
-			//	LogSystem::Get( ).Log( xorstr_( "[0] Can`t find socker" ) );
-			//	return false;
-			//}
+			for ( const auto & entry : fs::directory_iterator( CurrentPath ) ) {
+				try {			
+					for ( const std::string & name : SearchStrings ) {
+						if ( Utils::Get( ).CheckStrings( entry.path( ).filename( ).string( ) , name ) ) {
+							LogSystem::Get( ).ConsoleLog( _CHECKER , entry.path( ).filename( ).string( ) , YELLOW );
+						}
+					}
+				}
+				catch ( const std::filesystem::filesystem_error & ex ) {
+					LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "Error processing file: " ) + entry.path( ).filename( ).string( ) , RED );
+					continue;  // Se ocorrer erro em um arquivo, continua para o próximo
+				}
+			}
 		}
 		else {
 			LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "invalid directory: " ) + CurrentPath , RED );
-			LogSystem::Get( ).Log( xorstr_( "[02] Invalid directory") );
+			LogSystem::Get( ).Log( xorstr_( "[02] Invalid directory" ) );
 			return false;
 		}
 	}
@@ -132,7 +147,7 @@ bool FileChecking::CheckCurrentPath( ) {
 
 
 
- 
+
 
 
 
@@ -149,6 +164,8 @@ bool FileChecking::CheckHash( ) {
 
 bool FileChecking::ValidateFiles( ) {
 
+	if ( !this->CheckWindowsDumpSetting( ) )
+		return false;
 
 	if ( !this->GetNickname( ) )
 		return false;

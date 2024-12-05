@@ -303,7 +303,6 @@ bool SaveFirstFunctionBytes( const std::string & moduleName , const std::string 
 	outFile << "};" << std::endl;
 
 	outFile.close( );
-	std::cout << "Os primeiros " << byteCount << " bytes da função foram salvos em: " << outputFileName << std::endl;
 	return true;
 }
 
@@ -545,7 +544,7 @@ void Detections::CheckFunctions( ) {
 		0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x6C, 0x24, 0x10, 0x48, 0x89, 0x74, 0x24, 0x18
 		};
 
-		if ( this->DoesFunctionAppearHooked( xorstr_( "ws2_32.dll" ) , xorstr_( "send" ) , SENDfunctionBytes ) ) {
+		if ( this->DoesFunctionAppearHooked( xorstr_( "ws2_32.dll" ) , xorstr_( "send" ) , nullptr ) ) {
 			AddDetection( FUNCTION_HOOKED , DetectionStruct( xorstr_( "ws2_32.dll:send() hooked" ) , SUSPECT ) );
 			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "ws2_32.dll:send() hooked" ) , RED );
 		}
@@ -556,20 +555,9 @@ void Detections::CheckFunctions( ) {
 	0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x74, 0x24, 0x10, 0x44, 0x89, 0x4C, 0x24, 0x20
 		};
 
-		if ( this->DoesFunctionAppearHooked( xorstr_( "ws2_32.dll" ) , xorstr_( "recv" ) , RECVfunctionBytes ) ) {
+		if ( this->DoesFunctionAppearHooked( xorstr_( "ws2_32.dll" ) , xorstr_( "recv" ) , nullptr ) ) {
 			AddDetection( FUNCTION_HOOKED , DetectionStruct( xorstr_( "ws2_32.dll:recv() hooked" ) , SUSPECT ) );
 			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "ws2_32.dll:recv() hooked" ) , RED );
-		}
-	}
-
-	{
-		unsigned char PresentBytes[ ] = {
-			0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x74, 0x24, 0x10, 0x57, 0x48, 0x83, 0xEC, 0x20
-		};
-
-		if ( this->DoesFunctionAppearHooked( xorstr_( "d3d11.dll" ) , xorstr_( "Present" ) , PresentBytes ) ) {
-			AddDetection( FUNCTION_HOOKED , DetectionStruct( xorstr_( "d3d11.dll:Present() hooked" ) , SUSPECT ) );
-			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "d3d11.dll:Present() hooked" ) , RED );
 		}
 	}
 }
@@ -641,45 +629,45 @@ void Detections::threadFunction( ) {
 		}
 
 
-		//switch ( CurrentDetection ) {
-		//case 0:
-		//	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "checking open handles!" ) , GRAY );
-		//	this->CheckOpenHandles( );
-		//	break;
-		//case 1:
-		//	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "checking functions!" ) , GRAY );
-		//	this->CheckFunctions( );
-		//	break;
-		//case 2:
-		//	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning loaded drivers!" ) , GRAY );
-		//	this->CheckLoadedDrivers( );
-		//	break;
-		//case 3:
-		//	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning loaded dlls!" ) , GRAY );
-		//	this->CheckLoadedDlls( );
-		//	break;
-		//case 4:
-		//	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning open windows!" ) , GRAY );
-		//	this->ScanWindows( );
-		//	break;
-		//case 5:
-		//	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning running threads!" ) , GRAY );
-		//	this->CheckRunningThreads( );
-		//	break;
-		//case 6:
-		//	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning parent modules!" ) , GRAY );
-		//	this->ScanParentModules( );
-		//	break;
-		//case 7:
-		//	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "digesting detecions!" ) , GRAY );
-		//	this->DigestDetections( );
-		//	break;
-		//default:
-		//	std::this_thread::sleep_for( std::chrono::seconds( this->getThreadSleepTime( ) ) );
-		//	//SET TO -1, CAUSE ++ = 0, so we wont miss handle verification
-		//	CurrentDetection = -1;
-		//	break;
-		//}
+		switch ( CurrentDetection ) {
+		case 0:
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "checking open handles!" ) , GRAY );
+			this->CheckOpenHandles( );
+			break;
+		case 1:
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "checking functions!" ) , GRAY );
+			this->CheckFunctions( );
+			break;
+		case 2:
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning loaded drivers!" ) , GRAY );
+			this->CheckLoadedDrivers( );
+			break;
+		case 3:
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning loaded dlls!" ) , GRAY );
+			this->CheckLoadedDlls( );
+			break;
+		case 4:
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning open windows!" ) , GRAY );
+			this->ScanWindows( );
+			break;
+		case 5:
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning running threads!" ) , GRAY );
+			this->CheckRunningThreads( );
+			break;
+		case 6:
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning parent modules!" ) , GRAY );
+			this->ScanParentModules( );
+			break;
+		case 7:
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "digesting detecions!" ) , GRAY );
+			this->DigestDetections( );
+			break;
+		default:
+			std::this_thread::sleep_for( std::chrono::seconds( this->getThreadSleepTime( ) ) );
+			//SET TO -1, CAUSE ++ = 0, so we wont miss handle verification
+			CurrentDetection = -1;
+			break;
+		}
 
 
 		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "ping" ) , GRAY );

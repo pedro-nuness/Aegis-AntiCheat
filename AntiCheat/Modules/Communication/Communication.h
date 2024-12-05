@@ -22,7 +22,7 @@ class Communication : public ThreadHolder {
 	void SignalShutdown( bool shut ) { this->ShutdownServerPing = shut; }
 	bool IsShutdownSignalled( ) { return this->ShutdownServerPing; }
 
-	int PingLimit = 10;
+	int PingLimit = 15;
 	std::chrono::steady_clock::time_point LastClientPing;
 	bool PingInTime( );
 	void UpdatePingTime( );

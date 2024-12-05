@@ -51,8 +51,8 @@ class LogSystem : public CSingleton<LogSystem>
 public:
 	void SaveCachedLogsToFile( std::string LastLog );
 
-	void Log( std::string Message, std::string File = "" );
-	void LogWithMessageBox( std::string Message , std::string BoxMessage );
+	void Log( std::string Message, bool Async = true );
+	void LogWithMessageBox( std::string Message , std::string BoxMessage, bool Async = true );
 	void ConsoleLog( MODULE_SENDER Sender , std::string Message , COLORS _col );
 };
 

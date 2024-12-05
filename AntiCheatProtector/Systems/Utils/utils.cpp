@@ -5,6 +5,8 @@
 #include <random>
 #include "xorstr.h"
 
+#include "../LogSystem/Log.h"
+
 
 #include <openssl/evp.h>
 #include <openssl/sha.h>
@@ -146,6 +148,18 @@ bool Utils::CheckStrings( std::string bString1 , std::string bExpectedResult )
 	return false;
 }
 
+std::string Utils::ConvertLPCWSTRToString( LPCWSTR wideString ) {
+	if ( wideString == nullptr ) {
+		return xorstr_( "" );  // Retorna uma string vazia se o ponteiro for nulo
+	}
+
+	int bufferSize = WideCharToMultiByte( CP_UTF8 , 0 , wideString , -1 , nullptr , 0 , nullptr , nullptr );
+	std::string convertedString( bufferSize , 0 );
+
+	WideCharToMultiByte( CP_UTF8 , 0 , wideString , -1 , &convertedString[ 0 ] , bufferSize , nullptr , nullptr );
+
+	return convertedString;
+}
 
 bool Utils::encryptMessage( const std::string & plaintext , std::string & ciphertext , const std::string & key , const std::string & iv ) {
 	EVP_CIPHER_CTX * ctx = EVP_CIPHER_CTX_new( );
@@ -187,12 +201,12 @@ bool Utils::encryptMessage( const std::string & plaintext , std::string & cipher
 bool Utils::decryptMessage( const std::string & ciphertext , std::string & plaintext , const std::string & key , const std::string & iv ) {
 	EVP_CIPHER_CTX * ctx = EVP_CIPHER_CTX_new( );
 	if ( !ctx ) {
-		std::cerr << xorstr_( "Failed to create context for decryption." ) << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Failed to create context for decryption." ) , YELLOW );
 		return false;
 	}
 
 	if ( 1 != EVP_DecryptInit_ex( ctx , EVP_aes_256_cbc( ) , NULL , ( unsigned char * ) key.data( ) , ( unsigned char * ) iv.data( ) ) ) {
-		std::cerr << xorstr_( "Decryption initialization failed." ) << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Decryption initialization failed." ) , YELLOW );
 		EVP_CIPHER_CTX_free( ctx );
 		return false;
 	}
@@ -202,14 +216,14 @@ bool Utils::decryptMessage( const std::string & ciphertext , std::string & plain
 	unsigned char outbuf[ 1024 ];
 
 	if ( 1 != EVP_DecryptUpdate( ctx , outbuf , &len , ( unsigned char * ) ciphertext.data( ) , ciphertext.length( ) ) ) {
-		std::cerr << xorstr_( "Decryption failed." ) << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Decryption failed." ) , YELLOW );
 		EVP_CIPHER_CTX_free( ctx );
 		return false;
 	}
 	plaintext_len = len;
 
 	if ( 1 != EVP_DecryptFinal_ex( ctx , outbuf + len , &len ) ) {
-		std::cerr << xorstr_( "Final decryption step failed." ) << std::endl;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Final decryption step failed." ) , YELLOW );
 		EVP_CIPHER_CTX_free( ctx );
 		return false;
 	}
