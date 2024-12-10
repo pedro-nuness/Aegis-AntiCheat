@@ -5,6 +5,8 @@
 #include <Aclapi.h>     
 #include <sddl.h>       
 #include <tchar.h>      
+#include <sstream>
+#include <iomanip>
 
 #include "../../Process/Process.hpp"
 #include "../../Process/Exports.hpp"
@@ -16,6 +18,9 @@
 #include "../../Obscure/ntldr.h"
 
 #include "../../externals/minhook/MinHook.h"
+
+#include "../../Modules/Detections/Detections.h"
+#include "../../Globals/Globals.h"
 
 #include <Windows.h>
 #include <iostream>
@@ -473,6 +478,52 @@ typedef HANDLE( WINAPI * pCreateThread )(
 	LPDWORD lpThreadId
 	);
 
+std::string GenerateInvalidThreadLog(
+	LPSECURITY_ATTRIBUTES lpThreadAttributes ,
+	SIZE_T dwStackSize ,
+	LPTHREAD_START_ROUTINE lpStartAddress ,
+	LPVOID lpParameter ,
+	DWORD dwCreationFlags ,
+	LPDWORD lpThreadId )
+{
+	std::ostringstream log;
+
+	log << xorstr_( "Thread Creation Details:\n");
+
+	log << xorstr_( "lpThreadAttributes: ");
+	if ( lpThreadAttributes ) {
+		log << xorstr_( "Present (nLength: ") << lpThreadAttributes->nLength << xorstr_( ", lpSecurityDescriptor: ")
+			<< lpThreadAttributes->lpSecurityDescriptor << xorstr_( ", bInheritHandle: " )
+			<< ( lpThreadAttributes->bInheritHandle ? xorstr_( "true") : xorstr_( "false") ) << xorstr_( ")");
+	}
+	else {
+		log << xorstr_( "nullptr");
+	}
+	log << xorstr_( "\n");
+
+	log << xorstr_( "dwStackSize: ") << dwStackSize << xorstr_( " bytes\n");
+
+	log << xorstr_( "lpStartAddress: ") << std::hex << std::setw( sizeof( void * ) * 2 ) << std::setfill( '0' )
+		<< reinterpret_cast< void * >( lpStartAddress ) << "\n";
+
+	log << xorstr_( "lpParameter: ") << std::hex << std::setw( sizeof( void * ) * 2 ) << std::setfill( '0' )
+		<< reinterpret_cast< void * >( lpParameter ) << "\n";
+
+	log << xorstr_( "dwCreationFlags: 0x") << std::hex << dwCreationFlags << "\n";
+
+	log << xorstr_( "lpThreadId: ");
+	if ( lpThreadId ) {
+		log << *lpThreadId;
+	}
+	else {
+		log << xorstr_( "nullptr" );
+	}
+	log << xorstr_( "\n");
+
+	return log.str( );
+}
+
+
 pCreateThread originalCreateThread = nullptr;
 
 HANDLE WINAPI MyCreateThread(
@@ -486,12 +537,23 @@ HANDLE WINAPI MyCreateThread(
 
 	//somehow, this mf managed to get the createthread function pointer, and called it, so let's check
 
-	if ( SuspectThreadAddress( lpStartAddress ) ) {
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Blocked create thread attemp on suspect address!" ), YELLOW );
+	MEMORY_BASIC_INFORMATION mbi;
+	// Obtemos a informação sobre a região de memória onde o thread foi alocado
+	if ( VirtualQuery( lpStartAddress , &mbi , sizeof( mbi ) ) )
+	{
+		if ( mbi.Type != MEM_IMAGE ) {
+			if ( _globals.DetectionsPointer != nullptr ) {
+				Detections * DetectionPtr = reinterpret_cast< Detections * > ( _globals.DetectionsPointer );
+				DetectionPtr->AddExternalDetection( INVALID_THREAD_CREATION , DetectionStruct( GenerateInvalidThreadLog( lpThreadAttributes ,
+					dwStackSize, lpStartAddress, lpParameter, dwCreationFlags, lpThreadId
+					) , DETECTED ) );
+			}
 
-		//return nothing, no threads for you today
-		return NULL;
+			LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Invalid thread creation attempted" ) , RED );
+			return NULL;
+		}
 	}
+
 
 	// Call the original CreateThread function
 	return originalCreateThread(
@@ -554,8 +616,8 @@ void Preventions::Deploy( ) {
 	if ( !Preventions::Get( ).PreventDllInjection( ) )
 		LogSystem::Get( ).Log( xorstr_( "[3] Failed to protect process" ) );
 
-	if(!Preventions::Get().PreventThreadCreation() )
-		LogSystem::Get( ).Log( xorstr_( "[4] Failed to protect process" ) );
+	/*if(!Preventions::Get().PreventThreadCreation() )
+		LogSystem::Get( ).Log( xorstr_( "[4] Failed to protect process" ) );*/
 
 
 	/*if ( !Preventions::Get( ).RemapProgramSections( ) ) {

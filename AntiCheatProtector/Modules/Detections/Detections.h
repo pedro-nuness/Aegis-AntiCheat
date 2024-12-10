@@ -47,10 +47,11 @@ class Detections:  public ThreadHolder
 
 
 	std::vector<std::pair<FLAG_DETECTION , DetectionStruct>> DetectedFlags;
-	bool DoesFunctionAppearHooked( std::string moduleName , std::string functionName , const unsigned char * expectedBytes );
+	bool DoesFunctionAppearHooked( std::string moduleName , std::string functionName , const unsigned char * expectedBytes, bool restore );
 	void CheckFunctions( );
 	void CheckHandles( );
 	bool InjectProcess( DWORD processId );  
+	bool UsingReshade( );
 	void RemoveInjection( DWORD processId );
 	void CheckInjectedProcesses( );
 

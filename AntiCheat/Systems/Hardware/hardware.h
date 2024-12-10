@@ -12,7 +12,11 @@ public:
 	std::vector<std::string> getMacAddress( );
 	std::string GetIp(  );
 	bool GetLoggedUsers( std::vector<std::string> * Buffer);
+	bool GetUniqueUID( std::string * buffer, std::string ID = "" );
+	bool GetVersionUID( std::string * buffer );
 
-	void GenerateCache( );
+	void GenerateInitialCache( );
+	void EndCacheGeneration( );
+
 };
 

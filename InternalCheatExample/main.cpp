@@ -387,8 +387,13 @@ DWORD WINAPI main( PVOID base )
 		return EXIT_SUCCESS;
 	}
 
-	SaveFirstFunctionBytes( "ws2_32.dll" , "send" , "send_dump.bin" , 16 );
-	SaveFirstFunctionBytes( "ws2_32.dll" , "recv" , "recv_dump.bin" , 16 );
+	/*SaveFirstFunctionBytes( "ws2_32.dll" , "send" , "send_dump.bin" , 16 );
+	SaveFirstFunctionBytes( "ws2_32.dll" , "recv" , "recv_dump.bin" , 16 );*/
+
+	while ( true ) {
+		std::cout << "Hi from cheat !\n";
+		Sleep( 100 );
+	}
 
 
 

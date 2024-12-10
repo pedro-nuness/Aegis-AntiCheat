@@ -30,22 +30,25 @@ enum FLAG_DETECTION {
 	HIDE_FROM_CAPTURE_WINDOW ,
 	FUNCTION_HOOKED,
 	OPENHANDLE_TO_US,
+	INVALID_THREAD_CREATION
 };
 
 class Detections : public ThreadHolder {
 
 	std::mutex AccessGuard;
+	std::mutex ExternalDetectionsAcessGuard;
 
 	DWORD MomProcess = 0 , ProtectProcess = 0;
 	std::vector<std::string> LoadedDlls;
 	std::vector<std::string> PendingLoadedDlls;
 
 	std::vector<std::pair<FLAG_DETECTION , DetectionStruct>> DetectedFlags;
+	std::vector<std::pair<FLAG_DETECTION , DetectionStruct>> ExternalDetectedFlags;
 
 	std::vector<DWORD> AllowedThreads;
 	bool RegisteredThreads = false;
 
-	bool DoesFunctionAppearHooked( std::string moduleName , std::string functionName, const unsigned char * expectedBytes );
+	bool DoesFunctionAppearHooked( std::string moduleName , std::string functionName, const unsigned char * expectedBytes, bool restore);
 
 	bool IsIATHooked( std::string & moduleName );
 	bool IsEATHooked( std::string & moduleName );
@@ -62,20 +65,16 @@ class Detections : public ThreadHolder {
 
 	void AddDetection( FLAG_DETECTION flag , DetectionStruct Detect );
 	void DigestDetections( );
-	
-
-
-	 
+		 
 	std::string GenerateDetectionStatus( FLAG_DETECTION flag , DetectionStruct _detection );
 
 	void threadFunction( ) override;
 	static VOID OnDllNotification( ULONG NotificationReason , const PLDR_DLL_NOTIFICATION_DATA NotificationData , PVOID Context );
 
-
-
 public:
 	void InitializeThreads( );
 	void AddThreadToWhitelist( DWORD PID );
+	void AddExternalDetection( FLAG_DETECTION , DetectionStruct );
 	void SetupPid( DWORD _MomProcess , DWORD _ProtectProcess );
 
 	Detections( );

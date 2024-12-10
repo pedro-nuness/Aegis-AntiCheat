@@ -295,7 +295,7 @@ void Communication::HandleMissingPing( ) {
 	closeconnection( ClientSocket );
 	closeconnection( ListenSocket );
 
-	if ( Mem::Get( ).IsPIDRunning( Globals::Get( ).ProtectProcess ) ) {
+	if ( Mem::Get( ).IsPIDRunning( _globals.ProtectProcess ) ) {
 		LogSystem::Get( ).Log( xorstr_( "[303] Can't find client answer!" ) );
 	}
 	else {
@@ -304,7 +304,7 @@ void Communication::HandleMissingPing( ) {
 }
 
 bool Communication::InitializeClient( ) {
-	return Injector::Get( ).Inject( xorstr_( "winsock.dll" ) , Globals::Get( ).ProtectProcess ) == 1;
+	return Injector::Get( ).Inject( xorstr_( "winsock.dll" ) , _globals.ProtectProcess ) == 1;
 }
 
 bool Communication::SendPasswordToServer( ) {
@@ -356,11 +356,9 @@ void Communication::SendPingToServer( LPVOID AD ) {
 		}
 
 		// Envia PING para o servidor
-		if ( client::Get( ).SendPingToServer( ) )
-			communication->ServerResponse = RECEIVED;
-		else
-			communication->ServerResponse = RECEIVE_ERROR;
-
+		if ( !client::Get( ).SendPingToServer( ) ) {
+			LogSystem::Get( ).ConsoleLog( _SERVER_MESSAGE , xorstr_( "Failed to send ping!" ) , YELLOW );
+		}
 
 		std::this_thread::sleep_for( std::chrono::seconds( 10 ) );
 	}
@@ -467,12 +465,12 @@ void Communication::threadFunction( ) {
 		this->~Communication( );
 	}
 	{
-		ThreadGuard * Guard = reinterpret_cast< ThreadGuard * >( Globals::Get( ).GuardMonitorPointer );
+		ThreadGuard * Guard = reinterpret_cast< ThreadGuard * >( _globals.GuardMonitorPointer );
 		Guard->AddThreadToList( PingThread->GetId( ) );
 	}
 
 	//Unlock all threads
-	Globals::Get( ).VerifiedSession = true;
+	_globals.VerifiedSession = true;
 
 	this->LastClientPing = now;
 

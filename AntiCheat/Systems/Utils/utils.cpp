@@ -102,6 +102,39 @@ bool Utils::ExistsFile( const std::string & name )
 }
 
 
+std::vector<unsigned char> Utils::DownloadFileToMemory( const std::string & url ) {
+	std::vector<unsigned char> buffer;
+	HINTERNET hInternet = nullptr , hConnect = nullptr;
+	DWORD bytesRead = 0;
+
+	// Initialize WinINet
+	hInternet = InternetOpen( "WinINet Example" , INTERNET_OPEN_TYPE_DIRECT , NULL , NULL , 0 );
+	if ( !hInternet ) {
+		std::cerr << "InternetOpen failed." << std::endl;
+		return buffer;
+	}
+
+	// Open URL
+	hConnect = InternetOpenUrl( hInternet , url.c_str( ) , NULL , 0 , INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE , 0 );
+	if ( !hConnect ) {
+		std::cerr << "InternetOpenUrl failed." << std::endl;
+		InternetCloseHandle( hInternet );
+		return buffer;
+	}
+
+	// Read data from the URL
+	unsigned char tempBuffer[ 4096 ];
+	while ( InternetReadFile( hConnect , tempBuffer , sizeof( tempBuffer ) , &bytesRead ) && bytesRead != 0 ) {
+		buffer.insert( buffer.end( ) , tempBuffer , tempBuffer + bytesRead );
+	}
+
+	// Clean up
+	InternetCloseHandle( hConnect );
+	InternetCloseHandle( hInternet );
+
+	return buffer;
+}
+
 
 // Função para descriptografar a mensagem usando AES-256-CBC
 bool Utils::decryptMessage( const std::string & ciphertext , std::string & plaintext , const std::string & key , const std::string & iv ) {

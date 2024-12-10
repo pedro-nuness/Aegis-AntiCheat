@@ -21,6 +21,7 @@
 
 #include <TlHelp32.h>
 #include <set>
+#include <winternl.h>
 
 void Detections::InitializeThreads( ) {
 	for ( ThreadInfo Thread : Mem::Thread::Get( ).EnumerateThreads( GetCurrentProcessId( ) ) ) {
@@ -94,6 +95,7 @@ void Detections::CheckLoadedDrivers( ) {
 				|| Utils::Get( ).CheckStrings( Driver , xorstr_( "dump_dumpfve.sys" ) )
 				|| Utils::Get( ).CheckStrings( Driver , xorstr_( "dump_storahci.sys" ) ) ) {
 				LogSystem::Get( ).Log( xorstr_( "[203] Windows dump files found" ) );
+				continue;
 			}
 
 			size_t pos = Driver.find( toReplace );
@@ -134,7 +136,7 @@ void Detections::CheckOpenHandles( ) {
 
 	for ( auto & handle : handles )
 	{
-		if ( handle.ProcessId == Globals::Get( ).ProtectProcess )
+		if ( handle.ProcessId == _globals.ProtectProcess )
 			continue;
 
 		if ( DoesProcessHaveOpenHandleTous( handle.ProcessId , handles ) )
@@ -216,6 +218,9 @@ std::string Detections::GenerateDetectionStatus( FLAG_DETECTION flag , Detection
 	case OPENHANDLE_TO_US:
 		_result += xorstr_( "** Found open handle to our process **\n" );
 		break;
+	case INVALID_THREAD_CREATION:
+		_result += xorstr_( "** Invalid Thread creation attempted **\n" );
+		break;
 	}
 
 	_result += xorstr_( "`" ) + _detection.Log + xorstr_( "`\n" );
@@ -227,49 +232,79 @@ void Detections::AddDetection( FLAG_DETECTION flag , DetectionStruct _detection 
 	this->DetectedFlags.emplace_back( std::make_pair( flag , _detection ) );
 }
 
-
-
 void Detections::DigestDetections( ) {
+
+
+	static std::vector<std::pair<FLAG_DETECTION , DetectionStruct>> OldDetectedFlags;
+	{
+		std::lock_guard<std::mutex> lock( this->ExternalDetectionsAcessGuard );
+		if ( !ExternalDetectedFlags.empty( ) ) {
+			for ( auto __Detection : ExternalDetectedFlags ) {
+				DetectedFlags.emplace_back( __Detection );
+			}
+			ExternalDetectedFlags.clear( );
+		}
+	}
+
 	if ( DetectedFlags.empty( ) ) {
 		return;
 	}
 
-	if ( !DetectedFlags.empty( ) ) {
-		/*
-		* DIGEST DETECTION
-		*/
-		std::string FinalInfo = "";
+	/*
+	* DIGEST DETECTION
+	*/
+	std::string FinalInfo = "";
 
-		FinalInfo += xorstr_( "> AC FLAG detected\n\n" );
+	FinalInfo += xorstr_( "> AC FLAG detected\n\n" );
 
-		bool Ban = false;
+	bool Ban = false;
+	int Elapsed = 0;
 
-		for ( auto Detection : DetectedFlags ) {
-			FinalInfo += this->GenerateDetectionStatus( Detection.first , Detection.second );
-			if ( Detection.second._Status == DETECTED )
-				Ban = true;
+	std::vector<std::pair<FLAG_DETECTION , DetectionStruct>> OldCopy = OldDetectedFlags;
+
+	for ( auto Detection : DetectedFlags ) {
+		if ( Detection.second._Status != DETECTED )
+		{
+			bool Skip = false;
+
+			for ( auto OldDetection : OldCopy ) {
+				if ( OldDetection.first == Detection.first
+					&& OldDetection.second._Status == Detection.second._Status
+					&& !strcmp( OldDetection.second.Log.c_str( ) , Detection.second.Log.c_str( ) ) ) {
+					Skip = true;
+					break;
+				}
+			}
+
+			if ( Skip )
+				continue;
+
+			OldDetectedFlags.emplace_back( Detection );
 		}
 
-		LogSystem::Get( ).ConsoleLog( _DETECTION , FinalInfo , Ban ? RED : YELLOW );
-
-		client::Get( ).SendPunishToServer( FinalInfo , Ban );
-		LogSystem::Get( ).Log( xorstr_( "AC Flagged unsafe!" ) );
+		FinalInfo += this->GenerateDetectionStatus( Detection.first , Detection.second );
+		if ( Detection.second._Status == DETECTED )
+			Ban = true;
+		Elapsed++;
 	}
 
-	this->DetectedFlags.clear( );
+	if ( !Elapsed )
+		return;
+
+
+	if ( client::Get( ).SendPunishToServer( FinalInfo , Ban ) ) {
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Sent Punish to server sucessfully!" ) , GREEN );
+		this->DetectedFlags.clear( );
+
+		if ( Ban )
+			LogSystem::Get( ).Log( xorstr_( "AC Flagged unsafe!" ) );
+	}
+	else {
+		// Don`t erase the detection vector, we will try again later!
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Failed to send punish to server" ) , RED );
+	}
 }
 
-static BOOL __forceinline AppearHooked( UINT64 AddressFunction ) {
-	__try
-	{
-		if ( *( BYTE * ) AddressFunction == 0xE8 || *( BYTE * ) AddressFunction == 0xE9 || *( BYTE * ) AddressFunction == 0xEA || *( BYTE * ) AddressFunction == 0xEB ) //0xEB = short jump, 0xE8 = call X, 0xE9 = long jump, 0xEA = "jmp oper2:oper1"
-			return FALSE;
-	}
-	__except ( EXCEPTION_EXECUTE_HANDLER )
-	{
-		return FALSE; //couldn't read memory at function
-	}
-}
 
 bool SaveFirstFunctionBytes( const std::string & moduleName , const std::string & functionName , const std::string & outputFileName , size_t byteCount ) {
 	// Obter o handle do módulo
@@ -306,44 +341,61 @@ bool SaveFirstFunctionBytes( const std::string & moduleName , const std::string 
 	return true;
 }
 
+void Detections::AddExternalDetection( FLAG_DETECTION  flag , DetectionStruct  _detection ) {
+	std::lock_guard<std::mutex> lock( this->ExternalDetectionsAcessGuard );
+	this->ExternalDetectedFlags.emplace_back( std::make_pair( flag , _detection ) );
+	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Received External Detection!\n" ) + _detection.Log , YELLOW );
+}
 
 
-bool Detections::DoesFunctionAppearHooked( std::string moduleName , std::string functionName , const unsigned char * expectedBytes )
-{
+
+bool Detections::DoesFunctionAppearHooked( std::string moduleName , std::string functionName , const unsigned char * expectedBytes , bool restore ) {
 	if ( moduleName.empty( ) || functionName.empty( ) )
 		return false;
 
-	if ( !expectedBytes ) {
-		SaveFirstFunctionBytes( moduleName , functionName , functionName + xorstr_( ".txt" ) , 15 );
+	if ( !expectedBytes || expectedBytes == nullptr ) {
+		SaveFirstFunctionBytes( moduleName , functionName , functionName + xorstr_( ".txt" ) , sizeof( expectedBytes ) );
 		return false;
 	}
 
-	bool FunctionPreambleHooked = false;
-
 	HMODULE hMod = GetModuleHandleA( moduleName.c_str( ) );
-	if ( hMod == NULL )
-	{
+	if ( hMod == NULL ) {
 		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Couldn't fetch module " ) + moduleName , RED );
 		return false;
 	}
 
-
 	UINT64 AddressFunction = ( UINT64 ) GetProcAddress( hMod , functionName.c_str( ) );
-
-	if ( AddressFunction == NULL )
-	{
+	if ( AddressFunction == NULL ) {
 		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Couldn't fetch address of function " ) + functionName , RED );
-		return FALSE;
+		return false;
 	}
 
 	bool FOUND_HOOK = false;
 
-	unsigned char buffer[ sizeof( expectedBytes ) ];
+	unsigned char buffer[ sizeof( expectedBytes ) ]; // Substituí sizeof(expectedBytes) por um tamanho fixo
 	SIZE_T bytesRead;
+	SIZE_T bytesWritten;
+
+	// Leia os primeiros bytes da função
 	if ( ReadProcessMemory( GetCurrentProcess( ) , ( void * ) AddressFunction , buffer , sizeof( expectedBytes ) , &bytesRead ) ) {
+		// Verifique se os bytes diferem dos esperados
 		if ( memcmp( buffer , expectedBytes , sizeof( expectedBytes ) ) != 0 ) {
-			FOUND_HOOK = TRUE;
+			FOUND_HOOK = true;
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Function " ) + functionName + xorstr_( " appears to be hooked! Restoring original bytes..." ) , YELLOW );
+
+			if ( restore ) {
+				// Restaure os bytes originais
+				if ( WriteProcessMemory( GetCurrentProcess( ) , ( void * ) AddressFunction , expectedBytes , sizeof( expectedBytes ) , &bytesWritten ) ) {
+					LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Successfully restored original bytes for function " ) + functionName , GREEN );
+				}
+				else {
+					LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Failed to restore original bytes for function " ) + functionName , RED );
+				}
+			}
 		}
+	}
+	else {
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Failed to read function memory for " ) + functionName , RED );
 	}
 
 	return FOUND_HOOK;
@@ -387,7 +439,7 @@ void Detections::ScanWindows( ) {
 
 	for ( const auto & [processId , _] : processedProcesses ) {
 
-		if ( processId == 4 || processId == 0 || processId == Globals::Get( ).ProtectProcess )
+		if ( processId == 4 || processId == 0 || processId == _globals.ProtectProcess )
 			continue;
 
 		HANDLE hProcess = OpenProcess( PROCESS_VM_READ | PROCESS_QUERY_INFORMATION , FALSE , processId );
@@ -537,35 +589,65 @@ bool Detections::IsIATHooked( std::string & moduleName ) {
 }
 
 
+
+
 void Detections::CheckFunctions( ) {
 
-	{
-		unsigned char SENDfunctionBytes[ ] = {
+
+	WindowsVersion OSVersion = Services::Get( ).GetWindowsVersion( );
+	std::vector<unsigned char> SENDfunctionBytes;
+	std::vector<unsigned char> RECVfunctionBytes;
+
+
+	switch ( OSVersion ) {
+	case Windows10:
+
+		SENDfunctionBytes = {
 		0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x6C, 0x24, 0x10, 0x48, 0x89, 0x74, 0x24, 0x18
 		};
 
-		if ( this->DoesFunctionAppearHooked( xorstr_( "ws2_32.dll" ) , xorstr_( "send" ) , nullptr ) ) {
-			AddDetection( FUNCTION_HOOKED , DetectionStruct( xorstr_( "ws2_32.dll:send() hooked" ) , SUSPECT ) );
-			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "ws2_32.dll:send() hooked" ) , RED );
-		}
-	}
-
-	{
-		unsigned char RECVfunctionBytes[ ] = {
+		RECVfunctionBytes = {
 	0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x74, 0x24, 0x10, 0x44, 0x89, 0x4C, 0x24, 0x20
 		};
 
-		if ( this->DoesFunctionAppearHooked( xorstr_( "ws2_32.dll" ) , xorstr_( "recv" ) , nullptr ) ) {
-			AddDetection( FUNCTION_HOOKED , DetectionStruct( xorstr_( "ws2_32.dll:recv() hooked" ) , SUSPECT ) );
-			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "ws2_32.dll:recv() hooked" ) , RED );
-		}
+		break;
+
+	case Windows11:
+
+		RECVfunctionBytes = {
+			0x48, 0x89, 0x5c, 0x24, 0x8, 0x48, 0x89, 0x6c, 0x24, 0x10, 0x44, 0x89, 0x4c, 0x24, 0x20, 0x56
+		};
+
+		SENDfunctionBytes = {
+		0x48, 0x89, 0x5c, 0x24, 0x8, 0x48, 0x89, 0x6c, 0x24, 0x10, 0x48, 0x89, 0x74, 0x24, 0x18, 0x57
+		};
+
+		break;
+
+	default:
+		LogSystem::Get( ).Log( xorstr_( "Incompatible OS Version!" ) );
+		goto out;
 	}
+
+	if ( this->DoesFunctionAppearHooked( xorstr_( "ws2_32.dll" ) , xorstr_( "send" ) , SENDfunctionBytes.data( ) , true ) ) {
+		AddDetection( FUNCTION_HOOKED , DetectionStruct( xorstr_( "ws2_32.dll:send() hooked" ) , DETECTED ) );
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "ws2_32.dll:send() hooked" ) , RED );
+	}
+
+	if ( this->DoesFunctionAppearHooked( xorstr_( "ws2_32.dll" ) , xorstr_( "recv" ) , RECVfunctionBytes.data( ) , true ) ) {
+		AddDetection( FUNCTION_HOOKED , DetectionStruct( xorstr_( "ws2_32.dll:recv() hooked" ) , DETECTED ) );
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "ws2_32.dll:recv() hooked" ) , RED );
+	}
+
+out:
+	return;
+
 }
 
 void Detections::CheckRunningThreads( ) {
 
 	if ( !RegisteredThreads ) {
-		ThreadGuard * Guard = reinterpret_cast< ThreadGuard * >( Globals::Get( ).GuardMonitorPointer );
+		ThreadGuard * Guard = reinterpret_cast< ThreadGuard * >( _globals.GuardMonitorPointer );
 		for ( auto ID : Guard->GetRunningThreadsID( ) ) {
 			bool Found = false;
 			for ( DWORD AllowedThread : AllowedThreads ) {
@@ -603,7 +685,7 @@ void Detections::threadFunction( ) {
 	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );
 
 
-	while ( !Globals::Get( ).VerifiedSession ) {
+	while ( !_globals.VerifiedSession ) {
 		if ( this->ThreadObject->IsShutdownSignalled( ) ) {
 			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "shutting down thread" ) , RED );
 			return;
@@ -675,5 +757,5 @@ void Detections::threadFunction( ) {
 		CurrentDetection++;
 
 		std::this_thread::sleep_for( std::chrono::milliseconds( 250 ) );
-	} 
+	}
 }

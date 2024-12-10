@@ -19,6 +19,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Driver", "Driver\Driver.vcx
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LogDecryptor", "LogDecryptor\LogDecryptor.vcxproj", "{F6659541-73C6-45CA-802F-2C048DA55D65}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DayZ-Alyx", "..\DayZ-Alyx\DayZ-Alyx\DayZ-Alyx.vcxproj", "{9D26B6B9-A604-470F-9236-459A97E333D9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM64 = Debug|ARM64
@@ -131,6 +133,18 @@ Global
 		{F6659541-73C6-45CA-802F-2C048DA55D65}.Release|x64.Build.0 = Release|x64
 		{F6659541-73C6-45CA-802F-2C048DA55D65}.Release|x86.ActiveCfg = Release|Win32
 		{F6659541-73C6-45CA-802F-2C048DA55D65}.Release|x86.Build.0 = Release|Win32
+		{9D26B6B9-A604-470F-9236-459A97E333D9}.Debug|ARM64.ActiveCfg = Debug|x64
+		{9D26B6B9-A604-470F-9236-459A97E333D9}.Debug|ARM64.Build.0 = Debug|x64
+		{9D26B6B9-A604-470F-9236-459A97E333D9}.Debug|x64.ActiveCfg = Debug|x64
+		{9D26B6B9-A604-470F-9236-459A97E333D9}.Debug|x64.Build.0 = Debug|x64
+		{9D26B6B9-A604-470F-9236-459A97E333D9}.Debug|x86.ActiveCfg = Debug|Win32
+		{9D26B6B9-A604-470F-9236-459A97E333D9}.Debug|x86.Build.0 = Debug|Win32
+		{9D26B6B9-A604-470F-9236-459A97E333D9}.Release|ARM64.ActiveCfg = Release|x64
+		{9D26B6B9-A604-470F-9236-459A97E333D9}.Release|ARM64.Build.0 = Release|x64
+		{9D26B6B9-A604-470F-9236-459A97E333D9}.Release|x64.ActiveCfg = Release|x64
+		{9D26B6B9-A604-470F-9236-459A97E333D9}.Release|x64.Build.0 = Release|x64
+		{9D26B6B9-A604-470F-9236-459A97E333D9}.Release|x86.ActiveCfg = Release|Win32
+		{9D26B6B9-A604-470F-9236-459A97E333D9}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

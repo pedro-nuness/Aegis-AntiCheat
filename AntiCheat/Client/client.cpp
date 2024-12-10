@@ -63,7 +63,7 @@ bool client::InitializeConnection( ) {
 	}
 
 	this->CurrentSocket = sock;
-	LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Connected successfully." ) , GREEN );
+	//LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Connected successfully." ) , GREEN );
 	return true;
 }
 
@@ -122,7 +122,6 @@ bool client::GetResponse( CommunicationResponse * response ) {
 	if ( response != nullptr )
 		*response = ( CommunicationResponse ) messageInt;
 
-
 	return true;
 }
 
@@ -172,7 +171,7 @@ bool client::SendData( std::string data , CommunicationType type , bool encrypt 
 		totalSent += sent;
 	}
 
-	LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Message sent successfully." ) , GREEN );
+	//LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Message sent successfully." ) , GREEN );
 	return true;
 }
 
@@ -196,7 +195,7 @@ bool client::SendDataToServer( std::string str , CommunicationType type ) {
 	success = SendData( str , type , type == WARN || type == BAN ? false : true );
 
 	if ( success ) {
-		CommunicationResponse response;
+		CommunicationResponse response = NORESPONSE;
 		GetResponse( &response );
 
 		switch ( response ) {
@@ -211,11 +210,13 @@ bool client::SendDataToServer( std::string str , CommunicationType type ) {
 			LogSystem::Get( ).LogWithMessageBox( xorstr_( "Server denied ping" ) , xorstr_( "You have been banned!" ) );
 			success = false;
 			break;
+		default:
+			success = false;
+			break;
 		}
 	}
 
 	CloseConnection( );
-
 
 	return success;
 }
@@ -258,8 +259,8 @@ bool GetHWIDJson( json & js ) {
 
 	js[ xorstr_( "ip" ) ] = Ip;
 
-	std::string Nickname = Globals::Get( ).Nickname;
-	if ( Utils::Get( ).GenerateStringHash( Nickname ) != Globals::Get( ).NicknameHash ) {
+	std::string Nickname = _globals.Nickname;
+	if ( Utils::Get( ).GenerateStringHash( Nickname ) != _globals.NicknameHash ) {
 		js[ xorstr_( "warn_message" ) ] = xorstr_( "Nickname hash corrupted, user may have changed its user!" );
 	}
 	js[ xorstr_( "nickname" ) ] = Nickname;

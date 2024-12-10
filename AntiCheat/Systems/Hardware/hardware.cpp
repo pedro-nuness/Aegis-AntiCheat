@@ -33,6 +33,7 @@
 
 #include "../../Systems/LogSystem/File/File.h"
 #include "../../Systems/LogSystem/Log.h"
+#include "../../Systems/Memory/memory.h"
 
 #include "../Utils/xorstr.h"
 #include "../Utils/utils.h"
@@ -47,14 +48,23 @@ CryptedString CachedMotherBoardSerialNumber;
 CryptedString CachedDiskSerialNumber;
 std::vector<CryptedString> CachedMac;
 CryptedString CachedIp;
+CryptedString CachedUniqueID;
+CryptedString CachedVersionID;
 
 
-void hardware::GenerateCache( ) {
-	GetMotherboardSerialNumber(nullptr );
+
+
+void hardware::GenerateInitialCache( ) {
+	GetMotherboardSerialNumber( nullptr );
 	GetDiskSerialNumber( nullptr );
+}
+
+void hardware::EndCacheGeneration( ) {
 	getMacAddress( );
 	GetIp( );
+	GetVersionUID( nullptr );
 }
+
 
 class ComInitializer {
 public:
@@ -136,6 +146,38 @@ bool hardware::GetMotherboardSerialNumber( std::string * buffer ) {
 		LogSystem::Get( ).ConsoleLog( _HWID , ex.what( ) , RED );
 		return false;
 	}
+}
+
+bool hardware::GetVersionUID( std::string * buffer ) {
+	if ( !CachedVersionID.EncryptedString.empty( ) && buffer ) {
+		std::string * Str = StringCrypt::Get( ).DecryptString( CachedVersionID );
+		*buffer = *Str;
+		StringCrypt::Get( ).CleanString( Str );
+		return true;
+	}
+
+	{
+		std::string VersionID = Mem::Get( ).GetFileHash( Mem::Get( ).GetProcessExecutablePath( GetCurrentProcessId( ) ) );
+		CachedVersionID = StringCrypt::Get( ).EncryptString( VersionID );
+	}
+}
+
+bool hardware::GetUniqueUID( std::string * buffer , std::string ID ) {
+	if ( buffer == nullptr ) {
+		if ( ID.empty( ) || !CachedUniqueID.EncryptedString.empty( ) )
+			return false;
+		CachedUniqueID = StringCrypt::Get( ).EncryptString( ID );
+		return true;
+	}
+
+	if ( !CachedUniqueID.EncryptedString.empty( ) && buffer ) {
+		std::string * Str = StringCrypt::Get( ).DecryptString( CachedUniqueID );
+		*buffer = *Str;
+		StringCrypt::Get( ).CleanString( Str );
+		return true;
+	}
+
+	return false;
 }
 
 bool hardware::GetDiskSerialNumber( std::string * buffer ) {

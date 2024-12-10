@@ -234,7 +234,6 @@ void Triggers::DigestTriggers( ) {
 
 	if ( !NewTriggers.empty( ) ) {
 		client::Get( ).SendPunishToServer( GenerateWarningStatus( NewTriggers ) , false );
-		 LogSystem::Get( ).LogWithMessageBox( xorstr_( "Unsafe" ) , xorstr_( "unsafe session" ) );
 	}
 
 	this->LastTriggers = this->FoundTriggers;
@@ -243,7 +242,7 @@ void Triggers::DigestTriggers( ) {
 void Triggers::CheckBlackListedProcesses( ) {
 	for ( auto Process : Mem::Get( ).EnumAllProcesses( ) ) {
 		DWORD PID = Mem::Get( ).GetProcessID( Process.c_str( ) );
-		if ( PID == this->MomProcess || PID == this->ProtectProcess || PID == Globals::Get( ).SelfID )
+		if ( PID == this->MomProcess || PID == this->ProtectProcess || PID == _globals.SelfID )
 			continue;
 		std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
 
@@ -303,7 +302,7 @@ void Triggers::threadFunction( ) {
 	bool Run = true;
 	LogSystem::Get( ).ConsoleLog( _TRIGGERS , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );
 
-	while ( !Globals::Get( ).VerifiedSession ) {
+	while ( !_globals.VerifiedSession ) {
 		if ( this->ThreadObject->IsShutdownSignalled( ) ) {
 			LogSystem::Get( ).ConsoleLog( _TRIGGERS , xorstr_( "shutting down thread" ) , RED );
 			return;

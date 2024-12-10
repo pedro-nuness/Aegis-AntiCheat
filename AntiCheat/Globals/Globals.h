@@ -10,7 +10,7 @@ enum DETECTION_STATUS {
 	SUSPECT
 };
 
-class Globals : public CSingleton<Globals>
+class Globals
 {
 public:
 	int OriginalProcess;
@@ -22,6 +22,8 @@ public:
 	void * TriggersPointer;
 	void * AntiDebuggerPointer;
 
+	std::string GeneralUID;
+
 	bool VerifiedSession = false;
 
 	std::string Nickname;
@@ -32,4 +34,5 @@ public:
 	std::string CLIENT_NAME;
 	std::string DUMPER_NAME;
 };
+extern Globals _globals;
 

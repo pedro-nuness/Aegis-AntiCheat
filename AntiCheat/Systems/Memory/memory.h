@@ -75,7 +75,7 @@ public:
 	bool ReadFileToMemory( const std::string & file_path , std::vector<uint8_t> * out_buffer );
 	std::string  GetFileHash( std::string path );
 	std::string  GenerateHash( std::string str );
-	std::string  GenerateVecCharHash( std::vector<char> msg );
+	std::string  GenerateVecCharHash( std::vector<unsigned char> msg );
 	bool IsPIDRunning( DWORD PID );
 	std::string GetProcessName( DWORD PID );
 	bool DumpProcessMemory( HANDLE hProcess , std::vector<MemoryRegion> & memoryDump );

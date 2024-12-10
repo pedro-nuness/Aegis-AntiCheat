@@ -461,30 +461,6 @@ std::string TypeToString( DWORD type ) {
 	}
 }
 
-
-BOOL SuspectThreadAddress( LPVOID lpStartAddress )
-{
-	MEMORY_BASIC_INFORMATION mbi;
-	// Obtemos a informação sobre a região de memória onde o thread foi alocado
-	if ( !VirtualQuery( lpStartAddress , &mbi , sizeof( mbi ) ) == 0 )
-	{
-		std::cout << "VirtualQuery failed!\n";
-		return TRUE;  // Se a consulta falhar, o endereço é inválido
-	}
-
-	std::cout << "mbi.State: " << StateToString( mbi.State ) << ", mbi.Type: " << TypeToString( mbi.Type ) << std::endl;
-
-
-	// Verifica se a região de memória é válida para threads (não deve ser uma área de código ou dados suspeitos)
-	// Por exemplo, vamos verificar se o endereço está no espaço de heap ou pilha
-	/*if ( mbi.State == MEM_COMMIT && ( mbi.Type == MEM_PRIVATE || mbi.Type == MEM_MAPPED ) )
-	{
-		return TRUE;
-	}*/
-
-	return FALSE;
-}
-
 typedef HANDLE( WINAPI * pCreateThread )(
 	LPSECURITY_ATTRIBUTES lpThreadAttributes ,
 	SIZE_T dwStackSize ,
@@ -507,13 +483,20 @@ HANDLE WINAPI MyCreateThread(
 
 	//somehow, this mf managed to get the createthread function pointer, and called it, so let's check
 
-	std::cout << "Thread created at " << lpStartAddress << std::endl;
+	ULONG64 start = 0x7FF000000000;
+	if ( ( ULONG64 ) lpStartAddress < start ) {
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Invalid thread creation attempted" ) , YELLOW );
+		return NULL;
+	}
 
-	if ( SuspectThreadAddress( lpStartAddress ) ) {
-		//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Blocked create thread attemp on suspect address!" ), YELLOW );
-
-		//return nothing, no threads for you today
-		//return NULL;
+	MEMORY_BASIC_INFORMATION mbi;
+	// Obtemos a informação sobre a região de memória onde o thread foi alocado
+	if ( VirtualQuery( lpStartAddress , &mbi , sizeof( mbi ) ) )
+	{
+		if ( mbi.Type != MEM_IMAGE ) {
+			LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Invalid thread creation attempted" ) , YELLOW );
+			return NULL;
+		}
 	}
 
 	// Call the original CreateThread function

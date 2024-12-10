@@ -13,6 +13,7 @@ class FileChecking : public CSingleton<FileChecking>
 	bool isLauncherValid( );
 	bool isGameValid( std::string GameName );
 	bool CheckCurrentPath( );
+	bool UpdateRegValues( );
 	bool CheckHash( );
 
 	bool SearchFiles( );

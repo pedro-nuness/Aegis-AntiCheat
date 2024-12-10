@@ -20,6 +20,7 @@
 #include "../../Systems/LogSystem/Log.h"
 #include "../../Systems/AntiTamper/Authentication.h"
 #include "../../Client/client.h"
+#include <winternl.h>
 
 
 Detections::Detections( ) {
@@ -160,12 +161,12 @@ bool SaveFirstFunctionBytes( const std::string & moduleName , const std::string 
 }
 
 
-bool Detections::DoesFunctionAppearHooked( std::string moduleName , std::string functionName , const unsigned char * expectedBytes ) {
+bool Detections::DoesFunctionAppearHooked( std::string moduleName , std::string functionName , const unsigned char * expectedBytes , bool restore ) {
 	if ( moduleName.empty( ) || functionName.empty( ) )
 		return false;
 
 	if ( !expectedBytes || expectedBytes == nullptr ) {
-		SaveFirstFunctionBytes( moduleName , functionName , functionName + xorstr_( ".txt" ) , 15 );
+		SaveFirstFunctionBytes( moduleName , functionName , functionName + xorstr_( ".txt" ) , sizeof( expectedBytes ) );
 		return false;
 	}
 
@@ -183,23 +184,25 @@ bool Detections::DoesFunctionAppearHooked( std::string moduleName , std::string 
 
 	bool FOUND_HOOK = false;
 
-	unsigned char buffer[ 15 ]; // Substituí sizeof(expectedBytes) por um tamanho fixo
+	unsigned char buffer[ sizeof( expectedBytes ) ]; // Substituí sizeof(expectedBytes) por um tamanho fixo
 	SIZE_T bytesRead;
 	SIZE_T bytesWritten;
 
 	// Leia os primeiros bytes da função
-	if ( ReadProcessMemory( GetCurrentProcess( ) , ( void * ) AddressFunction , buffer , 15 , &bytesRead ) ) {
+	if ( ReadProcessMemory( GetCurrentProcess( ) , ( void * ) AddressFunction , buffer , sizeof( expectedBytes ) , &bytesRead ) ) {
 		// Verifique se os bytes diferem dos esperados
-		if ( memcmp( buffer , expectedBytes , 15 ) != 0 ) {
+		if ( memcmp( buffer , expectedBytes , sizeof( expectedBytes ) ) != 0 ) {
 			FOUND_HOOK = true;
-			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Function " ) + functionName + xorstr_( " appears to be hooked! Restoring original bytes..." ) , YELLOW );
+			if ( restore ) {
+				LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Function " ) + functionName + xorstr_( " appears to be hooked! Restoring original bytes..." ) , YELLOW );
 
-			// Restaure os bytes originais
-			if ( WriteProcessMemory( GetCurrentProcess( ) , ( void * ) AddressFunction , expectedBytes , 15 , &bytesWritten ) ) {
-				LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Successfully restored original bytes for function " ) + functionName , GREEN );
-			}
-			else {
-				LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Failed to restore original bytes for function " ) + functionName , RED );
+				// Restaure os bytes originais
+				if ( WriteProcessMemory( GetCurrentProcess( ) , ( void * ) AddressFunction , expectedBytes , sizeof( expectedBytes ) , &bytesWritten ) ) {
+					LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Successfully restored original bytes for function " ) + functionName , GREEN );
+				}
+				else {
+					LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Failed to restore original bytes for function " ) + functionName , RED );
+				}
 			}
 		}
 	}
@@ -210,49 +213,125 @@ bool Detections::DoesFunctionAppearHooked( std::string moduleName , std::string 
 	return FOUND_HOOK;
 }
 
-void Detections::CheckFunctions( ) {
+
+enum OsType {
+	Windows10 ,
+	Windows11 ,
+	Neither ,
+	OUTDATEDAASYSTEM,
+	CANTCATCH
+};
+
+typedef NTSTATUS( WINAPI * RtlGetVersionPtr )( PRTL_OSVERSIONINFOW );
+OsType GetWindowsVersion( ) {
+	RTL_OSVERSIONINFOW osInfo = { sizeof( RTL_OSVERSIONINFOW ) };
+	HMODULE hNtDll = GetModuleHandleW( L"ntdll.dll" );
+	if ( hNtDll ) {
+		RtlGetVersionPtr pRtlGetVersion = ( RtlGetVersionPtr ) GetProcAddress( hNtDll , "RtlGetVersion" );
+		if ( pRtlGetVersion && NT_SUCCESS( pRtlGetVersion( &osInfo ) ) ) {
+			if ( osInfo.dwMajorVersion == 10 ) {
+				if ( osInfo.dwBuildNumber >= 22000 ) {
+					return OsType::Windows11;
+				}
+				else {
+					return OsType::Windows10;
+				}
+			}
+			else {
+				return OsType::Neither;
+			}
+		}
+		else {
+			return OsType::OUTDATEDAASYSTEM;
+		}
+	}
+	else {
+		return OsType::CANTCATCH;
+	}
+}
+
+
+
+bool Detections::UsingReshade( ) {
+	//Reshade appears to change these functions byte
 
 	{
 		unsigned char SENDfunctionBytes[ ] = {
-		0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x6C, 0x24, 0x10, 0x48, 0x89, 0x74, 0x24, 0x18
+			0xe9, 0xae, 0xe7, 0xdb, 0xfe, 0x48, 0x89, 0x6c, 0x24, 0x10, 0x48, 0x89, 0x74, 0x24, 0x18, 0x57
 		};
 
-		if ( this->DoesFunctionAppearHooked( xorstr_( "ws2_32.dll" ) , xorstr_( "send" ) , SENDfunctionBytes ) ) {
-			AddDetection( FUNCTION_HOOKED , DetectionStruct( xorstr_( "ws2_32.dll:send() hooked" ) , DETECTED ) );
-			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "ws2_32.dll:send() hooked" ) , RED );
+		if ( this->DoesFunctionAppearHooked( xorstr_( "ws2_32.dll" ) , xorstr_( "send" ) , SENDfunctionBytes , false ) ) {
+			return false;
 		}
 	}
 
 	{
 		unsigned char RECVfunctionBytes[ ] = {
-	0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x74, 0x24, 0x10, 0x44, 0x89, 0x4C, 0x24, 0x20
+			0xe9, 0xbe, 0xed, 0xda, 0xfe, 0x48, 0x89, 0x74, 0x24, 0x10, 0x44, 0x89, 0x4c, 0x24, 0x20, 0x55
 		};
 
-		if ( this->DoesFunctionAppearHooked( xorstr_( "ws2_32.dll" ) , xorstr_( "recv" ) , RECVfunctionBytes ) ) {
-			AddDetection( FUNCTION_HOOKED , DetectionStruct( xorstr_( "ws2_32.dll:recv() hooked" ) , DETECTED ) );
-			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "ws2_32.dll:recv() hooked" ) , RED );
+		if ( this->DoesFunctionAppearHooked( xorstr_( "ws2_32.dll" ) , xorstr_( "recv" ) , RECVfunctionBytes , false ) ) {
+			return false;
 		}
 	}
 
-	{
+	return true;
+}
 
-		/*	std::vector<std::tuple<std::string , std::string , const unsigned char *>> functionsToCheck = {
-			{"dxgi.dll", "IDXGISwapChain::Present", nullptr},
-			{"dxgi.dll", "IDXGISwapChain::ResizeBuffers", nullptr},
-			{"d3d11.dll", "ID3D11Device::CreateRenderTargetView", nullptr},
-			{"d3d11.dll", "ID3D11DeviceContext::Draw", nullptr},
-			{"d3d11.dll", "ID3D11DeviceContext::DrawIndexed", nullptr},
-			{"d3d11.dll", "ID3D11Device::CreateBuffer", nullptr},
-			{"d3d11.dll", "ID3D11Device::CreateShaderResourceView", nullptr},
+
+void Detections::CheckFunctions( ) {
+
+	if ( !UsingReshade( ) ) {
+		OsType OSVersion = GetWindowsVersion( );
+		std::vector<unsigned char> SENDfunctionBytes;
+		std::vector<unsigned char> RECVfunctionBytes;
+
+
+		switch ( OSVersion ) {
+		case Windows10:
+
+			SENDfunctionBytes = {
+			0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x6C, 0x24, 0x10, 0x48, 0x89, 0x74, 0x24, 0x18
 			};
 
-			for ( const auto & [moduleName , functionName , expectedBytes] : functionsToCheck ) {
-				bool isHooked = DoesFunctionAppearHooked( moduleName , functionName , expectedBytes );
-				if ( isHooked ) {
-					LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Hook detected in function: " ) + functionName , RED );
-				}
-			}*/
+			RECVfunctionBytes = {
+		0x48, 0x89, 0x5C, 0x24, 0x08, 0x48, 0x89, 0x74, 0x24, 0x10, 0x44, 0x89, 0x4C, 0x24, 0x20
+			};
+
+			break;
+
+		case Windows11:
+
+			RECVfunctionBytes = {
+				0x48, 0x89, 0x5c, 0x24, 0x8, 0x48, 0x89, 0x6c, 0x24, 0x10, 0x44, 0x89, 0x4c, 0x24, 0x20, 0x56
+			};
+
+			SENDfunctionBytes = {
+			0x48, 0x89, 0x5c, 0x24, 0x8, 0x48, 0x89, 0x6c, 0x24, 0x10, 0x48, 0x89, 0x74, 0x24, 0x18, 0x57
+			};
+
+			break;
+
+		default:
+			LogSystem::Get( ).Log( xorstr_( "Incompatible OS Version!" ) );
+			goto out;
+		}
+
+		if ( this->DoesFunctionAppearHooked( xorstr_( "ws2_32.dll" ) , xorstr_( "send" ) , SENDfunctionBytes.data( ) , true ) ) {
+			AddDetection( FUNCTION_HOOKED , DetectionStruct( xorstr_( "ws2_32.dll:send() hooked" ) , DETECTED ) );
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "ws2_32.dll:send() hooked" ) , RED );
+		}
+
+		if ( this->DoesFunctionAppearHooked( xorstr_( "ws2_32.dll" ) , xorstr_( "recv" ) , RECVfunctionBytes.data( ) , true ) ) {
+			AddDetection( FUNCTION_HOOKED , DetectionStruct( xorstr_( "ws2_32.dll:recv() hooked" ) , DETECTED ) );
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "ws2_32.dll:recv() hooked" ) , RED );
+		}
+
 	}
+	
+out:
+	return;
+
 }
 
 

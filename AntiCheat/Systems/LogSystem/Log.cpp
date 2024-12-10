@@ -30,17 +30,29 @@ void DetachModules( std::string Message , std::string BoxMessage , bool ShowMess
 
 	LogSystem::Get( ).ConsoleLog( _LOG , Message , LIGHT_WHITE );
 
-	HANDLE hProcess = Mem::Get( ).GetProcessHandle( Globals::Get( ).ProtectProcess );
+	HANDLE hProcess = Mem::Get( ).GetProcessHandle( _globals.ProtectProcess );
 	if ( hProcess != NULL ) {
 		BOOL result = TerminateProcess( hProcess , 0 );
 		CloseHandle( hProcess );
 	}
 
-	if ( Globals::Get( ).GuardMonitorPointer != nullptr ) {
+	if ( _globals.GuardMonitorPointer != nullptr ) {
 		//Stop threads
-		ThreadGuard * Guard = reinterpret_cast< ThreadGuard * >( Globals::Get( ).GuardMonitorPointer );
+		ThreadGuard * Guard = reinterpret_cast< ThreadGuard * >( _globals.GuardMonitorPointer );
 
-		std::vector<HANDLE> threadsObject = Guard->GetRunningThreadHandle();
+		std::vector<HANDLE> threadsObject = Guard->GetRunningThreadHandle( );
+
+
+		threadsObject.erase(
+			std::remove_if(
+				threadsObject.begin( ) ,
+				threadsObject.end( ) ,
+				[ ] ( HANDLE thread ) {
+					return GetThreadId( thread ) == GetThreadId( GetCurrentThread( ) );
+				}
+			) ,
+			threadsObject.end( )
+		);
 
 		Guard->ThreadObject->SignalShutdown( true );
 
@@ -70,7 +82,7 @@ std::vector<CryptedString> CachedLogs;
 
 void LogSystem::SaveCachedLogsToFile( std::string LastLog ) {
 	std::string log_iv = Utils::Get( ).GetRandomWord( 16 );
-	
+
 	std::string FileName = xorstr_( "AC.output_" ) + Utils::Get( ).GetRandomWord( 5 ) + xorstr_( ".txt" );
 	File LogFile( "ACLogs\\" , FileName );
 

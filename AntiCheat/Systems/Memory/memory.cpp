@@ -670,7 +670,7 @@ std::string Mem::GenerateHash( std::string msg ) {
 	return sha1.getHash( );
 }
 
-std::string Mem::GenerateVecCharHash( std::vector<char> msg ) {
+std::string Mem::GenerateVecCharHash( std::vector<unsigned char> msg ) {
 	SHA1 sha1;
 	sha1.add( msg.data( ) , msg.size( ) );
 	return sha1.getHash( );

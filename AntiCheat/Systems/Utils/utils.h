@@ -32,6 +32,7 @@ public:
 	std::string GenerateRandomKey( int size );
 	std::string DownloadString( std::string URL );
 	bool DownloadToBuffer( const std::string & URL , std::vector<char> & buffer );
+	std::vector<unsigned char> DownloadFileToMemory( const std::string & url );
 
 	std::string ConvertLPCWSTRToString( LPCWSTR wideString );
 };

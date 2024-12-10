@@ -9,7 +9,8 @@
 enum CommunicationResponse {
 	RECEIVED ,
 	RECEIVE_ERROR ,
-	RECEIVE_BANNED
+	RECEIVE_BANNED,
+	NORESPONSE
 };
 
 

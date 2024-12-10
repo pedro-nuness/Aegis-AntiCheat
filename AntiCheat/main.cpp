@@ -31,12 +31,12 @@
 Detections DetectionEvent;
 
 void Startup( ) {
-	Communication CommunicationEvent( Globals::Get( ).OriginalProcess , Globals::Get( ).ProtectProcess );
-	Triggers TriggerEvent( Globals::Get( ).OriginalProcess , Globals::Get( ).ProtectProcess );
+	Communication CommunicationEvent( _globals.OriginalProcess , _globals.ProtectProcess );
+	Triggers TriggerEvent( _globals.OriginalProcess , _globals.ProtectProcess );
 	AntiDebugger AntiDbg;
 	Listener ListenEvent;
 
-	DetectionEvent.SetupPid( Globals::Get( ).OriginalProcess , Globals::Get( ).ProtectProcess );
+	DetectionEvent.SetupPid( _globals.OriginalProcess , _globals.ProtectProcess );
 
 	CommunicationEvent.start( );
 	DetectionEvent.start( );
@@ -55,13 +55,13 @@ void Startup( ) {
 	};
 
 	ThreadGuard monitor( threads );
-	Globals::Get( ).GuardMonitorPointer = &monitor;
-	Globals::Get( ).DetectionsPointer = &DetectionEvent;
-	Globals::Get( ).TriggersPointer = &TriggerEvent;
-	Globals::Get( ).AntiDebuggerPointer = &AntiDbg;
+	_globals.GuardMonitorPointer = &monitor;
+
+	_globals.TriggersPointer = &TriggerEvent;
+	_globals.AntiDebuggerPointer = &AntiDbg;
 	monitor.start( );
 
-	while ( !Globals::Get( ).VerifiedSession ) {
+	while ( !_globals.VerifiedSession ) {
 		//as fast as possible cuh
 		std::this_thread::sleep_for( std::chrono::nanoseconds( 1 ) );
 	}
@@ -82,50 +82,73 @@ void Startup( ) {
 	}
 }
 
-// Function to get the parent process ID
-DWORD GetParentProcessId( DWORD processId ) {
-	HANDLE hSnapshot = CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS , 0 );
-	if ( hSnapshot == INVALID_HANDLE_VALUE ) {
+DWORD GetParentProcessID( DWORD processID ) {
+	PROCESSENTRY32 pe;
+	pe.dwSize = sizeof( PROCESSENTRY32 );
+
+	// Create a snapshot of all processes
+	HANDLE snapshot = CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS , 0 );
+	if ( snapshot == INVALID_HANDLE_VALUE ) {
 		return 0;
 	}
 
-	PROCESSENTRY32 processEntry;
-	processEntry.dwSize = sizeof( PROCESSENTRY32 );
-
-	if ( Process32First( hSnapshot , &processEntry ) ) {
+	// Iterate through the processes to find the one with the matching process ID
+	if ( Process32First( snapshot , &pe ) ) {
 		do {
-			if ( processEntry.th32ProcessID == processId ) {
-				DWORD parentPid = processEntry.th32ParentProcessID;
-				CloseHandle( hSnapshot );
-				return parentPid;
+			if ( pe.th32ProcessID == processID ) {
+				CloseHandle( snapshot );
+				return pe.th32ParentProcessID;
 			}
-		} while ( Process32Next( hSnapshot , &processEntry ) );
+		} while ( Process32Next( snapshot , &pe ) );
 	}
 
-	CloseHandle( hSnapshot );
+	CloseHandle( snapshot );
 	return 0;
+}
+
+bool IsProcessParent( DWORD processID , DWORD targetParentPID ) {
+	DWORD parentPID = GetParentProcessID( processID );
+	return parentPID == targetParentPID;
 }
 
 
 int main( int argc , char * argv[ ] ) {
-	//Ignore load library missing msgbox
-
-	// LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Hello world!" ) , GREEN );
-	hardware::Get( ).GenerateCache( );
-	Preventions::Get( ).Deploy( );
-	SetErrorMode( SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX );
+	//Init anti-cheat
+	{
+		//Request MB and Disk ID
+		hardware::Get( ).GenerateInitialCache( );
+		//Initialize in case preventions module has to add a external detection
+		_globals.DetectionsPointer = &DetectionEvent;
+		//Deploy Preventions
+		Preventions::Get( ).Deploy( );
+		//Ignore errors caused in process
+		SetErrorMode( SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX ); \
+			//End HWID cache generation, unique id, version, ip, etc..
+		hardware::Get( ).EndCacheGeneration( );
+		std::string VersionID;
+		if ( hardware::Get( ).GetVersionUID( &VersionID ) )
+		{
+			LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "VersionID: " ) + VersionID , YELLOW );
+		}
+	}
 
 	::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
 
-	Globals::Get( ).SelfID = ::_getpid( );
+	_globals.SelfID = ::_getpid( );
 	FileChecking::Get( ).ValidateFiles( );
 #if true
-	DWORD ParentProcessId = GetParentProcessId( GetCurrentProcessId( ) );
 
-	if ( !ParentProcessId || ParentProcessId == GetCurrentProcessId() ) {
-		LogSystem::Get( ).Log( xorstr_( "[401] Initialization failed no parent"), false );
+	DWORD myProcessID = GetCurrentProcessId( ); // Get the current process ID
+	DWORD ParentProcessId = GetParentProcessID( myProcessID ); // Get the parent process ID
+
+	if ( !ParentProcessId ) {
+		LogSystem::Get( ).Log( xorstr_( "[401] Initialization failed no parent" ) , false );
 		return 0;
 	}
+
+	std::string ParentHash = Mem::Get( ).GetFileHash( Mem::Get( ).GetProcessExecutablePath( ParentProcessId ) );
+	//std::cout << "Parent hash:  " << ParentHash << "\n";
+	//[system( "pause" ); ]
 
 	//FreeConsole( );
 	//::ShowWindow( ::GetConsoleWindow( ) , SW_HIDE );
@@ -138,10 +161,10 @@ int main( int argc , char * argv[ ] ) {
 		LogSystem::Get( ).Log( xorstr_( "[401] Invalid Input" ) , false );
 		return 0;
 	}
-	Globals::Get( ).OriginalProcess = stoi( ( std::string ) argv[ 1 ] );
-	Globals::Get( ).ProtectProcess = stoi( ( std::string ) argv[ 2 ] );
+	_globals.OriginalProcess = stoi( ( std::string ) argv[ 1 ] );
+	_globals.ProtectProcess = stoi( ( std::string ) argv[ 2 ] );
 
-	/*std::string OriginalProcessPath = Mem::Get( ).GetProcessExecutablePath( Globals::Get( ).OriginalProcess );
+	/*std::string OriginalProcessPath = Mem::Get( ).GetProcessExecutablePath( _globals.OriginalProcess );
 
 	if ( OriginalProcessPath.empty( ) ) {
 		LogSystem::Get( ).Log( xorstr_( "[401] Can't get original process path!" ) );
@@ -153,31 +176,32 @@ int main( int argc , char * argv[ ] ) {
 		LogSystem::Get( ).Log( xorstr_( "[401] Can't get original process hash!" ) );
 		return 0;
 	}
-	Globals::Get( ).OriginalProcessHash = OriginalProcessHash;
+
+	std::vector< unsigned char> OriginalLauncherMemory;
+	_globals.OriginalProcessHash = OriginalProcessHash;
 	{
 		std::cout << "trying to download!\n";
 		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
 
-		std::vector<char> OriginalLauncherMemory;
-		if ( !Utils::Get( ).DownloadToBuffer( xorstr_( "https://download1076.mediafire.com/c9yznmvqavegRUmomfayh0JMiTBzWAsOUn44K-_gOI8HbrQeZe-4rV8QtMpVxWwOneIdBGltMzL4t_PmETpe8ygwzhuXwc8UJBA2CK1gEVvj4md6SGLjLhnfTSWRBla-sfAkt4ZtYGXDRHiJwn1Y66571g8xw7Pl2jYGYAvMRxnuGQ/oqngyfw6l8fd1s1/LauncherApocalypse_1.0.0.exe" ) , OriginalLauncherMemory ) ) {
+		OriginalLauncherMemory = Utils::Get( ).DownloadFileToMemory( xorstr_( "https://download1076.mediafire.com/cnno6vri78lgPrISy_qtx29qTEQ5hB0HiF6yKBrJHZVDB9GZWJHurcsmKmfiwd5gVCQOwyp2xCnO9xw5MKiG2As5Phys3UCLRMFNDkFuDO247dPF3f1ih1VsheNYMlou_-439VH-z7eiyBBvOhFaHjanOlRKi56lTnlUwyWa_rA/oqngyfw6l8fd1s1/LauncherApocalypse_1.0.0.exe" ) );
+		if ( OriginalLauncherMemory.empty( ) ) {
 			LogSystem::Get( ).Log( xorstr_( "[401] Failed to require file!" ) );
 			return 0;
 		}
+	}
 
-		std::cout << "downloaded!\n";
-		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
+	std::cout << "downloaded!\n";
+	std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
 
-		std::string AuthenticLauncherHash = Mem::Get( ).GenerateVecCharHash( OriginalLauncherMemory );
-		if ( AuthenticLauncherHash.empty( ) ) {
-			LogSystem::Get( ).Log( xorstr_( "[401] Failed to get required file hash!" ) );
-			return 0;
-		}
+	std::string AuthenticLauncherHash = Mem::Get( ).GenerateVecCharHash( OriginalLauncherMemory );
+	if ( AuthenticLauncherHash.empty( ) ) {
+		LogSystem::Get( ).Log( xorstr_( "[401] Failed to get required file hash!" ) );
+		return 0;
+	}
 
-		if ( AuthenticLauncherHash != OriginalProcessHash ) {
-			LogSystem::Get( ).Log( xorstr_( "[401] Failed initialize!" ) );
-			return 0;
-		}
-
+	if ( AuthenticLauncherHash != OriginalProcessHash ) {
+		LogSystem::Get( ).Log( xorstr_( "[401] Failed initialize!" ) );
+		return 0;
 	}*/
 
 	if ( !Communication::InitializeClient( ) ) {
@@ -189,11 +213,11 @@ int main( int argc , char * argv[ ] ) {
 		}
 
 		//Start client module
-		TerminateProcess( Mem::Get( ).GetProcessHandle( Globals::Get( ).OriginalProcess ) , 1 );
+		TerminateProcess( Mem::Get( ).GetProcessHandle( _globals.OriginalProcess ) , 1 );
 
 #else
-	Globals::Get( ).OriginalProcess = Mem::Get( ).GetProcessID( "explorer.exe" );
-	Globals::Get( ).ProtectProcess = Mem::Get( ).GetProcessID( "notepad.exe" );
+	_globals.OriginalProcess = Mem::Get( ).GetProcessID( "explorer.exe" );
+	_globals.ProtectProcess = Mem::Get( ).GetProcessID( "notepad.exe" );
 
 	if ( !Communication::InitializeClient( ) ) {
 		LogSystem::Get( ).Log( xorstr_( "Can't init client" ) );
@@ -202,17 +226,17 @@ int main( int argc , char * argv[ ] ) {
 		::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
 #endif // !DEBUG
 
-	
+
 
 		Startup( );
 	}
-	
-	
+
+
 idle:
 	int MaxIdle = 3;
 	for ( int i = 0; i <= MaxIdle; i++ ) {
 		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "idle" ) , GRAY );
-		std::this_thread::sleep_for( std::chrono::seconds( 5 ) ); 
+		std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
 	}
 
 	return 1;
