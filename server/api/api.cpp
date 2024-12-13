@@ -42,7 +42,7 @@ enum class ApiAnswer {
 };
 
 
-bool Api::Login( ) {
+bool Api::Login( std::string * buffer) {
 	const std::string Apikey = config::Get( ).GetApiKey( );
 	const std::string json_data = R"({"username": "admin", "password": "password"})";
 
@@ -105,7 +105,6 @@ bool Api::Login( ) {
 		}
 
 
-
 		switch ( ( ApiAnswer ) http_code ) {
 		case ApiAnswer::Success:
 			globals::Get( ).LoggedIn = true;
@@ -114,6 +113,12 @@ bool Api::Login( ) {
 			LogSystem::Get( ).LogWithMessageBox( xorstr_( "Error" ) , js[ xorstr_( "message" ) ] );
 			break;
 		}
+
+		if ( buffer != nullptr )
+		{
+			*buffer = js[ xorstr_( "message" ) ];
+		}
+
 
 		// Limpeza
 		curl_slist_free_all( headers );

@@ -10,14 +10,16 @@ enum CommunicationType {
 	BAN ,
 	WARN ,
 	MESSAGE ,
-	NONE ,
-	UNBAN
+	UNBAN,
+	LOGIN,
+	NONE
 };
 
 enum CommunicationResponse {
 	RECEIVED,
 	RECEIVE_ERROR,
 	RECEIVE_BANNED,
+	RECEIVE_INVALIDSESSION,
 	RECEIVE_LOGGEDIN
 };
 

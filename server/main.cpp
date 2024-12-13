@@ -32,7 +32,7 @@ std::string macToStr( UINT8 * mac ) {
 	char macStr[ 18 ];
 	snprintf( macStr , sizeof( macStr ) , "%02X:%02X:%02X:%02X:%02X:%02X" ,
 		mac[ 0 ] , mac[ 1 ] , mac[ 2 ] , mac[ 3 ] , mac[ 4 ] , mac[ 5 ] );
-	return std::string( macStr ); 
+	return std::string( macStr );
 }
 
 std::string ipToStr( UINT32 ip ) {
@@ -150,14 +150,18 @@ void WatchFunction( ) {
 
 int main( int argc , char * argv[ ] ) {
 
-	
+
 	Server connection_server;
 
 	config::Get( ).LoadConfig( );
 
+	std::string VerifiedSessionID = "";
+
 	//Login api
 	{
-		Api::Get( ).Login( );
+		if ( Api::Get( ).Login( &VerifiedSessionID ) ) {
+			globals::Get( ).VerifiedSessionID = VerifiedSessionID;
+		}
 
 		if ( !globals::Get( ).LoggedIn ) {
 			exit( 0 );
@@ -166,6 +170,7 @@ int main( int argc , char * argv[ ] ) {
 		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Connected sucessfully" ) , GREEN );
 	}
 
+	utils::Get( ).WarnMessage( _SERVER , xorstr_( "Authentic SessionID: " ) + globals::Get().VerifiedSessionID , GREEN );
 
 	if ( argc > 1 ) {
 		for ( int i = 0; i < argc; i++ ) {
@@ -177,11 +182,19 @@ int main( int argc , char * argv[ ] ) {
 			if ( utils::Get( ).CheckStrings( argv[ i ] , xorstr_( "-nolock" ) ) ) {
 				globals::Get( ).LockConnections = false;
 				utils::Get( ).WarnMessage( _SERVER , xorstr_( "Server initializing on no lock mode" ) , YELLOW );
+				continue;
+			}
+
+			if ( utils::Get( ).CheckStrings( argv[ i ] , xorstr_( "-noauth" ) ) ) {
+				globals::Get( ).NoAuthentication = true;
+				utils::Get( ).WarnMessage( _SERVER , xorstr_( "Server initializing on no authentication mode" ) , YELLOW );
+				continue;
 			}
 
 			if ( utils::Get( ).CheckStrings( argv[ i ] , xorstr_( "-nobot" ) ) ) {
 				globals::Get( ).Usebot = false;
 				utils::Get( ).WarnMessage( _SERVER , xorstr_( "Server initializing on no bot mode" ) , YELLOW );
+				continue;
 			}
 		}
 	}

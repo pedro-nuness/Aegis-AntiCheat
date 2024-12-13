@@ -294,13 +294,14 @@ void Listener::handleClient( SOCKET clientSock ) {
 		return;
 	}
 
+	closesocket( clientSock );
+
 	json js;
 	try {
 		js = json::parse( encryptedMessage );
 	}
 	catch ( json::parse_error error ) {
 		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Failed parse json" ) , COLORS::RED );
-		closesocket( clientSock );
 		return;
 	}
 
@@ -316,7 +317,6 @@ void Listener::handleClient( SOCKET clientSock ) {
 	for ( const auto & field : validations ) {
 		if ( !js.contains( field ) || js[ field ].empty( ) ) {
 			LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "invalid json format" ) , COLORS::RED );
-			closesocket( clientSock );
 			return;
 		}
 	}
@@ -328,26 +328,39 @@ void Listener::handleClient( SOCKET clientSock ) {
 	if ( Password != Mem::Get( ).GenerateHash( ReceivedKeyKey + salt ) )
 	{
 		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Invalid password" ) , COLORS::RED );
-		closesocket( clientSock );
 		return;
 	}
 
+
 	CommunicationType Type = js[ xorstr_( "type" ) ];
+	bool sent = false;
+
+	try_send:
+
 	switch ( Type ) {
 	case BAN:
-		client::Get( ).SendPunishToServer( Message , true );
+		sent = client::Get( ).SendPunishToServer( Message , true );
 		break;
 	case WARN:
-		client::Get( ).SendPunishToServer( Message , false );
+		sent = client::Get( ).SendPunishToServer( Message , false );
 		break;
 	case MESSAGE:
-		client::Get( ).SendMessageToServer( Message );
+		sent = client::Get( ).SendMessageToServer( Message );
 		break;
 	}
 
 	LogSystem::Get( ).ConsoleLog( _LISTENER , Message , Type == BAN ? RED : WHITE );
 
-	closesocket( clientSock );
+	if ( sent ) {
+		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_("Sucessfully sent punish to server!"), GREEN );
+	}
+	else {
+		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Error while sent punish to server, retrying...") , RED );
+		goto try_send;
+	}
+
+
+
 
 	//CommunicationType messageType = static_cast< CommunicationType >( firstCharacter - '0' );
 

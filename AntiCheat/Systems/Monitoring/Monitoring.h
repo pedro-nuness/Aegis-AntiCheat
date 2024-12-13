@@ -23,5 +23,7 @@ public:
 	HBITMAP ByteArrayToBitmap( const std::vector<BYTE> & bitmapData , int width , int height );
 	HBITMAP CaptureScreenBitmap( );
 	std::vector<BYTE> BitmapToByteArray( HBITMAP hBitmap );
+	std::vector<BYTE> CompressBitmapByteArray( const std::vector<BYTE> & bitmapByteArray );
+	std::vector<BYTE> DecompressBitmapByteArray( const std::vector<BYTE> & compressedArray );
 };
 

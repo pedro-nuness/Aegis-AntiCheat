@@ -242,7 +242,8 @@ bool CheckHWID( const json & js ) {
 		xorstr_( "mac" ),
 		xorstr_( "ip" ),
 		xorstr_( "nickname" ),
-		xorstr_( "steamid" )
+		xorstr_( "steamid" ),
+		xorstr_( "versionid" )
 	};
 
 	for ( const auto & field : requiredFields ) {
@@ -369,20 +370,46 @@ bool Server::UnbanIP( std::string IP ) {
 
 bool Server::SendData( std::string data , SOCKET socket ) {
 	if ( socket == INVALID_SOCKET ) {
-		utils::Get( ).WarnMessage( _SENDER , xorstr_( "Invalid socket." ) , RED );
+		//LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Invalid socket." ) , RED );
 		return false;
 	}
 
 	std::string encryptedMessage;
 
-	if ( !utils::Get( ).encryptMessage( data , encryptedMessage , server_key , server_iv ) ) {
-		utils::Get( ).WarnMessage( _SENDER , xorstr_( "Failed to encrypt the message." ) , RED );
+	encryptedMessage = data;
+
+	if ( !utils::Get( ).encryptMessage( encryptedMessage , encryptedMessage , server_key , server_iv ) ) {
 		return false;
 	}
 
-	if ( send( socket , encryptedMessage.c_str( ) , encryptedMessage.size( ) , 0 ) == SOCKET_ERROR )
-		return false;
+	long int messageSize = encryptedMessage.size( );
 
+	std::string messageSizeStr = std::to_string( messageSize );
+	int SizeBackup = messageSizeStr.size( );
+	//message_size bufer = char * 35 - 1 ( end of the string \0 )
+	messageSizeStr.insert( 0 , 34 - SizeBackup , '0' );  // Insere 'quantidade_zeros' zeros no início
+	// 000000..001348
+	if ( send( socket , messageSizeStr.c_str( ) , messageSizeStr.size( ) , 0 ) == SOCKET_ERROR ) {
+		//LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to send message size." ) , RED );
+		return false;
+	}
+
+	//pause, so the server can process it
+	std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
+
+	int totalSent = 0;
+	while ( totalSent < messageSize ) {
+		int sent = send( socket , encryptedMessage.c_str( ) + totalSent , messageSize - totalSent , 0 );
+		if ( sent == SOCKET_ERROR ) {
+			//LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to send encrypted message." ) , RED );
+			closesocket( socket );
+			WSACleanup( );
+			return false;
+		}
+		totalSent += sent;
+	}
+
+	//LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Message sent successfully." ) , GREEN );
 	return true;
 }
 
@@ -479,11 +506,17 @@ CommunicationResponse Server::receiveping( const std::string & encryptedMessage 
 	std::string MotherboardID = js[ xorstr_( "mb" ) ];
 	std::string Ip = js[ xorstr_( "ip" ) ];
 	std::string Nick = js[ xorstr_( "nickname" ) ];
+	std::string VersionID = js[ xorstr_( "versionid" ) ];
 	std::vector<std::string> Steam = js[ xorstr_( "steamid" ) ];
 
 	if ( IsDiskBanned( DiskID ) || IsBiosBanned( MotherboardID ) || IsMacBanned( Mac ) || IsSteamBanned( Steam ) ) {
 		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Banned user " ) + ( Ip ) +xorstr_( " tried to connect to server!" ) , RED );
 		return RECEIVE_BANNED;
+	}
+
+	if ( VersionID != globals::Get( ).VerifiedSessionID && !globals::Get( ).NoAuthentication ) {
+		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Unverified anticheat on ip " ) + ( Ip ) +xorstr_( " tried to connect to server!" ) , YELLOW );
+		return RECEIVE_INVALIDSESSION;
 	}
 
 	{
@@ -504,7 +537,7 @@ CommunicationResponse Server::receiveping( const std::string & encryptedMessage 
 			);
 
 			globals::Get( ).ConnectionMap[ Ip ] = NewConnection;
-			utils::Get( ).WarnMessage( _SERVER , xorstr_( "Player " ) + ( Nick ) + xorstr_( ": " ) + Ip + xorstr_( " logged in." ) , GRAY );
+			utils::Get( ).WarnMessage( _SERVER , xorstr_( "Player " ) + ( Nick ) +xorstr_( ": " ) + Ip + xorstr_( " logged in." ) , GRAY );
 			return RECEIVE_LOGGEDIN;
 		}
 		else {
@@ -593,14 +626,51 @@ CommunicationResponse Server::receivepunish( const std::string & encryptedMessag
 		return RECEIVE_ERROR;
 	}
 
-	json js;
-	try {
-		js = json::parse( encryptedMessage );
-	}
-	catch ( const json::parse_error & e ) {
-		std::cout << xorstr_( "Failed to parse JSON: " ) << e.what( ) << std::endl;
+	size_t separator_pos = encryptedMessage.find( "endinfo" );
+	if ( separator_pos == std::string::npos ) {
+		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Separador nao encontrado na string" ) , RED );
 		return RECEIVE_ERROR;
 	}
+
+	// Separar os segmentos
+	std::string encrypted_hwid_and_message = encryptedMessage.substr( 0 , separator_pos );
+	std::string raw_image_json = encryptedMessage.substr( separator_pos + std::string( "endinfo" ).length( ) );
+
+
+	if ( !utils::Get( ).decryptMessage( encrypted_hwid_and_message , encrypted_hwid_and_message , server_key , server_iv ) ) {
+		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to decrypt punishment message." ) , COLORS::RED );
+		return RECEIVE_ERROR;
+	}
+
+	json js;
+
+	{
+		// Parsing do primeiro JSON (encrypted_hwid_and_message)
+		json temp_json;
+		try {
+			temp_json = json::parse( encrypted_hwid_and_message );
+		}
+		catch ( const json::parse_error & e ) {
+			std::cout << xorstr_( "Failed to parse JSON: " ) << e.what( ) << std::endl;
+			return RECEIVE_ERROR;
+		}
+		js.update( temp_json );  // Mescla os campos no objeto `js`
+	}
+
+	{
+		// Parsing do segundo JSON (raw_image_json)
+		json temp_json;
+		try {
+			temp_json = json::parse( raw_image_json );
+		}
+		catch ( const json::parse_error & e ) {
+			std::cout << xorstr_( "Failed to parse JSON: " ) << e.what( ) << std::endl;
+			return RECEIVE_ERROR;
+		}
+		js.update( temp_json );  // Mescla os campos no objeto `js`
+	}
+
+
 
 	// Verificar HWID
 	if ( !CheckHWID( js ) ) {
@@ -630,69 +700,73 @@ CommunicationResponse Server::receivepunish( const std::string & encryptedMessag
 	// Obter os bytes da imagem e gerar o hash
 	std::string ImageHash = js[ xorstr_( "image_hash" ) ];
 	std::vector<BYTE> Image = js[ xorstr_( "image" ) ];
-	std::string Hash = utils::Get( ).GenerateHash( Image );
 
-	// Verificar a integridade da imagem
-	if ( ImageHash != Hash ) {
-		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Image corrupted!" ) , RED );
-	}
 
 	int height = js[ xorstr_( "image_height" ) ];
 	int width = js[ xorstr_( "image_width" ) ];
 
 	//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Reconstructing image!" ) , YELLOW );
 
+	std::string Filename = "";
+
 	// Recriar a imagem
-	HBITMAP reconstructedBitmap = image::Get( ).ByteArrayToBitmap( Image , width , height );
-	//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Reconstructed bitmap successfully!" ) , GREEN );
-
-	// Criar nome da pasta
-	std::string Nickname = js[ xorstr_( "nickname" ) ];
-	std::vector<std::string> SteamIDs = js[ xorstr_( "steamid" ) ];
-	std::string FolderName = memory::Get( ).GetProcessPath( ::_getpid( ) ) + "\\" + Nickname + xorstr_( "-" ) + SteamIDs[ 0 ];
-
-	//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Folder name: " ) + FolderName , WHITE );
-
-	// Criar diretório se não existir
-	if ( !fs::exists( FolderName.c_str( ) ) ) {
-		//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Creating directory " ) + FolderName , YELLOW );
-		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
-		fs::create_directory( FolderName.c_str( ) );
+	Image = image::Get( ).DecompressBitmapByteArray( Image );
+	if ( Image.empty( ) ) {
+		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to decompress image!" ) , RED );
 	}
 	else {
-		//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Directory " ) + FolderName + xorstr_( " already exists!" ) , GRAY );
+		std::string Hash = utils::Get( ).GenerateHash( Image );
+
+		// Verificar a integridade da imagem
+		if ( ImageHash != Hash ) {
+			utils::Get( ).WarnMessage( _SERVER , xorstr_( "Image corrupted!" ) , RED );
+		}
+		HBITMAP reconstructedBitmap = image::Get( ).ByteArrayToBitmap( Image , width , height );
+
+		// Criar nome da pasta
+		std::string Nickname = js[ xorstr_( "nickname" ) ];
+		std::vector<std::string> SteamIDs = js[ xorstr_( "steamid" ) ];
+		std::string FolderName = memory::Get( ).GetProcessPath( ::_getpid( ) ) + "\\" + Nickname + xorstr_( "-" ) + SteamIDs[ 0 ];
+
+		// Criar diretório se não existir
+		if ( !fs::exists( FolderName.c_str( ) ) ) {
+			std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
+			fs::create_directory( FolderName.c_str( ) );
+		}
+
+		// Salvar a imagem
+		Filename = FolderName + "\\" + utils::Get( ).GetRandomWord( 20 ) + xorstr_( ".jpg" );
+		image::Get( ).SaveBitmapToFile( reconstructedBitmap , Filename );
+
+		// Liberar o recurso HBITMAP
+		DeleteObject( reconstructedBitmap );
 	}
-
-	// Salvar a imagem
-	std::string Filename = FolderName + "\\" + utils::Get( ).GetRandomWord( 20 ) + xorstr_( ".jpg" );
-	image::Get( ).SaveBitmapToFile( reconstructedBitmap , Filename );
-	//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Saved image successfully!" ) , GREEN );
-
-	// Liberar o recurso HBITMAP
-	DeleteObject( reconstructedBitmap );
-	//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Deleted image object successfully!" ) , GREEN );
-
-	json MessageJson;
-
 
 	// Adicionar o hwid à mensagem
 	std::string Message = AppendHWIDToString( js[ xorstr_( "message" ) ] , Ip );
 	//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Appended hwid to message!" ) , GREEN );
 	//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Sending message to webhook: \n" ) + Message + xorstr_( "\n\n" ) , WHITE );
 
-	std::lock_guard<std::mutex> lock( connectionMutex );
+	{
+		std::lock_guard<std::mutex> lock( connectionMutex );
 
-	// Adicionar à lista de Webhook
-	if ( ban ) {
-		WebhookList.emplace_back( WHookRequest( WHOOKTYPE::BAN_ , Message , Filename , Ip , 0 ) );
-		BanPlayer( Ip );
-		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Computer banned from server!" ) , RED );
-	}
-	else {
-		WebhookList.emplace_back( WHookRequest( WHOOKTYPE::WARN_ , Message , Filename , Ip , 0 ) );
+		// Adicionar à lista de Webhook
+		if ( ban ) {
+			WebhookList.emplace_back( WHookRequest( WHOOKTYPE::BAN_ , Message , Filename , Ip , 0 ) );
+			if ( !BanPlayer( Ip ) ) {
+				utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to ban computer banned from server!" ) , RED );
+			}
+			else {
+				utils::Get( ).WarnMessage( _SERVER , xorstr_( "Successfully banned computer banned from server!" ) , GREEN );
+			}
+			
+		}
+		else {
+			WebhookList.emplace_back( WHookRequest( WHOOKTYPE::WARN_ , Message , Filename , Ip , 0 ) );
+		}
 	}
 
-	utils::Get( ).WarnMessage( _SERVER , xorstr_( "Sent ban to webhook request list!" ) , GREEN );
+	utils::Get( ).WarnMessage( _SERVER , xorstr_( "Sent punishment to webhook request list!" ) , GREEN );
 
 	return RECEIVED;
 }
@@ -776,7 +850,6 @@ void Server::ProcessMessages( ) {
 				utils::Get( ).WarnMessage( _SERVER , xorstr_( "Invalid message type!" ) , RED );
 				break;
 			}
-
 
 
 			if ( !SendData( std::to_string( Response ) , message.Socket ) ) {

@@ -68,3 +68,66 @@ void image::SaveBitmapToFile( HBITMAP hBitmap , const std::string & filePath )
 		file.close( );
 	}
 }
+
+std::vector<BYTE> image::CompressBitmapByteArray(  std::vector<BYTE> & bitmapByteArray ) {
+	std::vector<BYTE> compressedArray;
+	size_t i = 0;
+
+	while ( i < bitmapByteArray.size( ) ) {
+		BYTE current = bitmapByteArray[ i ];
+		size_t count = 1;
+
+		// Contar repetições consecutivas do byte atual
+		while ( i + count < bitmapByteArray.size( ) && bitmapByteArray[ i + count ] == current && count < 255 ) {
+			++count;
+		}
+
+		if ( count > 3 ) {
+			// Sequência longa, adicionar sequência comprimida
+			compressedArray.push_back( 0xFF ); // Flag para sequência
+			compressedArray.push_back( current );
+			compressedArray.push_back( static_cast< BYTE >( count ) );
+		}
+		else {
+			// Adicionar bytes únicos como bloco
+			size_t start = i;
+			size_t blockLength = 0;
+			while ( i < bitmapByteArray.size( ) && ( blockLength < 255 ) &&
+				( i + 1 == bitmapByteArray.size( ) || bitmapByteArray[ i ] != bitmapByteArray[ i + 1 ] ) ) {
+				++i;
+				++blockLength;
+			}
+			compressedArray.push_back( static_cast< BYTE >( blockLength ) ); // Comprimento do bloco
+			compressedArray.insert( compressedArray.end( ) , bitmapByteArray.begin( ) + start , bitmapByteArray.begin( ) + start + blockLength );
+		}
+
+		i += count;
+	}
+
+	return compressedArray;
+}
+
+std::vector<BYTE> image::DecompressBitmapByteArray(  std::vector<BYTE> & compressedArray ) {
+	std::vector<BYTE> decompressedArray;
+	size_t i = 0;
+
+	while ( i < compressedArray.size( ) ) {
+		BYTE flag = compressedArray[ i ];
+
+		if ( flag == 0xFF ) {
+			// Sequência comprimida
+			BYTE value = compressedArray[ i + 1 ];
+			BYTE count = compressedArray[ i + 2 ];
+			decompressedArray.insert( decompressedArray.end( ) , count , value );
+			i += 3;
+		}
+		else {
+			// Bloco de bytes únicos
+			size_t blockLength = static_cast< size_t >( flag );
+			decompressedArray.insert( decompressedArray.end( ) , compressedArray.begin( ) + i + 1 , compressedArray.begin( ) + i + 1 + blockLength );
+			i += 1 + blockLength;
+		}
+	}
+
+	return decompressedArray;
+}

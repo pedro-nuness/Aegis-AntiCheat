@@ -9,7 +9,9 @@
 enum CommunicationResponse {
 	RECEIVED ,
 	RECEIVE_ERROR ,
-	RECEIVE_BANNED,
+	RECEIVE_BANNED ,
+	RECEIVE_INVALIDSESSION ,
+	RECEIVE_LOGGEDIN,
 	NORESPONSE
 };
 
@@ -30,6 +32,7 @@ class client : public CSingleton<client>{
 
 	SOCKET CurrentSocket;
 	bool InitializeConnection( );
+	bool ReceiveInformation(std::string * buffer );
 	bool GetResponse( CommunicationResponse * response );
 	bool CloseConnection( );
 	bool SendData( std::string Data , CommunicationType Type , bool encrypt = true );

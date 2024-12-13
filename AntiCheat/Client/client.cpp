@@ -16,6 +16,7 @@
 #include "../Systems/Hardware/hardware.h"
 #include "../Systems/Punishing/PunishSystem.h"
 #include "../Systems/LogSystem/Log.h"
+#include "../Systems/LogSystem/File/File.h"
 #include "../../Globals/Globals.h"
 
 #pragma comment(lib, "wbemuuid.lib")
@@ -87,29 +88,118 @@ bool client::CloseConnection( ) {
 	return Result;
 }
 
+
+bool isNumeric( const std::string & str );
+
+bool client::ReceiveInformation( std::string * buff ) {
+	char sizeBuffer[ 35 ];
+	int received = recv( this->CurrentSocket , sizeBuffer , sizeof( sizeBuffer ) - 1 , 0 );
+	if ( received <= 0 ) {
+		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Failed to receive message size." ) , COLORS::RED );
+		closesocket( this->CurrentSocket );
+		return false;
+	}
+	sizeBuffer[ received ] = '\0';
+	std::string sizeString( sizeBuffer );
+
+	LogSystem::Get( ).ConsoleLog( _LISTENER , sizeString , BLUE );
+	if ( !isNumeric( sizeString ) ) {
+		closesocket( this->CurrentSocket );
+		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Received invalid size: " ) + sizeString , COLORS::RED );
+		return false;
+	}
+
+	int messageSize;
+	try {
+		messageSize = std::stoi( sizeString );
+	}
+	catch ( const std::invalid_argument & ) {
+		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Invalid message size" ) , COLORS::RED );
+		closesocket( this->CurrentSocket );
+		return false;
+	}
+	catch ( const std::out_of_range & ) {
+		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Message size out of range" ) , COLORS::RED );
+		closesocket( this->CurrentSocket );
+		return false;
+	}
+
+	const int MAX_MESSAGE_SIZE = 50 * 1024 * 1024; // Limite de 50 MB
+	if ( messageSize <= 0 || messageSize > MAX_MESSAGE_SIZE ) {
+		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Invalid message size." ) , COLORS::RED );
+		closesocket( this->CurrentSocket );
+		return false;
+	}
+
+	char * buffer = new( std::nothrow ) char[ messageSize ];
+	if ( !buffer ) {
+		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Failed to allocate memory for message." ) , COLORS::RED );
+		closesocket( this->CurrentSocket );
+		return false;
+	}
+
+	bool FailedReceive = false;
+	int totalReceived = 0;
+	while ( totalReceived < messageSize ) {
+		received = recv( this->CurrentSocket , buffer + totalReceived , messageSize - totalReceived , 0 );
+		if ( received <= 0 ) {
+			LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Failed to receive encrypted message." ) , COLORS::RED );
+			delete[ ] buffer;
+			closesocket( this->CurrentSocket );
+			FailedReceive = true;
+			return false;
+		}
+		totalReceived += received;
+	}
+
+	if ( FailedReceive ) {
+		return false;
+	}
+
+	if ( totalReceived < messageSize ) {
+		delete[ ] buffer;
+		closesocket( this->CurrentSocket );
+		return false;
+	}
+
+	std::string encryptedMessage( buffer , messageSize );
+	delete[ ] buffer;
+
+	if ( encryptedMessage.empty( ) ) {
+		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Empty message received." ) , COLORS::RED );
+		closesocket( this->CurrentSocket );
+		return false;
+	}
+
+	if ( !Utils::Get( ).decryptMessage( encryptedMessage , encryptedMessage , key , IV ) )
+	{
+		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Failed to decrypt message" ) , COLORS::RED );
+		closesocket( this->CurrentSocket );
+		return false;
+	}
+
+	if ( buff != nullptr ) {
+		*buff = encryptedMessage;
+	}
+
+	return true;
+}
+
 bool client::GetResponse( CommunicationResponse * response ) {
 	if ( this->CurrentSocket == INVALID_SOCKET ) {
 		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Invalid socket." ) , RED );
 		return false;
 	}
 
-	char sizeBuffer[ 16 ];
-	int received = recv( this->CurrentSocket , sizeBuffer , sizeof( sizeBuffer ) , 0 );
-	if ( received <= 0 ) {
-		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to receive message size." ) , RED );
-		return false;
-	}
-
-	std::string encryptedMessage( sizeBuffer , sizeof( sizeBuffer ) );
-
-	if ( !Utils::Get( ).decryptMessage( encryptedMessage , encryptedMessage , key , IV ) ) {
-		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to decrypt message" ) , RED );
+	std::string Response;
+	if ( !ReceiveInformation( &Response ) ) {
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to receive information" ) , RED );
 		return false;
 	}
 
 	int messageInt;
 	try {
-		messageInt = std::stoi( encryptedMessage );
+		messageInt = std::stoi( Response );
 	}
 	catch ( const std::invalid_argument & e ) {
 		return false;
@@ -175,6 +265,13 @@ bool client::SendData( std::string data , CommunicationType type , bool encrypt 
 	return true;
 }
 
+enum SuccessStatus {
+	NOTHING ,
+	TRYAGAIN ,
+	DENIED ,
+	SUCCESS
+};
+
 bool client::SendDataToServer( std::string str , CommunicationType type ) {
 	json js;
 	try {
@@ -185,38 +282,57 @@ bool client::SendDataToServer( std::string str , CommunicationType type ) {
 		return false;
 	}
 
-	bool success = false;
+	SuccessStatus success = NOTHING;
 
-	if ( !InitializeConnection( ) ) {
-		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to initialize connection!" ) , RED );
-		return false;
-	}
+	for ( int i = 0; i < 3; i++ ) {
+		if ( success == SUCCESS )
+			break;
 
-	success = SendData( str , type , type == WARN || type == BAN ? false : true );
-
-	if ( success ) {
-		CommunicationResponse response = NORESPONSE;
-		GetResponse( &response );
-
-		switch ( response ) {
-		case RECEIVED:
-			break;
-		case RECEIVE_ERROR:
-			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Ping failed!" ) , RED );
-			success = false;
-			break;
-		case RECEIVE_BANNED:
-			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "You have been banned!" ) , RED );
-			LogSystem::Get( ).LogWithMessageBox( xorstr_( "Server denied ping" ) , xorstr_( "You have been banned!" ) );
-			success = false;
-			break;
-		default:
-			success = false;
-			break;
+		if ( !InitializeConnection( ) ) {
+			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to initialize connection!" ) , RED );
+			return false;
 		}
-	}
 
-	CloseConnection( );
+		if ( SendData( str , type , type == WARN || type == BAN ? false : true ) )
+			success = SUCCESS;
+		else
+			success = TRYAGAIN;
+
+		if ( success == SUCCESS ) {
+			CommunicationResponse response = NORESPONSE;
+			if ( !GetResponse( &response ) ) {
+				success = TRYAGAIN;
+			}
+
+			switch ( response ) {
+			case RECEIVED:
+				break;
+			case RECEIVE_ERROR:
+				LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Ping failed!" ) , RED );
+				success = TRYAGAIN;
+				break;
+			case RECEIVE_BANNED:
+				LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "You have been banned!" ) , RED );
+				LogSystem::Get( ).LogWithMessageBox( xorstr_( "Server denied ping" ) , xorstr_( "You have been banned!" ) );
+				success = DENIED;
+				break;
+			case RECEIVE_INVALIDSESSION:
+				LogSystem::Get( ).LogWithMessageBox( xorstr_( "Unverified Session" ) , xorstr_( "Can't verify session integrity" ) );
+				success = DENIED;
+				break;
+			default:
+				success = TRYAGAIN;
+				break;
+			}
+		}
+
+		CloseConnection( );
+		if ( success != DENIED ) {
+			std::this_thread::sleep_for( std::chrono::seconds( 3 ) );
+		}
+		else
+			break;
+	}
 
 	return success;
 }
@@ -251,17 +367,24 @@ bool GetHWIDJson( json & js ) {
 	js[ xorstr_( "mb" ) ] = MotherboardID;
 
 
-	std::string Ip = hardware::Get( ).GetIp( );
+	std::string Ip;
+
+	if ( !hardware::Get( ).GetIp( &Ip ) ) {
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "failed to get ip" ) , RED );
+		return false;
+	}
 
 	if ( Ip.empty( ) ) {
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "ip is empty" ) , RED );
 		return false;
 	}
 
 	js[ xorstr_( "ip" ) ] = Ip;
 
 	std::string Nickname = _globals.Nickname;
-	if ( Utils::Get( ).GenerateStringHash( Nickname ) != _globals.NicknameHash ) {
-		js[ xorstr_( "warn_message" ) ] = xorstr_( "Nickname hash corrupted, user may have changed its user!" );
+	if ( strcmp( Utils::Get( ).GenerateStringHash( Nickname ).c_str( ) , _globals.NicknameHash.c_str( ) ) ) {
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "nickname hash invalid!" ) , RED );
+		return false;
 	}
 	js[ xorstr_( "nickname" ) ] = Nickname;
 
@@ -277,6 +400,22 @@ bool GetHWIDJson( json & js ) {
 	}
 
 	js[ xorstr_( "steamid" ) ] = LoggedUsers;
+
+	std::string UniqueID;
+	if ( !hardware::Get( ).GetUniqueUID( &UniqueID ) ) {
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "failed to get unique id!" ) , RED );
+		return false;
+	}
+
+	js[ xorstr_( "uniqueid" ) ] = UniqueID;
+
+	std::string VersionID;
+	if ( !hardware::Get( ).GetVersionUID( &VersionID ) ) {
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "failed to get version id!" ) , RED );
+		return false;
+	}
+
+	js[ xorstr_( "versionid" ) ] = VersionID;
 
 	return true;
 }
@@ -307,9 +446,17 @@ bool client::SendMessageToServer( std::string Message ) {
 	return SendDataToServer( js.dump( ) , CommunicationType::MESSAGE );
 }
 
+bool Sent = false;
+
+
 bool client::SendPunishToServer( std::string Message , bool Ban ) {
 	if ( !Ban )
 		PunishSystem::Get( ).UnsafeSession( );
+
+	if ( Sent )
+		return true;
+
+	Sent = true;
 
 	if ( Message.empty( ) ) {
 		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Empty message!" ) , YELLOW );
@@ -323,7 +470,9 @@ bool client::SendPunishToServer( std::string Message , bool Ban ) {
 	}
 
 	HBITMAP screen = Monitoring::Get( ).CaptureScreenBitmap( );
-	std::vector<BYTE> bitmapData = Monitoring::Get( ).BitmapToByteArray( screen );
+
+	auto bitmapData = Monitoring::Get( ).BitmapToByteArray( screen );
+
 	if ( bitmapData.empty( ) ) {
 		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Can't get screen bitmap!" ) , YELLOW );
 		return false;
@@ -335,13 +484,35 @@ bool client::SendPunishToServer( std::string Message , bool Ban ) {
 		return false;
 	}
 
+	bitmapData = Monitoring::Get( ).CompressBitmapByteArray( bitmapData );
+
+	if ( bitmapData.empty( ) ) {
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to compress bitmap" ) , YELLOW );
+		return false;
+	}
+
+
+	js[ xorstr_( "message" ) ] = Message;
+
+	std::string Info = js.dump( );
+
+	if ( !Utils::Get( ).encryptMessage( Info , Info , key , IV ) ) {
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to encrypt the message." ) , RED );
+		return false;
+	}
+
+	js.clear( );
+	Info += xorstr_( "endinfo" );
+
 	BITMAP bitmap;
 	GetObject( screen , sizeof( BITMAP ) , &bitmap );
 	js[ xorstr_( "image" ) ] = bitmapData;
 	js[ xorstr_( "image_width" ) ] = bitmap.bmWidth;
 	js[ xorstr_( "image_height" ) ] = bitmap.bmHeight;
 	js[ xorstr_( "image_hash" ) ] = hash;
-	js[ xorstr_( "message" ) ] = Message;
+
+	Info += js.dump( );
+
 
 	return SendDataToServer( js.dump( ) , Ban ? CommunicationType::BAN : CommunicationType::WARN );
 }

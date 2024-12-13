@@ -55,13 +55,15 @@ CryptedString CachedVersionID;
 
 
 void hardware::GenerateInitialCache( ) {
+	//before preventions deployment
 	GetMotherboardSerialNumber( nullptr );
 	GetDiskSerialNumber( nullptr );
+	GetIp( nullptr );
 }
 
 void hardware::EndCacheGeneration( ) {
+	//after preventions deployment
 	getMacAddress( );
-	GetIp( );
 	GetVersionUID( nullptr );
 }
 
@@ -160,6 +162,8 @@ bool hardware::GetVersionUID( std::string * buffer ) {
 		std::string VersionID = Mem::Get( ).GetFileHash( Mem::Get( ).GetProcessExecutablePath( GetCurrentProcessId( ) ) );
 		CachedVersionID = StringCrypt::Get( ).EncryptString( VersionID );
 	}
+
+	return true;
 }
 
 bool hardware::GetUniqueUID( std::string * buffer , std::string ID ) {
@@ -315,24 +319,48 @@ std::vector<std::string> hardware::getMacAddress( ) {
 	return MACS;
 }
 
-std::string hardware::GetIp( ) {
+bool hardware::GetIp( std::string * Buffer ) {
 	if ( CachedIp.EncryptedString.empty( ) ) {
+
+		std::string Ip = Utils::Get( ).DownloadString( xorstr_( "https://httpbin.org/ip" ) );
+		if ( Ip.empty( ) ) {
+			LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to request ip address from url!" ) , RED );
+			return false;
+		}
+
 		json js;
 		try {
-			js = json::parse( Utils::Get( ).DownloadString( xorstr_( "https://httpbin.org/ip" ) ) );
+			js = json::parse( Ip );
 		}
 		catch ( const json::parse_error & e ) {
 			std::cout << xorstr_( "Failed to parse JSON: " ) << e.what( ) << std::endl;
-			return "";
+			return false;
+		}
+
+		if ( !js.contains( xorstr_( "origin" ) ) ) {
+			LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to get ip json value!" ) , RED );
+			return false;
 		}
 
 		CachedIp = StringCrypt::Get( ).EncryptString( js[ xorstr_( "origin" ) ] );
-		return js[ xorstr_( "origin" ) ];
+
+		if ( Buffer != nullptr ) {
+			*Buffer = js[ xorstr_( "origin" ) ];
+		}
+
+		return true;
 	}
-	std::string * str = StringCrypt::Get( ).DecryptString( CachedIp );
-	std::string result = *str;
-	StringCrypt::Get( ).CleanString( str );
+
+	{
+		std::string * str = StringCrypt::Get( ).DecryptString( CachedIp );
+
+		if ( Buffer != nullptr ) {
+			*Buffer = *str;
+		}
+
+		StringCrypt::Get( ).CleanString( str );
+	}
 
 
-	return result;
+	return true;
 }

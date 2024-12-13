@@ -366,6 +366,8 @@ bool Utils::DownloadToBuffer( const std::string & URL , std::vector<char> & buff
 }
 
 std::string Utils::DownloadString( std::string URL ) {
+
+
 	HINTERNET interwebs = InternetOpenA( "Mozilla/5.0" , INTERNET_OPEN_TYPE_DIRECT , NULL , NULL , NULL );
 	HINTERNET urlFile;
 	std::string rtn;

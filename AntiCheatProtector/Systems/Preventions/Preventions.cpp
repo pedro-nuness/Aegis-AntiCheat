@@ -481,14 +481,6 @@ HANDLE WINAPI MyCreateThread(
 	LPDWORD lpThreadId
 ) {
 
-	//somehow, this mf managed to get the createthread function pointer, and called it, so let's check
-
-	ULONG64 start = 0x7FF000000000;
-	if ( ( ULONG64 ) lpStartAddress < start ) {
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Invalid thread creation attempted" ) , YELLOW );
-		return NULL;
-	}
-
 	MEMORY_BASIC_INFORMATION mbi;
 	// Obtemos a informação sobre a região de memória onde o thread foi alocado
 	if ( VirtualQuery( lpStartAddress , &mbi , sizeof( mbi ) ) )
@@ -510,17 +502,62 @@ HANDLE WINAPI MyCreateThread(
 	);
 }
 
+// Define pointers for the original functions
+typedef HMODULE( WINAPI * LoadLibraryA_t )( LPCSTR lpLibFileName );
+typedef HMODULE( WINAPI * LoadLibraryW_t )( LPCWSTR lpLibFileName );
+typedef HMODULE( WINAPI * LoadLibraryExA_t )( LPCSTR lpLibFileName , HANDLE hFile , DWORD dwFlags );
+typedef HMODULE( WINAPI * LoadLibraryExW_t )( LPCWSTR lpLibFileName , HANDLE hFile , DWORD dwFlags );
+
+// Pointers to original functions
+LoadLibraryA_t OriginalLoadLibraryA = nullptr;
+LoadLibraryW_t OriginalLoadLibraryW = nullptr;
+LoadLibraryExA_t OriginalLoadLibraryExA = nullptr;
+LoadLibraryExW_t OriginalLoadLibraryExW = nullptr;
+
+std::string WideStringToAnsi( const LPCWSTR wideString ) {
+	if ( !wideString ) return "";
+	int bufferSize = WideCharToMultiByte( CP_ACP , 0 , wideString , -1 , nullptr , 0 , nullptr , nullptr );
+	std::string ansiString( bufferSize - 1 , '\0' );
+	WideCharToMultiByte( CP_ACP , 0 , wideString , -1 , ansiString.data( ) , bufferSize , nullptr , nullptr );
+	return ansiString;
+}
+
+// Hooked LoadLibraryA
+HMODULE WINAPI HookedLoadLibraryA( LPCSTR lpLibFileName ) {
+	LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[HookedLoadLibraryA] Library Loaded: " ) + std::string( lpLibFileName ) , WHITE );
+	return OriginalLoadLibraryA( lpLibFileName ); // Call the original function
+}
+
+// Hooked LoadLibraryW
+HMODULE WINAPI HookedLoadLibraryW( LPCWSTR lpLibFileName ) {
+	LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[HookedLoadLibraryW] Library Loaded: " ) + WideStringToAnsi( lpLibFileName ) , WHITE );
+	return OriginalLoadLibraryW( lpLibFileName );
+}
+
+// Hooked LoadLibraryExA
+HMODULE WINAPI HookedLoadLibraryExA( LPCSTR lpLibFileName , HANDLE hFile , DWORD dwFlags ) {
+	LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[HookedLoadLibraryExA] Library Loaded: " ) + std::string( lpLibFileName ) , WHITE );
+	return OriginalLoadLibraryExA( lpLibFileName , hFile , dwFlags );
+}
+
+// Hooked LoadLibraryExW
+HMODULE WINAPI HookedLoadLibraryExW( LPCWSTR lpLibFileName , HANDLE hFile , DWORD dwFlags ) {
+	LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[HookedLoadLibraryExW] Library Loaded: " ) + WideStringToAnsi( lpLibFileName ) , WHITE );
+	return OriginalLoadLibraryExW( lpLibFileName , hFile , dwFlags );
+}
+
+
 // Function to unhook CreateThread
 bool UnhookApis( ) {
 	// Disable the hook
 	if ( MH_DisableHook( MH_ALL_HOOKS ) != MH_OK ) {
-		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Failed to disable hook!" ) , YELLOW );
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Failed to disable hook!" ) , YELLOW );
 		return false;
 	}
 
 	// Uninitialize MinHook
 	if ( MH_Uninitialize( ) != MH_OK ) {
-		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "MinHook uninitialization failed!" ) , YELLOW );
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "MinHook uninitialization failed!" ) , YELLOW );
 		return false;
 	}
 	return true;
@@ -529,17 +566,42 @@ bool UnhookApis( ) {
 bool Preventions::EnableApiHooks( ) {
 
 	if ( MH_Initialize( ) != MH_OK ) {
-		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "MinHook initialization failed!" ) , YELLOW );
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "MinHook initialization failed!" ) , YELLOW );
 		return false;
 	}
 
-	if ( MH_CreateHookApi( L"kernel32.dll" , "CreateThread" , &MyCreateThread , reinterpret_cast< LPVOID * >( &originalCreateThread ) ) != MH_OK ) {
-		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Failed to create hook for CreateThread!" ) , YELLOW );
+	if ( MH_CreateHookApi( L"kernel32.dll" , xorstr_( "CreateThread" ) , &MyCreateThread , reinterpret_cast< LPVOID * >( &originalCreateThread ) ) != MH_OK ) {
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Failed to create hook for CreateThread!" ) , YELLOW );
 		return false;
 	}
+
+	// Hook LoadLibraryA
+	if ( MH_CreateHookApi( L"kernel32" , xorstr_( "LoadLibraryA" ) , &HookedLoadLibraryA , reinterpret_cast< LPVOID * >( &OriginalLoadLibraryA ) ) != MH_OK ) {
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Failed to create hook for LoadLibraryA!" ) , YELLOW );
+		return false;
+	}
+
+	// Hook LoadLibraryW
+	if ( MH_CreateHookApi( L"kernel32" , xorstr_( "LoadLibraryW" ) , &HookedLoadLibraryW , reinterpret_cast< LPVOID * >( &OriginalLoadLibraryW ) ) != MH_OK ) {
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Failed to create hook for LoadLibraryW!" ) , YELLOW );
+		return false;
+	}
+
+	// Hook LoadLibraryExA
+	if ( MH_CreateHookApi( L"kernel32" , xorstr_( "LoadLibraryExA" ) , &HookedLoadLibraryExA , reinterpret_cast< LPVOID * >( &OriginalLoadLibraryExA ) ) != MH_OK ) {
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Failed to create hook for LoadLibraryExA!" ) , YELLOW );
+		return false;
+	}
+
+	// Hook LoadLibraryExW
+	if ( MH_CreateHookApi( L"kernel32" , xorstr_( "LoadLibraryExW") , &HookedLoadLibraryExW , reinterpret_cast< LPVOID * >( &OriginalLoadLibraryExW ) ) != MH_OK ) {
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Failed to create hook for LoadLibraryExW!" ) , YELLOW );
+		return false;
+	}
+
 
 	if ( MH_EnableHook( MH_ALL_HOOKS ) != MH_OK ) {
-		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Failed to enable hooks!" ) , YELLOW );
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Failed to enable hooks!" ) , YELLOW );
 		return false;
 	}
 
@@ -562,8 +624,6 @@ void Preventions::Deploy( ) {
 
 	//if ( !Preventions::Get( ).PreventThreadCreation( ) )
 	//	LogSystem::Get( ).Log( xorstr_( "[3] Failed to protect process" ) );
-
-
 
 
 	/*if ( !Preventions::Get( ).RemapProgramSections( ) ) {

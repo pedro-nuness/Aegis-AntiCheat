@@ -65,8 +65,10 @@ public:
 	bool ValidatingConnections = false;
 	bool LoggedIn = false;
 	bool LockConnections = true;
+	bool NoAuthentication = false;
 	bool Usebot = true;
 	std::string SelfIP;
+	std::string VerifiedSessionID;
 	WebHook whook;
 
 };

@@ -25,7 +25,7 @@ WebHook::WebHook( ) {
 
 
 void WebHook::SendWebHookPunishMent( std::string Message , std::string ScreenshotPath , std::string IP , bool already_banned ) {
-	if ( !BOT || !ServerPtr || !BotReady)
+	if ( !BOT || !ServerPtr || !BotReady )
 		return;
 
 	try {
@@ -151,6 +151,10 @@ void WebHook::SendWebHookMessageWithFile( std::string Message , std::string File
 			return;
 		}
 
+		if ( Filename.empty( ) ) {
+			js[ xorstr_( "message" ) ] += xorstr_( "\n Can't retrieve file!\n" );
+		}
+
 		// Criar um embed
 		utils::Get( ).WarnMessage( WEBHOOK , xorstr_( "Sending webhook message" ) , LIGHTER_BLUE );
 		dpp::embed embed;
@@ -167,8 +171,8 @@ void WebHook::SendWebHookMessageWithFile( std::string Message , std::string File
 
 		// Ler o arquivo e adicioná-lo à mensagem
 		std::string File = dpp::utility::read_file( Filename );
-		msg.add_file( Filename , File );
-
+		if ( !File.empty( ) )
+			msg.add_file( Filename , File );
 		// Enviar a mensagem com o webhook= 
 		reinterpret_cast< dpp::cluster * >( this->BOT )->message_create( msg );
 
@@ -301,7 +305,7 @@ void WebHook::Start( ) {
 
 		} );
 
-	bot.on_ready( [ &bot, this ] ( const dpp::ready_t & event ) {
+	bot.on_ready( [ &bot , this ] ( const dpp::ready_t & event ) {
 
 		/* Create and register a command when the bot is ready */
 
@@ -405,7 +409,7 @@ void WebHook::Start( ) {
 
 
 	bot.on_log( dpp::utility::cout_logger( ) );
-	
+
 
 
 

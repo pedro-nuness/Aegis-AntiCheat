@@ -38,7 +38,7 @@ void config::LoadConfig( ) {
 		{ xorstr_( "Username" ), "" },
 		{ xorstr_( "DiscordChannel" ), 0 },
 		{ xorstr_( "BotToken" ), "" },
-		{ xorstr_( "ServerPort" ), 0 }
+		{ xorstr_( "ServerPort" ), 0 },
 	};
 
 	// Verifica se o arquivo de configuração existe

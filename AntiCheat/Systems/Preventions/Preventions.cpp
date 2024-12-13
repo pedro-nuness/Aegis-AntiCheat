@@ -616,8 +616,8 @@ void Preventions::Deploy( ) {
 	if ( !Preventions::Get( ).PreventDllInjection( ) )
 		LogSystem::Get( ).Log( xorstr_( "[3] Failed to protect process" ) );
 
-	/*if(!Preventions::Get().PreventThreadCreation() )
-		LogSystem::Get( ).Log( xorstr_( "[4] Failed to protect process" ) );*/
+	if(!Preventions::Get().PreventThreadCreation() )
+		LogSystem::Get( ).Log( xorstr_( "[4] Failed to protect process" ) );
 
 
 	/*if ( !Preventions::Get( ).RemapProgramSections( ) ) {

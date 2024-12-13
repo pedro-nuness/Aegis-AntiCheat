@@ -65,7 +65,7 @@ bool FileChecking::CheckWindowsDumpSetting( ) {
 		RegCloseKey( hKey );
 		ScheduleShutdown( );
 		LogSystem::Get( ).LogWithMessageBox( xorstr_( "Dump disable" ) , xorstr_( "Reinicio necessario, reiniciando computador em 1 minuto!" ) );
-		return false; 
+		return false;
 	}
 
 	RegCloseKey( hKey );
@@ -82,8 +82,6 @@ bool FileChecking::GetNickname( ) {
 
 	std::string nickname = nick_file.Read( );
 	nickname = removeNonAlphanumeric( nickname );
-
-	auto Find = nickname.find( "\n" );
 
 	if ( nickname.empty( ) ) {
 		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "nickname is empty" ) , RED );
@@ -261,32 +259,38 @@ bool CreateFiles( HKEY hKey , LPCSTR GUID , LPCSTR Authenticator ) {
 }
 
 bool FileChecking::UpdateRegValues( ) {
-	LPCSTR keyPath = xorstr_( "SYSTEM\\CurrentControlSet\\Services\\AegisAntiCheat" );
-	LPCSTR GUIDValue = xorstr_( "GUID" );
-	LPCSTR GUIDAuthenticator = xorstr_( "GUIDAuthenticator" );
+	//LPCSTR keyPath = xorstr_( "SYSTEM\\CurrentControlSet\\Services\\AegisAntiCheat" );
+	//LPCSTR GUIDValue = xorstr_( "GUID" );
+	//LPCSTR GUIDAuthenticator = xorstr_( "GUIDAuthenticator" );
 
-	// Abrir ou criar a chave principal
-	HKEY hKey = OpenOrCreateKey( keyPath );
-	if ( !hKey ) return false;
+	//// Abrir ou criar a chave principal
+	//HKEY hKey = OpenOrCreateKey( keyPath );
+	//if ( !hKey ) return false;
 
-	// Verificar se o valor existe
-	if ( ValueExists( hKey , GUIDValue ) ) {
-		// Ler o valor existente
-		if ( !RequireValues( hKey , GUIDValue , GUIDAuthenticator ) )
-			return false;
+	//// Verificar se o valor existe
+	//if ( ValueExists( hKey , GUIDValue ) && ValueExists( hKey , GUIDAuthenticator ) ) {
+	//	// Ler o valor existente
+	//	if ( !RequireValues( hKey , GUIDValue , GUIDAuthenticator ) )
+	//		return false;
+	//}
+	//else
+	//{
+	//	if ( !CreateFiles( hKey , GUIDValue , GUIDAuthenticator ) )
+	//		return false;
+
+	//	if ( !RequireValues( hKey , GUIDValue , GUIDAuthenticator ) )
+	//		return false;
+
+	//}
+
+	//// Fechar a chave
+	//RegCloseKey( hKey );
+
+	if ( !hardware::Get( ).GetUniqueUID( nullptr , Utils::Get( ).GenerateStringHash( Utils::Get( ).GenerateRandomKey( 16 ) ) ) ) {
+		return false;
 	}
-	else
-	{
-		if ( !CreateFiles( hKey , GUIDValue , GUIDAuthenticator ) )
-			return false;
 
-		if ( !RequireValues( hKey , GUIDValue , GUIDAuthenticator ) )
-			return false;
 
-	}
-
-	// Fechar a chave
-	RegCloseKey( hKey );
 	return true;
 }
 
@@ -352,21 +356,30 @@ bool FileChecking::CheckHash( ) {
 
 bool FileChecking::ValidateFiles( ) {
 
-	if ( !this->UpdateRegValues( ) )
+	if ( !this->UpdateRegValues( ) ) {
+		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "cant update reg values" ) , RED );
 		return false;
+	}
 
-	if ( !this->CheckWindowsDumpSetting( ) )
+	if ( !this->CheckWindowsDumpSetting( ) ) {
+		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "cant check windows dump" ) , RED );
 		return false;
+	}
 
-	if ( !this->GetNickname( ) )
+	if ( !this->GetNickname( ) ) {
+		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "cant get nickname" ) , RED );
 		return false;
+	}
 
-	if ( !this->CheckCurrentPath( ) )
+	if ( !this->CheckCurrentPath( ) ) {
+		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "cant get currentpath" ) , RED );
 		return false;
+	}
 
-	if ( !this->CheckHash( ) )
+	if ( !this->CheckHash( ) ) {
+		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "cant checkhash" ) , RED );
 		return false;
-
+	}
 
 	return true;
 }

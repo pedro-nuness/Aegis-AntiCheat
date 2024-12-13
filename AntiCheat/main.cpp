@@ -135,7 +135,7 @@ int main( int argc , char * argv[ ] ) {
 	::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
 
 	_globals.SelfID = ::_getpid( );
-	FileChecking::Get( ).ValidateFiles( );
+	
 #if true
 
 	DWORD myProcessID = GetCurrentProcessId( ); // Get the current process ID
@@ -164,53 +164,20 @@ int main( int argc , char * argv[ ] ) {
 	_globals.OriginalProcess = stoi( ( std::string ) argv[ 1 ] );
 	_globals.ProtectProcess = stoi( ( std::string ) argv[ 2 ] );
 
-	/*std::string OriginalProcessPath = Mem::Get( ).GetProcessExecutablePath( _globals.OriginalProcess );
-
-	if ( OriginalProcessPath.empty( ) ) {
-		LogSystem::Get( ).Log( xorstr_( "[401] Can't get original process path!" ) );
-		return 0;
-	}
-	system( "pause" );
-	std::string OriginalProcessHash = Mem::Get( ).GetFileHash( OriginalProcessPath );
-	if ( OriginalProcessHash.empty( ) ) {
-		LogSystem::Get( ).Log( xorstr_( "[401] Can't get original process hash!" ) );
-		return 0;
+	if ( !FileChecking::Get( ).ValidateFiles( ) ) {
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Can't validate files" ) , RED );
+		goto idle;
 	}
 
-	std::vector< unsigned char> OriginalLauncherMemory;
-	_globals.OriginalProcessHash = OriginalProcessHash;
-	{
-		std::cout << "trying to download!\n";
-		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
-
-		OriginalLauncherMemory = Utils::Get( ).DownloadFileToMemory( xorstr_( "https://download1076.mediafire.com/cnno6vri78lgPrISy_qtx29qTEQ5hB0HiF6yKBrJHZVDB9GZWJHurcsmKmfiwd5gVCQOwyp2xCnO9xw5MKiG2As5Phys3UCLRMFNDkFuDO247dPF3f1ih1VsheNYMlou_-439VH-z7eiyBBvOhFaHjanOlRKi56lTnlUwyWa_rA/oqngyfw6l8fd1s1/LauncherApocalypse_1.0.0.exe" ) );
-		if ( OriginalLauncherMemory.empty( ) ) {
-			LogSystem::Get( ).Log( xorstr_( "[401] Failed to require file!" ) );
-			return 0;
-		}
+	if ( !client::Get( ).SendPingToServer( ) ) {
+		goto idle;
 	}
 
-	std::cout << "downloaded!\n";
-	std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
-
-	std::string AuthenticLauncherHash = Mem::Get( ).GenerateVecCharHash( OriginalLauncherMemory );
-	if ( AuthenticLauncherHash.empty( ) ) {
-		LogSystem::Get( ).Log( xorstr_( "[401] Failed to get required file hash!" ) );
-		return 0;
-	}
-
-	if ( AuthenticLauncherHash != OriginalProcessHash ) {
-		LogSystem::Get( ).Log( xorstr_( "[401] Failed initialize!" ) );
-		return 0;
-	}*/
-
-	if ( !Communication::InitializeClient( ) ) {
+	/*if ( !Communication::InitializeClient( ) ) {
 		LogSystem::Get( ).Log( xorstr_( "Can't init client" ) , false );
 	}
-	else {
-		if ( !client::Get( ).SendPingToServer( ) ) {
-			goto idle;
-		}
+	else {*/
+		
 
 		//Start client module
 		TerminateProcess( Mem::Get( ).GetProcessHandle( _globals.OriginalProcess ) , 1 );
@@ -229,7 +196,7 @@ int main( int argc , char * argv[ ] ) {
 
 
 		Startup( );
-	}
+	//}
 
 
 idle:

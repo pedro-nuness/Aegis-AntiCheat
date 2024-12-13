@@ -5,5 +5,5 @@
 class Api : public CSingleton<Api>
 {
 public:
-	bool Login(  );
+	bool Login( std::string * buffer );
 };

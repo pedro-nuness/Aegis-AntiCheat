@@ -69,7 +69,7 @@ SOCKET Communication::openConnection( const char * serverIp , int serverPort ) {
 	// Conecta ao servidor
 	iResult = SOCKET_ERROR;
 	int ConnectionTry = 0;
-	while ( iResult == SOCKET_ERROR && ConnectionTry <= 3 ) {
+	while ( iResult == SOCKET_ERROR && ConnectionTry <= 25 ) {
 		iResult = connect( ConnectSocket , ( SOCKADDR * ) &serverAddr , sizeof( serverAddr ) );
 		ConnectionTry++;
 		LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "attempting connection" ) , GRAY );
@@ -159,7 +159,7 @@ std::string Communication::receiveMessage( SOCKET ClientSocket , int time ) {
 
 	if ( !isNumeric( sizeString ) ) {
 		closesocket( ClientSocket );
-		LogSystem::Get( ).ConsoleLog( _COMMUNICATION  , xorstr_( "Received invalid size: " ) + sizeString , COLORS::RED );
+		LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "Received invalid size: " ) + sizeString , COLORS::RED );
 		return xorstr_( "" );
 	}
 
@@ -168,12 +168,12 @@ std::string Communication::receiveMessage( SOCKET ClientSocket , int time ) {
 		messageSize = std::stoi( sizeString );
 	}
 	catch ( const std::invalid_argument & ) {
-		LogSystem::Get( ).ConsoleLog( _COMMUNICATION  , xorstr_( "Invalid message size" ) , COLORS::RED );
+		LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "Invalid message size" ) , COLORS::RED );
 		closesocket( ClientSocket );
 		return xorstr_( " " );
 	}
 	catch ( const std::out_of_range & ) {
-		LogSystem::Get( ).ConsoleLog( _COMMUNICATION  , xorstr_( "Message size out of range" ) , COLORS::RED );
+		LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "Message size out of range" ) , COLORS::RED );
 		closesocket( ClientSocket );
 		return xorstr_( " " );
 	}
@@ -181,14 +181,14 @@ std::string Communication::receiveMessage( SOCKET ClientSocket , int time ) {
 
 	const int MAX_MESSAGE_SIZE = 50 * 1024 * 1024; // Limite de 50 MB
 	if ( messageSize <= 0 || messageSize > MAX_MESSAGE_SIZE ) {
-		LogSystem::Get( ).ConsoleLog( _COMMUNICATION  , xorstr_( "Invalid message size." ) , COLORS::RED );
+		LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "Invalid message size." ) , COLORS::RED );
 		closesocket( ClientSocket );
 		return xorstr_( " " );
 	}
 
 	char * buffer = new( std::nothrow ) char[ messageSize ];
 	if ( !buffer ) {
-		LogSystem::Get( ).ConsoleLog( _COMMUNICATION  , xorstr_( "Failed to allocate memory for message." ) , COLORS::RED );
+		LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "Failed to allocate memory for message." ) , COLORS::RED );
 		closesocket( ClientSocket );
 		return xorstr_( " " );
 	}
@@ -198,7 +198,7 @@ std::string Communication::receiveMessage( SOCKET ClientSocket , int time ) {
 	while ( totalReceived < messageSize ) {
 		received = recv( ClientSocket , buffer + totalReceived , messageSize - totalReceived , 0 );
 		if ( received <= 0 ) {
-			LogSystem::Get( ).ConsoleLog( _COMMUNICATION  , xorstr_( "Failed to receive encrypted message." ) , COLORS::RED );
+			LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "Failed to receive encrypted message." ) , COLORS::RED );
 			delete[ ] buffer;
 			closesocket( ClientSocket );
 			FailedReceive = true;
@@ -208,12 +208,12 @@ std::string Communication::receiveMessage( SOCKET ClientSocket , int time ) {
 	}
 
 	if ( FailedReceive ) {
-		LogSystem::Get( ).ConsoleLog( _COMMUNICATION  , xorstr_( "Failed to receive" ) , COLORS::RED );
+		LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "Failed to receive" ) , COLORS::RED );
 		return xorstr_( " " );
 	}
 
 	if ( totalReceived < messageSize ) {
-		LogSystem::Get( ).ConsoleLog( _COMMUNICATION  , xorstr_( "Received missing message" ) , COLORS::RED );
+		LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "Received missing message" ) , COLORS::RED );
 		delete[ ] buffer;
 		closesocket( ClientSocket );
 		return xorstr_( " " );
@@ -223,13 +223,13 @@ std::string Communication::receiveMessage( SOCKET ClientSocket , int time ) {
 	delete[ ] buffer;
 
 	if ( encryptedMessage.empty( ) ) {
-		LogSystem::Get( ).ConsoleLog( _COMMUNICATION  , xorstr_( "Empty message received." ) , COLORS::RED );
+		LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "Empty message received." ) , COLORS::RED );
 		closesocket( ClientSocket );
 		return xorstr_( " " );
 	}
 
 	if ( !Utils::Get( ).decryptMessage( encryptedMessage , encryptedMessage , communication_key , communication_iv ) ) {
-		LogSystem::Get( ).ConsoleLog( _COMMUNICATION  , xorstr_( "Failed to decrypt the message." ) , COLORS::RED );
+		LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "Failed to decrypt the message." ) , COLORS::RED );
 		closesocket( ClientSocket );
 		return xorstr_( " " );
 	}
@@ -262,7 +262,7 @@ void Communication::AddMessageToQueue( std::string message ) {
 void Communication::threadFunction( ) {
 	const char * ipAddress = "127.0.0.10";
 
-	LogSystem::Get( ).ConsoleLog( _COMMUNICATION  , xorstr_( "Sucessfully attached" ) , WHITE );
+	LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "Sucessfully attached" ) , WHITE );
 
 	int ConnectionTries = 0;
 	SOCKET ConnectSocket = openConnection( xorstr_( "127.0.0.10" ) , 8080 );
@@ -299,7 +299,7 @@ void Communication::threadFunction( ) {
 
 		// Recebe mensagem do cliente
 		std::string Message = receiveMessage( ConnectSocket , 10 );
-		if ( !Message.empty( ) ) {
+		if ( Message.size( ) > 1 ) {
 			if ( Message != this->ExpectedMessage ) {
 				LogSystem::Get( ).Log( xorstr_( "[client][802] client hash mismatch, expected: \n" ) + this->ExpectedMessage + ", " + Message );
 			}
