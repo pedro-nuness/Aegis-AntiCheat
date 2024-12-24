@@ -20,14 +20,14 @@
 #include "Modules/ThreadGuard/ThreadGuard.h"
 
 
-#define ALLOCCONSOLE 1
+
 
 Detections DetectionsEvents;
 
 DWORD WINAPI main( PVOID base )
 {
 	SetErrorMode( SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX );
-	
+
 
 #if ALLOCCONSOLE
 	AllocConsole( );
@@ -38,10 +38,12 @@ DWORD WINAPI main( PVOID base )
 		return EXIT_SUCCESS;
 	}
 
-
+#else
+	::ShowWindow( ::GetConsoleWindow( ) , SW_HIDE );
 #endif //  _DEBUG
 
-	
+
+
 	LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Sucessfully attached :)" ) , WHITE );
 
 	/*if ( Mem::Get( ).RestrictProcessAccess( ) ) {
@@ -71,6 +73,11 @@ DWORD WINAPI main( PVOID base )
 
 	while ( true ) {
 		std::this_thread::sleep_for( std::chrono::seconds( 10 ) );
+		if ( !monitor.isRunning( ) )
+		{
+
+		}
+
 	}
 
 #if ALLOCCONSOLE

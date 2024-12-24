@@ -24,6 +24,7 @@
 #pragma comment(lib, "iphlpapi.lib")
 
 #include <nlohmann/json.hpp>
+#include <mutex>
 
 using json = nlohmann::json;
 
@@ -34,6 +35,39 @@ client::~client( ) {}
 #define key xorstr_("ib33o5m8zsqlcgys3w46cfmtn8ztg1kn")
 #define salt xorstr_("8d88db7a1cc2512169bc970c2e2e7498")
 #define IV xorstr_("ume9ugz3m7lgch1z")
+
+std::mutex ServerSendMutex;
+
+std::string calculateStringSize( const std::string & str ) {
+	// Tamanho da string em bytes
+	size_t sizeInBytes = str.size( );
+
+	// Converte para KB, MB e GB
+	double sizeInKB = static_cast< double >( sizeInBytes ) / 1024;
+	double sizeInMB = sizeInKB / 1024;
+	double sizeInGB = sizeInMB / 1024;
+
+	// Cria o stream para formatar o retorno
+	std::ostringstream result;
+	result << std::fixed << std::setprecision( 2 ); // Define precisão para 2 casas decimais
+
+	// Determina a unidade mais apropriada e retorna como string
+	if ( sizeInGB >= 1.0 ) {
+		result << sizeInGB << " GB";
+	}
+	else if ( sizeInMB >= 1.0 ) {
+		result << sizeInMB << " MB";
+	}
+	else if ( sizeInKB >= 1.0 ) {
+		result << sizeInKB << " KB";
+	}
+	else {
+		result << sizeInBytes << " Bytes";
+	}
+
+	return result.str( );
+}
+
 
 bool client::InitializeConnection( ) {
 	WSADATA wsaData;
@@ -95,17 +129,17 @@ bool client::ReceiveInformation( std::string * buff ) {
 	char sizeBuffer[ 35 ];
 	int received = recv( this->CurrentSocket , sizeBuffer , sizeof( sizeBuffer ) - 1 , 0 );
 	if ( received <= 0 ) {
-		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Failed to receive message size." ) , COLORS::RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to receive message size." ) , COLORS::RED );
 		closesocket( this->CurrentSocket );
 		return false;
 	}
 	sizeBuffer[ received ] = '\0';
 	std::string sizeString( sizeBuffer );
 
-	LogSystem::Get( ).ConsoleLog( _LISTENER , sizeString , BLUE );
+
 	if ( !isNumeric( sizeString ) ) {
 		closesocket( this->CurrentSocket );
-		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Received invalid size: " ) + sizeString , COLORS::RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Received invalid size: " ) + sizeString , COLORS::RED );
 		return false;
 	}
 
@@ -114,26 +148,26 @@ bool client::ReceiveInformation( std::string * buff ) {
 		messageSize = std::stoi( sizeString );
 	}
 	catch ( const std::invalid_argument & ) {
-		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Invalid message size" ) , COLORS::RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Invalid message size" ) , COLORS::RED );
 		closesocket( this->CurrentSocket );
 		return false;
 	}
 	catch ( const std::out_of_range & ) {
-		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Message size out of range" ) , COLORS::RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Message size out of range" ) , COLORS::RED );
 		closesocket( this->CurrentSocket );
 		return false;
 	}
 
 	const int MAX_MESSAGE_SIZE = 50 * 1024 * 1024; // Limite de 50 MB
 	if ( messageSize <= 0 || messageSize > MAX_MESSAGE_SIZE ) {
-		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Invalid message size." ) , COLORS::RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Invalid message size." ) , COLORS::RED );
 		closesocket( this->CurrentSocket );
 		return false;
 	}
 
 	char * buffer = new( std::nothrow ) char[ messageSize ];
 	if ( !buffer ) {
-		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Failed to allocate memory for message." ) , COLORS::RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to allocate memory for message." ) , COLORS::RED );
 		closesocket( this->CurrentSocket );
 		return false;
 	}
@@ -143,7 +177,7 @@ bool client::ReceiveInformation( std::string * buff ) {
 	while ( totalReceived < messageSize ) {
 		received = recv( this->CurrentSocket , buffer + totalReceived , messageSize - totalReceived , 0 );
 		if ( received <= 0 ) {
-			LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Failed to receive encrypted message." ) , COLORS::RED );
+			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to receive encrypted message." ) , COLORS::RED );
 			delete[ ] buffer;
 			closesocket( this->CurrentSocket );
 			FailedReceive = true;
@@ -166,17 +200,21 @@ bool client::ReceiveInformation( std::string * buff ) {
 	delete[ ] buffer;
 
 	if ( encryptedMessage.empty( ) ) {
-		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Empty message received." ) , COLORS::RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Empty message received." ) , COLORS::RED );
 		closesocket( this->CurrentSocket );
 		return false;
 	}
 
 	if ( !Utils::Get( ).decryptMessage( encryptedMessage , encryptedMessage , key , IV ) )
 	{
-		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Failed to decrypt message" ) , COLORS::RED );
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to decrypt message" ) , COLORS::RED );
 		closesocket( this->CurrentSocket );
 		return false;
 	}
+
+
+	LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Received " ) + calculateStringSize( encryptedMessage ) + xorstr_( " from server!" ) , COLORS::GRAY );
+
 
 	if ( buff != nullptr ) {
 		*buff = encryptedMessage;
@@ -184,6 +222,10 @@ bool client::ReceiveInformation( std::string * buff ) {
 
 	return true;
 }
+
+
+
+
 
 bool client::GetResponse( CommunicationResponse * response ) {
 	if ( this->CurrentSocket == INVALID_SOCKET ) {
@@ -272,15 +314,19 @@ enum SuccessStatus {
 	SUCCESS
 };
 
+
+
 bool client::SendDataToServer( std::string str , CommunicationType type ) {
-	json js;
+	std::lock_guard<std::mutex> lock( ServerSendMutex );
+
+	/*json js;
 	try {
 		js = json::parse( str );
 	}
 	catch ( json::parse_error error ) {
 		LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "failed to parse message to json!" ) , YELLOW );
 		return false;
-	}
+	}*/
 
 	SuccessStatus success = NOTHING;
 
@@ -292,6 +338,8 @@ bool client::SendDataToServer( std::string str , CommunicationType type ) {
 			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to initialize connection!" ) , RED );
 			return false;
 		}
+
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Sending " ) + calculateStringSize( str ) + xorstr_( " to server!" ) , COLORS::GRAY );
 
 		if ( SendData( str , type , type == WARN || type == BAN ? false : true ) )
 			success = SUCCESS;
@@ -421,6 +469,7 @@ bool GetHWIDJson( json & js ) {
 }
 
 bool client::SendPingToServer( ) {
+
 	json js;
 	if ( !GetHWIDJson( js ) ) {
 		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Can't get HWID!" ) , YELLOW );
@@ -446,17 +495,12 @@ bool client::SendMessageToServer( std::string Message ) {
 	return SendDataToServer( js.dump( ) , CommunicationType::MESSAGE );
 }
 
-bool Sent = false;
 
 
 bool client::SendPunishToServer( std::string Message , bool Ban ) {
 	if ( !Ban )
 		PunishSystem::Get( ).UnsafeSession( );
 
-	if ( Sent )
-		return true;
-
-	Sent = true;
 
 	if ( Message.empty( ) ) {
 		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Empty message!" ) , YELLOW );
@@ -484,13 +528,12 @@ bool client::SendPunishToServer( std::string Message , bool Ban ) {
 		return false;
 	}
 
-	bitmapData = Monitoring::Get( ).CompressBitmapByteArray( bitmapData );
+	std::vector<int> CompressedBitmapData = Monitoring::Get().CompressToIntermediate( bitmapData );
 
-	if ( bitmapData.empty( ) ) {
+	if ( CompressedBitmapData.empty( ) ) {
 		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to compress bitmap" ) , YELLOW );
 		return false;
 	}
-
 
 	js[ xorstr_( "message" ) ] = Message;
 
@@ -506,7 +549,7 @@ bool client::SendPunishToServer( std::string Message , bool Ban ) {
 
 	BITMAP bitmap;
 	GetObject( screen , sizeof( BITMAP ) , &bitmap );
-	js[ xorstr_( "image" ) ] = bitmapData;
+	js[ xorstr_( "image" ) ] = CompressedBitmapData;
 	js[ xorstr_( "image_width" ) ] = bitmap.bmWidth;
 	js[ xorstr_( "image_height" ) ] = bitmap.bmHeight;
 	js[ xorstr_( "image_hash" ) ] = hash;
@@ -514,5 +557,5 @@ bool client::SendPunishToServer( std::string Message , bool Ban ) {
 	Info += js.dump( );
 
 
-	return SendDataToServer( js.dump( ) , Ban ? CommunicationType::BAN : CommunicationType::WARN );
+	return SendDataToServer( Info , Ban ? CommunicationType::BAN : CommunicationType::WARN );
 }

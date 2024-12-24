@@ -53,7 +53,7 @@ bool client::InitializeConnection( ) {
 		//GetNetworkAdapterIPs( this->ipaddres );
 	this->ipaddres = xorstr_("127.0.0.10");
 
-	LogSystem::Get( ).ConsoleLog( _SERVER , this->ipaddres , GREEN );
+	LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_("Sending message to " ) + this->ipaddres , GREEN );
 
 	sockaddr_in serverAddr;
 	const int serverPort = this->Port;
@@ -205,15 +205,25 @@ bool client::SendMessageToServer( std::string Message, CommunicationType type ) 
 	js[ xorstr_( "type" ) ] = type;
 	js[ xorstr_( "key" ) ] = _key;
 	js[ xorstr_( "password" ) ] = Mem::Get( ).GenerateHash( _key + salt );
-	if ( !InitializeConnection( ) ) {
-		//LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to initialize connection!" ) , RED );
-		return false;
+
+	int tries = 0;
+
+	bool success = false;
+
+	for ( int i = 0; i < 10; i++ ) {
+		if ( success )
+			break;
+
+		if ( !InitializeConnection( ) ) {
+			//LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to initialize connection!" ) , RED );
+			return false;
+		}
+
+		success = SendData( js.dump( ) , CommunicationType::MESSAGE );
+
+		CloseConnection( );
+		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
 	}
-
-	bool success = SendData( js.dump( ) , CommunicationType::MESSAGE );
-
-
-	CloseConnection( );
 
 	return success;
 }

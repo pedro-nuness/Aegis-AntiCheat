@@ -524,25 +524,25 @@ std::string WideStringToAnsi( const LPCWSTR wideString ) {
 
 // Hooked LoadLibraryA
 HMODULE WINAPI HookedLoadLibraryA( LPCSTR lpLibFileName ) {
-	LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[HookedLoadLibraryA] Library Loaded: " ) + std::string( lpLibFileName ) , WHITE );
+	//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[HookedLoadLibraryA] Library Loaded: " ) + std::string( lpLibFileName ) , WHITE );
 	return OriginalLoadLibraryA( lpLibFileName ); // Call the original function
 }
 
 // Hooked LoadLibraryW
 HMODULE WINAPI HookedLoadLibraryW( LPCWSTR lpLibFileName ) {
-	LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[HookedLoadLibraryW] Library Loaded: " ) + WideStringToAnsi( lpLibFileName ) , WHITE );
+	//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[HookedLoadLibraryW] Library Loaded: " ) + WideStringToAnsi( lpLibFileName ) , WHITE );
 	return OriginalLoadLibraryW( lpLibFileName );
 }
 
 // Hooked LoadLibraryExA
 HMODULE WINAPI HookedLoadLibraryExA( LPCSTR lpLibFileName , HANDLE hFile , DWORD dwFlags ) {
-	LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[HookedLoadLibraryExA] Library Loaded: " ) + std::string( lpLibFileName ) , WHITE );
+	//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[HookedLoadLibraryExA] Library Loaded: " ) + std::string( lpLibFileName ) , WHITE );
 	return OriginalLoadLibraryExA( lpLibFileName , hFile , dwFlags );
 }
 
 // Hooked LoadLibraryExW
 HMODULE WINAPI HookedLoadLibraryExW( LPCWSTR lpLibFileName , HANDLE hFile , DWORD dwFlags ) {
-	LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[HookedLoadLibraryExW] Library Loaded: " ) + WideStringToAnsi( lpLibFileName ) , WHITE );
+	//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[HookedLoadLibraryExW] Library Loaded: " ) + WideStringToAnsi( lpLibFileName ) , WHITE );
 	return OriginalLoadLibraryExW( lpLibFileName , hFile , dwFlags );
 }
 
@@ -575,31 +575,6 @@ bool Preventions::EnableApiHooks( ) {
 		return false;
 	}
 
-	// Hook LoadLibraryA
-	if ( MH_CreateHookApi( L"kernel32" , xorstr_( "LoadLibraryA" ) , &HookedLoadLibraryA , reinterpret_cast< LPVOID * >( &OriginalLoadLibraryA ) ) != MH_OK ) {
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Failed to create hook for LoadLibraryA!" ) , YELLOW );
-		return false;
-	}
-
-	// Hook LoadLibraryW
-	if ( MH_CreateHookApi( L"kernel32" , xorstr_( "LoadLibraryW" ) , &HookedLoadLibraryW , reinterpret_cast< LPVOID * >( &OriginalLoadLibraryW ) ) != MH_OK ) {
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Failed to create hook for LoadLibraryW!" ) , YELLOW );
-		return false;
-	}
-
-	// Hook LoadLibraryExA
-	if ( MH_CreateHookApi( L"kernel32" , xorstr_( "LoadLibraryExA" ) , &HookedLoadLibraryExA , reinterpret_cast< LPVOID * >( &OriginalLoadLibraryExA ) ) != MH_OK ) {
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Failed to create hook for LoadLibraryExA!" ) , YELLOW );
-		return false;
-	}
-
-	// Hook LoadLibraryExW
-	if ( MH_CreateHookApi( L"kernel32" , xorstr_( "LoadLibraryExW") , &HookedLoadLibraryExW , reinterpret_cast< LPVOID * >( &OriginalLoadLibraryExW ) ) != MH_OK ) {
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Failed to create hook for LoadLibraryExW!" ) , YELLOW );
-		return false;
-	}
-
-
 	if ( MH_EnableHook( MH_ALL_HOOKS ) != MH_OK ) {
 		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Failed to enable hooks!" ) , YELLOW );
 		return false;
@@ -624,15 +599,6 @@ void Preventions::Deploy( ) {
 
 	//if ( !Preventions::Get( ).PreventThreadCreation( ) )
 	//	LogSystem::Get( ).Log( xorstr_( "[3] Failed to protect process" ) );
-
-
-	/*if ( !Preventions::Get( ).RemapProgramSections( ) ) {
-		LogSystem::Get( ).Log( xorstr_( "[0] Failed to protect process" ) );
-	}
-
-	if ( !Preventions::Get( ).EnableProcessMitigations( true , true , false , true , false ) ) {
-		LogSystem::Get( ).Log( xorstr_( "[3] Failed to protect process" ) );
-	}*/
 
 	LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "deployed sucessfully" ) , GREEN );
 

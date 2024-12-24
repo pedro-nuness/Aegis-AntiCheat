@@ -141,63 +141,129 @@ std::vector<BYTE> Monitoring::BitmapToByteArray( HBITMAP hBitmap )
 
 	return bitmapData;
 }
-std::vector<BYTE> Monitoring::CompressBitmapByteArray( const std::vector<BYTE> & bitmapByteArray ) {
-	std::vector<BYTE> compressedArray;
+
+std::vector<int> Monitoring::CompressToIntermediate( std::vector<BYTE> & bitmapByteArray ) {
+	std::vector<int> compressedArray;
 	size_t i = 0;
 
 	while ( i < bitmapByteArray.size( ) ) {
-		BYTE current = bitmapByteArray[ i ];
-		size_t count = 1;
+		size_t maxPatternLength = 4;  // Limite para o comprimento do padrão
+		size_t patternLength = 1;
+		size_t repetitions = 1;
 
-		// Contar repetições consecutivas do byte atual
-		while ( i + count < bitmapByteArray.size( ) && bitmapByteArray[ i + count ] == current && count < 255 ) {
-			++count;
+		// Tentar encontrar o padrão mais longo que se repete
+		for ( size_t len = 1; len <= maxPatternLength; ++len ) {
+			if ( i + len * 2 > bitmapByteArray.size( ) ) break;
+
+			bool match = true;
+			for ( size_t k = 0; k < len; ++k ) {
+				if ( bitmapByteArray[ i + k ] != bitmapByteArray[ i + len + k ] ) {
+					match = false;
+					break;
+				}
+			}
+
+			if ( match ) {
+				patternLength = len;
+				repetitions = 2;
+
+				// Contar repetições do padrão
+				while ( i + patternLength * ( repetitions + 1 ) <= bitmapByteArray.size( ) &&
+					std::equal( bitmapByteArray.begin( ) + i ,
+						bitmapByteArray.begin( ) + i + patternLength ,
+						bitmapByteArray.begin( ) + i + patternLength * repetitions ) ) {
+					++repetitions;
+				}
+				break;
+			}
 		}
 
-		if ( count > 3 ) {
-			// Sequência longa, adicionar sequência comprimida
-			compressedArray.push_back( 0xFF ); // Flag para sequência
-			compressedArray.push_back( current );
-			compressedArray.push_back( static_cast< BYTE >( count ) );
+		if ( repetitions > 1 ) {
+			// Calcular o tamanho da compressão em formato de string
+			int compressedSize = std::to_string( -2 ).length( ) + 1 // -2,
+				+ std::to_string( patternLength ).length( ) + 1 // patternLength,
+				+ std::to_string( repetitions ).length( ) + 1 // repetitions,
+				+ patternLength * std::to_string( bitmapByteArray[ i ] ).length( ); // padrão
+
+			// Calcular o tamanho da sequência original não comprimida
+			int originalSize = repetitions * patternLength * 2 + ( repetitions - 1 ); // Ex: 23,23 (5 caracteres)
+
+			// Comparar os tamanhos e decidir se vale a pena comprimir
+			if ( compressedSize < originalSize ) {
+				// Codificar sequência repetitiva como padrão
+				compressedArray.push_back( -2 );                      // Flag de padrão
+				compressedArray.push_back( static_cast< int >( patternLength ) );
+				compressedArray.push_back( static_cast< int >( repetitions ) );
+				for ( size_t j = 0; j < patternLength; ++j ) {
+					compressedArray.push_back( static_cast< int >( bitmapByteArray[ i + j ] ) );
+				}
+				i += patternLength * repetitions;
+			}
+			else {
+				// Caso não compense, armazenar os bytes repetidos de forma simples
+				for ( size_t rep = 0; rep < repetitions; ++rep ) {
+					compressedArray.push_back( static_cast< int >( bitmapByteArray[ i + rep ] ) );
+				}
+				i += repetitions;
+			}
 		}
 		else {
-			// Adicionar bytes únicos como bloco
-			size_t start = i;
-			size_t blockLength = 0;
-			while ( i < bitmapByteArray.size( ) && ( blockLength < 255 ) &&
-				( i + 1 == bitmapByteArray.size( ) || bitmapByteArray[ i ] != bitmapByteArray[ i + 1 ] ) ) {
-				++i;
-				++blockLength;
-			}
-			compressedArray.push_back( static_cast< BYTE >( blockLength ) ); // Comprimento do bloco
-			compressedArray.insert( compressedArray.end( ) , bitmapByteArray.begin( ) + start , bitmapByteArray.begin( ) + start + blockLength );
-		}
+			// Processar bytes únicos ou pequenas repetições
+			BYTE current = bitmapByteArray[ i ];
+			size_t count = 1;
 
-		i += count;
+			while ( i + count < bitmapByteArray.size( ) && bitmapByteArray[ i + count ] == current && count < 255 ) {
+				++count;
+			}
+
+			if ( count > 3 ) {
+				compressedArray.push_back( -1 );  // Flag de repetição simples
+				compressedArray.push_back( static_cast< int >( current ) );
+				compressedArray.push_back( static_cast< int >( count ) );
+			}
+			else {
+				for ( size_t j = 0; j < count; ++j ) {
+					compressedArray.push_back( static_cast< int >( current ) );
+				}
+			}
+			i += count;
+		}
 	}
 
 	return compressedArray;
 }
 
-std::vector<BYTE> Monitoring::DecompressBitmapByteArray( const std::vector<BYTE> & compressedArray ) {
+
+
+
+std::vector<BYTE> Monitoring::DecompressFromIntermediate( std::vector<int> & compressedArray ) {
 	std::vector<BYTE> decompressedArray;
+
 	size_t i = 0;
-
 	while ( i < compressedArray.size( ) ) {
-		BYTE flag = compressedArray[ i ];
+		if ( compressedArray[ i ] == -2 ) {
+			// Decodificar sequência de padrões
+			int patternLength = compressedArray[ i + 1 ];
+			int repetitions = compressedArray[ i + 2 ];
 
-		if ( flag == 0xFF ) {
-			// Sequência comprimida
-			BYTE value = compressedArray[ i + 1 ];
-			BYTE count = compressedArray[ i + 2 ];
+			for ( int rep = 0; rep < repetitions; ++rep ) {
+				for ( int j = 0; j < patternLength; ++j ) {
+					decompressedArray.push_back( static_cast< BYTE >( compressedArray[ i + 3 + j ] ) );
+				}
+			}
+			i += 3 + patternLength;
+		}
+		else if ( compressedArray[ i ] == -1 ) {
+			// Decodificar repetição simples
+			BYTE value = static_cast< BYTE >( compressedArray[ i + 1 ] );
+			int count = compressedArray[ i + 2 ];
 			decompressedArray.insert( decompressedArray.end( ) , count , value );
 			i += 3;
 		}
 		else {
-			// Bloco de bytes únicos
-			size_t blockLength = static_cast< size_t >( flag );
-			decompressedArray.insert( decompressedArray.end( ) , compressedArray.begin( ) + i + 1 , compressedArray.begin( ) + i + 1 + blockLength );
-			i += 1 + blockLength;
+			// Decodificar byte único
+			decompressedArray.push_back( static_cast< BYTE >( compressedArray[ i ] ) );
+			++i;
 		}
 	}
 

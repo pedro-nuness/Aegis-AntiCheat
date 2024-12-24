@@ -4,6 +4,8 @@
 #include <mutex>
 #include <iostream>
 
+#include "../../Globals/Globals.h"
+
 #include "../Utils/File/File.h"
 #include "../Utils/utils.h"
 #include "../Utils/xorstr.h"
@@ -21,7 +23,7 @@ std::mutex PrintMutex;
 
 void LogSystem::ConsoleLog( MODULE_SENDER sender , std::string Message , COLORS _col ) {
 
-#if true
+#if ALLOCCONSOLE
 	std::lock_guard<std::mutex> lock( PrintMutex );
 	std::string custom_text = xorstr_( "undefined" );
 	COLORS custom_col = RED;

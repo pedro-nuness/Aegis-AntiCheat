@@ -179,9 +179,6 @@ void Listener::threadFunction( ) {
 	inet_ntop( AF_INET , &serverAddr.sin_addr , ipStr , sizeof( ipStr ) );
 	LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Server listening on port " ) + std::to_string( serverPort ) , COLORS::GREEN );
 
-
-	std::thread( &Listener::ProcessMessages , this ).detach( );
-
 	while ( true ) {
 		if ( this->ThreadObject->IsShutdownSignalled( ) ) {
 			LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Shutdown signalled!" ) , COLORS::GREEN );
@@ -192,7 +189,7 @@ void Listener::threadFunction( ) {
 		int clientAddrLen = sizeof( clientAddr );
 		SOCKET clientSock = accept( listenSock , ( sockaddr * ) &clientAddr , &clientAddrLen );
 		if ( clientSock == INVALID_SOCKET ) {
-			LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Accept failed." ) , COLORS::RED );
+			LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "No connections found" ) , COLORS::GRAY );
 			continue;
 		}
 

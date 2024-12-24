@@ -10,12 +10,12 @@
 
 #include "../Utils/utils.h"
 #include "../Utils/xorstr.h"
+#include "../LogSystem/Log.h"
 
 #pragma comment(lib, "wintrust.lib")
 
-BOOL Authentication::VerifyEmbeddedSignature( std::string filePath )
+AUTHENTICATION_RESPONSE Authentication::VerifyEmbeddedSignature( std::string filePath )
 {
-
 	std::wstring wStrFilePath = std::wstring( filePath.begin( ) , filePath.end( ) );
 
 	WINTRUST_FILE_INFO fileInfo = { 0 };
@@ -44,22 +44,63 @@ BOOL Authentication::VerifyEmbeddedSignature( std::string filePath )
 	trustData.dwStateAction = WTD_STATEACTION_CLOSE;
 	WinVerifyTrust( NULL , &policyGUID , &trustData );
 
-	// LogSystem::Get( ).ConsoleLog( _DETECTION , filePath + xorstr_( "file verification returned: " ) + std::to_string( status ) ), YELLOW );
+	AUTHENTICATION_RESPONSE response = NONE_AUTHENTICATION;
 
-	return status == ERROR_SUCCESS;
+	switch ( status )
+	{
+	case ERROR_SUCCESS:
+		response = AUTHENTICATED;
+		break;
+
+	case TRUST_E_NOSIGNATURE:
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Embedded] The file is not signed or the signature is invalid.") , RED );
+		response = NOT_AUTHENTICATED;
+		break;
+
+	case TRUST_E_SUBJECT_FORM_UNKNOWN:
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Embedded] The subject type is not recognized." ) , RED );
+		response = NOT_AUTHENTICATED;
+		break;
+
+	case TRUST_E_PROVIDER_UNKNOWN:
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Embedded] The trust provider is not recognized." ) , RED );
+		response = NOT_AUTHENTICATED;
+		break;
+
+	case TRUST_E_SUBJECT_NOT_TRUSTED:
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Embedded] The subject is not trusted." ) , RED );
+		response = NOT_AUTHENTICATED;
+		break;
+
+	case TRUST_E_ACTION_UNKNOWN:
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Embedded] The trust action is not supported." ) , RED );
+		response = FAILED_TO_GET;
+		break;
+
+	case CRYPT_E_FILE_ERROR:
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Embedded] There was a file error during verification." ) , RED );
+		response = FAILED_TO_GET;
+		break;
+	default:
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_("[Embedded] Unknown error during file verification." ) , RED );
+		response = NOT_AUTHENTICATED;
+		break;
+	}
+
+	return response;
 }
 
-BOOL Authentication::VerifyCatalogSignature( std::string filePath ) {
+AUTHENTICATION_RESPONSE Authentication::VerifyCatalogSignature( std::string filePath ) {
 	HANDLE hFile = CreateFile( filePath.c_str( ) , GENERIC_READ , FILE_SHARE_READ , NULL , OPEN_EXISTING , FILE_ATTRIBUTE_NORMAL , NULL );
 	if ( hFile == INVALID_HANDLE_VALUE ) {
 		// std::wcerr << L"Could not open file: " << filePath << std::endl;
-		return false;
+		return FAILED_TO_GET;
 	}
 
 	HCATADMIN hCatAdmin = NULL;
 	if ( !CryptCATAdminAcquireContext( &hCatAdmin , NULL , 0 ) ) {
 		CloseHandle( hFile );
-		return false;
+		return FAILED_TO_GET;
 	}
 
 	BYTE pbHash[ 100 ];
@@ -67,7 +108,7 @@ BOOL Authentication::VerifyCatalogSignature( std::string filePath ) {
 	if ( !CryptCATAdminCalcHashFromFileHandle( hFile , &cbHash , pbHash , 0 ) ) {
 		CryptCATAdminReleaseContext( hCatAdmin , 0 );
 		CloseHandle( hFile );
-		return false;
+		return FAILED_TO_GET;
 	}
 
 	CATALOG_INFO CatInfo;
@@ -79,15 +120,16 @@ BOOL Authentication::VerifyCatalogSignature( std::string filePath ) {
 		//std::wcerr << L"No catalog file found for " << filePath << std::endl;
 		CryptCATAdminReleaseContext( hCatAdmin , 0 );
 		CloseHandle( hFile );
-		return false;
+		return FAILED_TO_GET;
 	}
 
 	if ( !CryptCATCatalogInfoFromContext( hCatInfo , &CatInfo , 0 ) ) {
 		CryptCATAdminReleaseCatalogContext( hCatAdmin , hCatInfo , 0 );
 		CryptCATAdminReleaseContext( hCatAdmin , 0 );
 		CloseHandle( hFile );
-		return false;
+		return FAILED_TO_GET;
 	}
+
 
 	WINTRUST_CATALOG_INFO WinTrustCatalogInfo;
 	memset( &WinTrustCatalogInfo , 0 , sizeof( WinTrustCatalogInfo ) );
@@ -129,16 +171,66 @@ BOOL Authentication::VerifyCatalogSignature( std::string filePath ) {
 	CryptCATAdminReleaseContext( hCatAdmin , 0 );
 	CloseHandle( hFile );
 
-	return lStatus == ERROR_SUCCESS;
+	AUTHENTICATION_RESPONSE response = NONE_AUTHENTICATION;
+
+	switch ( lStatus )
+	{
+	case ERROR_SUCCESS:
+		response = AUTHENTICATED;
+		break;
+	case TRUST_E_NOSIGNATURE:
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Catalog] The file is not signed or the signature is invalid." ) , RED );
+		response = NOT_AUTHENTICATED;
+		break;
+
+	case TRUST_E_SUBJECT_FORM_UNKNOWN:
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Catalog] The subject type is not recognized." ) , RED );
+		response = NOT_AUTHENTICATED;
+		break;
+
+	case TRUST_E_PROVIDER_UNKNOWN:
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Catalog] The trust provider is not recognized." ) , RED );
+		response = NOT_AUTHENTICATED;
+		break;
+
+	case TRUST_E_SUBJECT_NOT_TRUSTED:
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Catalog] The subject is not trusted." ) , RED );
+		response = NOT_AUTHENTICATED;
+		break;
+
+	case TRUST_E_ACTION_UNKNOWN:
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Catalog] The trust action is not supported." ) , RED );
+		response = FAILED_TO_GET;
+		break;
+
+	case CRYPT_E_FILE_ERROR:
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Catalog] There was a file error during verification." ) , RED );
+		response = FAILED_TO_GET;
+		break;
+	default:
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Catalog] Unknown error during file verification." ) , RED );
+		response = NOT_AUTHENTICATED;
+		break;
+	}
+
+
+	return response;
+
 }
 
-/// <summary>
-/// Takes in a file path and returns if module is signed of not
-/// </summary>
-/// <param name="filePath:">Full file path to DLL</param>
-/// <returns>True if file has a signature</returns>
 BOOL Authentication::HasSignature( std::string filePath )
 {
-	return ( Authentication::VerifyEmbeddedSignature( filePath ) ||
-		Authentication::VerifyCatalogSignature( filePath ) );
+	// Primeiro, verifica a assinatura embutida
+	AUTHENTICATION_RESPONSE embeddedResponse = Authentication::VerifyEmbeddedSignature( filePath );
+	if ( embeddedResponse == AUTHENTICATED ) {
+		return true; // Autenticação válida encontrada
+	}
+
+	// Se falhou ou não estava autenticada, tenta a assinatura do catálogo
+	AUTHENTICATION_RESPONSE catalogResponse = Authentication::VerifyCatalogSignature( filePath );
+	if ( catalogResponse == AUTHENTICATED ) {
+		return true; // Autenticação válida encontrada
+	}
+
+	return false;
 }

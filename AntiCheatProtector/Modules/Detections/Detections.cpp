@@ -53,11 +53,17 @@ VOID CALLBACK Detections::OnDllNotification( ULONG NotificationReason , const PL
 void Detections::CheckLoadedDlls( ) {
 
 	{
-		std::lock_guard<std::mutex> lock( this->AccessGuard );
-		while ( !PendingLoadedDlls.empty( ) )
+		std::vector<std::string> NameCopy;
 		{
-			LoadedDlls.push_back( PendingLoadedDlls.back( ) );
-			PendingLoadedDlls.pop_back( );
+			std::lock_guard<std::mutex> lock( this->AccessGuard );
+			NameCopy = PendingLoadedDlls;
+			PendingLoadedDlls.clear( );
+		}
+
+		while ( !NameCopy.empty( ) )
+		{
+			LoadedDlls.push_back( NameCopy.back( ) );
+			NameCopy.pop_back( );
 		}
 	}
 
@@ -148,7 +154,8 @@ bool SaveFirstFunctionBytes( const std::string & moduleName , const std::string 
 		return false;
 	}
 
-	outFile << xorstr_( "unsigned char functionBytes[] = {" );
+	outFile << xorstr_( "unsigned char " );
+	outFile << functionName << xorstr_( "functionBytes[ ] = { " );
 	for ( size_t i = 0; i < byteCount; ++i ) {
 		outFile << xorstr_( "0x" ) << std::hex << static_cast< int >( start[ i ] );
 		if ( i < byteCount - 1 ) outFile << ", "; // Adiciona vírgula entre os bytes
@@ -218,7 +225,7 @@ enum OsType {
 	Windows10 ,
 	Windows11 ,
 	Neither ,
-	OUTDATEDAASYSTEM,
+	OUTDATEDAASYSTEM ,
 	CANTCATCH
 };
 
@@ -314,7 +321,7 @@ void Detections::CheckFunctions( ) {
 
 		default:
 			LogSystem::Get( ).Log( xorstr_( "Incompatible OS Version!" ) );
-			goto out;
+			return;
 		}
 
 		if ( this->DoesFunctionAppearHooked( xorstr_( "ws2_32.dll" ) , xorstr_( "send" ) , SENDfunctionBytes.data( ) , true ) ) {
@@ -328,10 +335,6 @@ void Detections::CheckFunctions( ) {
 		}
 
 	}
-	
-out:
-	return;
-
 }
 
 
@@ -481,13 +484,18 @@ void Detections::DigestDetections( ) {
 
 		client newclient;
 
-		while ( !newclient.SendMessageToServer( FinalInfo , Ban ? BAN : WARN ) ) {
-			Sleep( 10000 );
+
+		if ( !newclient.SendMessageToServer( FinalInfo , Ban ? BAN : WARN ) ) {
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Failed to send message to server, retrying later..." ) , YELLOW );
 		}
-		LogSystem::Get( ).Log( xorstr_( "AC Flagged unsafe!" ) );
+		else {
+			this->DetectedFlags.clear( );
+			if ( Ban )
+				LogSystem::Get( ).Log( xorstr_( "AC Flagged unsafe!" ) );
+		}
 	}
 
-	this->DetectedFlags.clear( );
+
 }
 
 

@@ -4,10 +4,17 @@
 
 #include "../Utils/singleton.h"
 
+enum AUTHENTICATION_RESPONSE {
+	FAILED_TO_GET ,
+	NOT_AUTHENTICATED ,
+	AUTHENTICATED,
+	NONE_AUTHENTICATION
+};
+
 class Authentication : public CSingleton<Authentication>
 {
-	BOOL VerifyEmbeddedSignature( std::string pwszSourceFile );
-	BOOL VerifyCatalogSignature( std::string filePath );
+	AUTHENTICATION_RESPONSE VerifyEmbeddedSignature( std::string pwszSourceFile );
+	AUTHENTICATION_RESPONSE VerifyCatalogSignature( std::string filePath );
 public:
 	BOOL HasSignature( std::string filePath );
 };

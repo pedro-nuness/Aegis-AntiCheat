@@ -111,8 +111,14 @@ bool IsProcessParent( DWORD processID , DWORD targetParentPID ) {
 	return parentPID == targetParentPID;
 }
 
+#include <nlohmann/json.hpp>
+#include "Systems/LogSystem/File/File.h"
+using nlohmann::json;
+
 
 int main( int argc , char * argv[ ] ) {
+
+
 	//Init anti-cheat
 	{
 		//Request MB and Disk ID

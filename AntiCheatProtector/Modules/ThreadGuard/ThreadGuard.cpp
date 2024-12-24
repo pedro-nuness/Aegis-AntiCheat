@@ -5,6 +5,7 @@
 #include "../../Systems/LogSystem/Log.h"
 #include "../../Systems/Utils/utils.h"
 #include "../../Globals/Globals.h"
+#include "../../Client/client.h"
 
 std::mutex ListMutex;
 
@@ -39,14 +40,23 @@ std::vector<HANDLE> ThreadGuard::GetRunningThreadHandle( ) {
 
 
 bool ThreadGuard::isRunning( ) const {
-	if ( this->ThreadObject->IsThreadSuspended( this->ThreadObject->GetHandle( ) ) ) {
+	if ( this->ThreadObject->IsThreadSuspended( this->ThreadObject->GetHandle( ) ) ) {	
 		
+		client newclient;
+		newclient.SendMessageToServer( xorstr_( "ThreadGuard suspended!" ) , BAN );
+		
+
 		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
+		return false;
 	}
 
 	if ( !this->ThreadObject->IsThreadRunning( this->ThreadObject->GetHandle( ) ) && !this->ThreadObject->IsShutdownSignalled( ) ) {
 	
+		client newclient;
+		newclient.SendMessageToServer( xorstr_( "ThreadGuard Terminated!" ) , BAN );
+
 		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
+		return false;
 	}
 
 	return true;

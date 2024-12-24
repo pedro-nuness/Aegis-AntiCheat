@@ -699,7 +699,7 @@ CommunicationResponse Server::receivepunish( const std::string & encryptedMessag
 
 	// Obter os bytes da imagem e gerar o hash
 	std::string ImageHash = js[ xorstr_( "image_hash" ) ];
-	std::vector<BYTE> Image = js[ xorstr_( "image" ) ];
+	std::vector<int> CompressedImage = js[ xorstr_( "image" ) ];
 
 
 	int height = js[ xorstr_( "image_height" ) ];
@@ -710,7 +710,8 @@ CommunicationResponse Server::receivepunish( const std::string & encryptedMessag
 	std::string Filename = "";
 
 	// Recriar a imagem
-	Image = image::Get( ).DecompressBitmapByteArray( Image );
+	std::vector<BYTE> Image = image::Get( ).DecompressFromIntermediate( CompressedImage );
+
 	if ( Image.empty( ) ) {
 		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to decompress image!" ) , RED );
 	}
@@ -721,25 +722,27 @@ CommunicationResponse Server::receivepunish( const std::string & encryptedMessag
 		if ( ImageHash != Hash ) {
 			utils::Get( ).WarnMessage( _SERVER , xorstr_( "Image corrupted!" ) , RED );
 		}
-		HBITMAP reconstructedBitmap = image::Get( ).ByteArrayToBitmap( Image , width , height );
+		else {
+			HBITMAP reconstructedBitmap = image::Get( ).ByteArrayToBitmap( Image , width , height );
 
-		// Criar nome da pasta
-		std::string Nickname = js[ xorstr_( "nickname" ) ];
-		std::vector<std::string> SteamIDs = js[ xorstr_( "steamid" ) ];
-		std::string FolderName = memory::Get( ).GetProcessPath( ::_getpid( ) ) + "\\" + Nickname + xorstr_( "-" ) + SteamIDs[ 0 ];
+			// Criar nome da pasta
+			std::string Nickname = js[ xorstr_( "nickname" ) ];
+			std::vector<std::string> SteamIDs = js[ xorstr_( "steamid" ) ];
+			std::string FolderName = memory::Get( ).GetProcessPath( ::_getpid( ) ) + "\\" + Nickname + xorstr_( "-" ) + SteamIDs[ 0 ];
 
-		// Criar diretório se não existir
-		if ( !fs::exists( FolderName.c_str( ) ) ) {
-			std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
-			fs::create_directory( FolderName.c_str( ) );
+			// Criar diretório se não existir
+			if ( !fs::exists( FolderName.c_str( ) ) ) {
+				std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
+				fs::create_directory( FolderName.c_str( ) );
+			}
+
+			// Salvar a imagem
+			Filename = FolderName + "\\" + utils::Get( ).GetRandomWord( 20 ) + xorstr_( ".jpg" );
+			image::Get( ).SaveBitmapToFile( reconstructedBitmap , Filename );
+
+			// Liberar o recurso HBITMAP
+			DeleteObject( reconstructedBitmap );
 		}
-
-		// Salvar a imagem
-		Filename = FolderName + "\\" + utils::Get( ).GetRandomWord( 20 ) + xorstr_( ".jpg" );
-		image::Get( ).SaveBitmapToFile( reconstructedBitmap , Filename );
-
-		// Liberar o recurso HBITMAP
-		DeleteObject( reconstructedBitmap );
 	}
 
 	// Adicionar o hwid à mensagem
@@ -759,7 +762,7 @@ CommunicationResponse Server::receivepunish( const std::string & encryptedMessag
 			else {
 				utils::Get( ).WarnMessage( _SERVER , xorstr_( "Successfully banned computer banned from server!" ) , GREEN );
 			}
-			
+
 		}
 		else {
 			WebhookList.emplace_back( WHookRequest( WHOOKTYPE::WARN_ , Message , Filename , Ip , 0 ) );

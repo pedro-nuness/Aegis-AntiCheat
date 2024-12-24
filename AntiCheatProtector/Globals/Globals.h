@@ -1,6 +1,8 @@
 #pragma once
 #include "../Systems/Utils/singleton.h"
 
+#define ALLOCCONSOLE 1
+
 class Globals : public CSingleton<Globals> {
 
 public:

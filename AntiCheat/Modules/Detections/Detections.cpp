@@ -13,6 +13,7 @@
 #include "../../Systems/Utils/xorstr.h"
 #include "../../Systems/Monitoring/Monitoring.h"
 #include "../../Systems/LogSystem/Log.h"
+#include "../../Systems/LogSystem/File/File.h"
 #include "../../Globals/Globals.h"
 #include "../../Systems/Utils/utils.h"
 #include "../../Systems/Injection/Injection.h"
@@ -81,6 +82,13 @@ bool Detections::isRunning( ) const {
 	return true;
 }
 
+
+#include <nlohmann/json.hpp>
+
+using nlohmann::json;
+
+bool DumpedDrivers = false;
+
 void Detections::CheckLoadedDrivers( ) {
 
 	std::vector<std::string> LoadedDrivers;
@@ -89,6 +97,14 @@ void Detections::CheckLoadedDrivers( ) {
 		std::string toReplace = xorstr_( "\\SystemRoot\\" );
 		std::string replacement = xorstr_( "C:\\WINDOWS\\" );
 
+		if ( !DumpedDrivers ) {
+			File DumpDrivers( "DriversDump.txt" );
+			json Js;
+			Js[ "drivers" ] = LoadedDrivers;
+			DumpDrivers.Write( Js.dump( ) );
+			DumpedDrivers = true;
+		}
+
 		for ( auto Driver : LoadedDrivers ) {
 
 			if ( Utils::Get( ).CheckStrings( Driver , xorstr_( "dump_diskdump.sys" ) )
@@ -96,6 +112,11 @@ void Detections::CheckLoadedDrivers( ) {
 				|| Utils::Get( ).CheckStrings( Driver , xorstr_( "dump_storahci.sys" ) ) ) {
 				LogSystem::Get( ).Log( xorstr_( "[203] Windows dump files found" ) );
 				continue;
+			}
+
+			if ( Utils::Get( ).CheckStrings( Driver , xorstr_( "kprocesshacker.sys" ) ) ) {
+				LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "ProcessHacker Driver Loaded!" ) , YELLOW );
+				AddDetection( UNVERIFIED_DRIVER_RUNNING , DetectionStruct( Driver , SUSPECT ) );
 			}
 
 			size_t pos = Driver.find( toReplace );
@@ -171,11 +192,17 @@ void Detections::CheckOpenHandles( ) {
 void Detections::CheckLoadedDlls( ) {
 
 	{
-		std::lock_guard<std::mutex> lock( this->AccessGuard );
-		while ( !PendingLoadedDlls.empty( ) )
+		std::vector<std::string> NameCopy;
 		{
-			LoadedDlls.push_back( PendingLoadedDlls.back( ) );
-			PendingLoadedDlls.pop_back( );
+			std::lock_guard<std::mutex> lock( this->AccessGuard );
+			NameCopy = PendingLoadedDlls;
+			PendingLoadedDlls.clear( );
+		}
+
+		while ( !NameCopy.empty( ) )
+		{
+			LoadedDlls.push_back( NameCopy.back( ) );
+			NameCopy.pop_back( );
 		}
 	}
 

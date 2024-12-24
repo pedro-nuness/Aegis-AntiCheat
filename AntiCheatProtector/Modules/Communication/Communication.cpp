@@ -69,8 +69,25 @@ SOCKET Communication::openConnection( const char * serverIp , int serverPort ) {
 	// Conecta ao servidor
 	iResult = SOCKET_ERROR;
 	int ConnectionTry = 0;
-	while ( iResult == SOCKET_ERROR && ConnectionTry <= 25 ) {
+	while ( ConnectionTry <= 50 ) {
+		// Recria o socket
+		ConnectSocket = socket( AF_INET , SOCK_STREAM , IPPROTO_TCP );
+		if ( ConnectSocket == INVALID_SOCKET ) {
+			LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "Failed to create socket." ) , RED );
+			continue;
+		}
+
 		iResult = connect( ConnectSocket , ( SOCKADDR * ) &serverAddr , sizeof( serverAddr ) );
+		if ( iResult == SOCKET_ERROR ) {
+			LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "Connection failed, retrying..." ) , GRAY );
+			closesocket( ConnectSocket ); // Fecha o socket antes da próxima tentativa
+			ConnectionTry++;
+		}
+		else {
+			LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "Connection successful!" ) , GREEN );
+			break;
+		}
+
 		ConnectionTry++;
 		LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "attempting connection" ) , GRAY );
 		std::this_thread::sleep_for( std::chrono::seconds( 2 ) );
@@ -79,11 +96,12 @@ SOCKET Communication::openConnection( const char * serverIp , int serverPort ) {
 	if ( iResult == SOCKET_ERROR ) {
 		LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "connection error: " ) + std::to_string( WSAGetLastError( ) ) , RED );
 		LogSystem::Get( ).Log( xorstr_( "[CLIENT][201] Can't connect to server!" ) );
-		system( "pause" );
 		closesocket( ConnectSocket );
 		WSACleanup( );
 		return INVALID_SOCKET;
 	}
+
+
 
 	return ConnectSocket;
 }
