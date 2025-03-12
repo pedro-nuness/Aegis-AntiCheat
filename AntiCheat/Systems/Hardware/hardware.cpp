@@ -40,6 +40,8 @@
 
 #include "../Utils/StringCrypt/StringCrypt.h"
 
+#include "../../Globals/Globals.h"
+
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -54,17 +56,31 @@ CryptedString CachedVersionID;
 
 
 
-void hardware::GenerateInitialCache( ) {
+bool hardware::GenerateInitialCache( ) {
 	//before preventions deployment
-	GetMotherboardSerialNumber( nullptr );
-	GetDiskSerialNumber( nullptr );
-	GetIp( nullptr );
+	if ( !GetMotherboardSerialNumber( nullptr ) ) {
+		return false;
+	}
+	if ( !GetDiskSerialNumber( nullptr ) ) {
+		return false;
+	}
+	if ( !GetIp( nullptr ) ) {
+		return false;
+	}
+
+	return true;
 }
 
-void hardware::EndCacheGeneration( ) {
+bool hardware::EndCacheGeneration( ) {
 	//after preventions deployment
-	getMacAddress( );
-	GetVersionUID( nullptr );
+	if ( getMacAddress( ).empty() ) {
+		return false;
+	}
+	if ( !GetVersionUID( nullptr ) ) {
+		return false;
+	}
+
+	return true;
 }
 
 
@@ -159,12 +175,34 @@ bool hardware::GetVersionUID( std::string * buffer ) {
 	}
 
 	{
-		std::string VersionID = Mem::Get( ).GetFileHash( Mem::Get( ).GetProcessExecutablePath( GetCurrentProcessId( ) ) );
-		CachedVersionID = StringCrypt::Get( ).EncryptString( VersionID );
+		std::string AntiCheatVersionID = Mem::Get( ).GetFileHash( Mem::Get( ).GetProcessExecutablePath( GetCurrentProcessId( ) ) );
+		if ( AntiCheatVersionID.empty( ) )
+			return false;
+
+		std::string ParentVersionID = Mem::Get( ).GetFileHash( Mem::Get( ).GetProcessExecutablePath( _globals.OriginalProcess ) );
+
+		if ( ParentVersionID.empty( ) )
+			return false;
+
+		std::string GameVersionID = Mem::Get( ).GetFileHash( Mem::Get( ).GetProcessExecutablePath( _globals.ProtectProcess ) );
+
+		if ( GameVersionID.empty( ) )
+			return false;
+
+		std::string FinalVersionID = Mem::Get( ).GenerateHash( AntiCheatVersionID + ParentVersionID + GameVersionID );
+
+		if ( FinalVersionID.empty( ) )
+			return false;
+
+		CachedVersionID = StringCrypt::Get( ).EncryptString( FinalVersionID );
 	}
 
 	return true;
 }
+
+
+
+
 
 bool hardware::GetUniqueUID( std::string * buffer , std::string ID ) {
 	if ( buffer == nullptr ) {

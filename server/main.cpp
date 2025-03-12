@@ -14,11 +14,17 @@
 #include "webhook/webhook.h"
 #include "api/api.h"
 
+#include "utils/File/File.h"
+
 #include "memory/memory.h"
+
+#include <filesystem>
 
 #pragma comment(lib, "Ws2_32.lib")
 
 #define MAXBUF  0xFFFF
+
+namespace fs = std::filesystem;
 
 // Estruturas de cabeçalho
 typedef struct {
@@ -146,83 +152,193 @@ void WatchFunction( ) {
 	}
 }
 
+void ReloadConfigThread( ) {
+	utils::Get( ).WarnMessage( _SERVER , xorstr_( "Reload config thread started! Press F5 to reload config / session ID / Whitelist!" ) , GREEN );
+	bool PressedReloadKey = false;
+	while ( true ) {
+		if ( GetAsyncKeyState( VK_F5 ) & 1 && !PressedReloadKey) {
+			_config.LoadConfig( );
+
+			std::string VerifiedSessionID = "";
+
+			//Login api
+			{
+				if ( Api::Get( ).Login( &VerifiedSessionID ) ) {
+					_globals.VerifiedSessionID = VerifiedSessionID;
+				}
+
+				if ( !_globals.LoggedIn ) {
+					exit( 0 );
+					__fastfail( 0 );
+				}
+				utils::Get( ).WarnMessage( _SERVER , xorstr_( "Reloaded successfully" ) , GREEN );
+			}
+
+			PressedReloadKey = true;
+		}
+		else if ( PressedReloadKey ) {
+			PressedReloadKey = false;
+		}
+
+		std::this_thread::sleep_for( std::chrono::milliseconds( 250 ) );
+	}
+}
+
+
+void UpdateSessionID( ) {
+	std::string SessionID;
+	std::cout << "SessionID: ";
+	std::cin >> SessionID;
+	std::cout << "\n";
+
+	std::string Response;
+	if( !Api::Get( ).UpdateSessionID( &Response , SessionID ) ) {
+		std::cout << "Request failed!\n";
+	}
+	else {
+		std::cout << "Sent request sucessfully!\n";
+	}
+
+	std::cout << Response << std::endl;
+	system( "pause" );
+}
+
+void GenerateSessionID( ) {
+	std::string AntiCheatVersionID = memory::Get( ).GetFileHash( xorstr_("aegis.exe" ));
+	if ( AntiCheatVersionID.empty( ) )
+		return;
+
+	std::string ParentVersionID = memory::Get( ).GetFileHash( xorstr_( "parent.exe" ) );
+
+	if ( ParentVersionID.empty( ) )
+		return;
+
+	std::string GameVersionID = memory::Get( ).GetFileHash( xorstr_( "game.exe" ) );
+
+	if ( GameVersionID.empty( ) )
+		return;
+
+	std::string FinalVersionID = memory::Get( ).GenerateHash( AntiCheatVersionID + ParentVersionID + GameVersionID );
+
+	File newfile( xorstr_( "output.txt" ) );
+	newfile.Write( FinalVersionID );
+}
+
+
+void ShowHelp( ) {
+	std::cout << "Available Commands:\n";
+	std::cout << "  -us         : Updates the session ID.\n";
+	std::cout << "  -watch      : Executes the watch function.\n";
+	std::cout << "  -nolock     : Disables connection locking.\n";
+	std::cout << "                Warning: This may reduce security.\n";
+	std::cout << "  -noauth     : Disables authentication.\n";
+	std::cout << "                Warning: This may allow unauthorized access.\n";
+	std::cout << "  -nobot      : Disables bot usage in the server.\n";
+	std::cout << "  -gs         : Generates session id, game.exe, aegis.exe and parent.exe must be on the folder!\n";
+	std::cout << "  -help       : Displays this help message.\n";
+}
+
 
 
 int main( int argc , char * argv[ ] ) {
 
 
+
 	Server connection_server;
 
-	config::Get( ).LoadConfig( );
+	_config.LoadConfig( );
 
 	std::string VerifiedSessionID = "";
 
 	//Login api
 	{
 		if ( Api::Get( ).Login( &VerifiedSessionID ) ) {
-			globals::Get( ).VerifiedSessionID = VerifiedSessionID;
+			_globals.VerifiedSessionID = VerifiedSessionID;
 		}
 
-		if ( !globals::Get( ).LoggedIn ) {
+		if ( !_globals.LoggedIn ) {
 			exit( 0 );
 			__fastfail( 0 );
 		}
 		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Connected sucessfully" ) , GREEN );
 	}
 
-	utils::Get( ).WarnMessage( _SERVER , xorstr_( "Authentic SessionID: " ) + globals::Get().VerifiedSessionID , GREEN );
+	utils::Get( ).WarnMessage( _SERVER , xorstr_( "Authentic SessionID: " ) + _globals.VerifiedSessionID , GREEN );
+
 
 	if ( argc > 1 ) {
 		for ( int i = 0; i < argc; i++ ) {
+			if ( utils::Get( ).CheckStrings( argv[ i ] , xorstr_( "-us" ) ) ) {
+				UpdateSessionID( );
+				return 1;
+			}
+
+			if ( utils::Get( ).CheckStrings( argv[ i ] , xorstr_( "-gs" ) ) ) {
+				GenerateSessionID( );
+				return 1;
+			}
+
+
 			if ( utils::Get( ).CheckStrings( argv[ i ] , xorstr_( "-watch" ) ) ) {
 				WatchFunction( );
 				return 1;
 			}
 
 			if ( utils::Get( ).CheckStrings( argv[ i ] , xorstr_( "-nolock" ) ) ) {
-				globals::Get( ).LockConnections = false;
+				_globals.LockConnections = false;
 				utils::Get( ).WarnMessage( _SERVER , xorstr_( "Server initializing on no lock mode" ) , YELLOW );
 				continue;
 			}
 
 			if ( utils::Get( ).CheckStrings( argv[ i ] , xorstr_( "-noauth" ) ) ) {
-				globals::Get( ).NoAuthentication = true;
+				_globals.NoAuthentication = true;
 				utils::Get( ).WarnMessage( _SERVER , xorstr_( "Server initializing on no authentication mode" ) , YELLOW );
 				continue;
 			}
 
 			if ( utils::Get( ).CheckStrings( argv[ i ] , xorstr_( "-nobot" ) ) ) {
-				globals::Get( ).Usebot = false;
+				_globals.Usebot = false;
 				utils::Get( ).WarnMessage( _SERVER , xorstr_( "Server initializing on no bot mode" ) , YELLOW );
 				continue;
 			}
+
+			if ( utils::Get( ).CheckStrings( argv[ i ] , xorstr_( "-help" ) ) ) {
+				ShowHelp( );
+				return 0;
+			}
 		}
+	}
+
+	std::thread( ReloadConfigThread ).detach( );
+	_globals.CurrentPath = memory::Get( ).GetProcessPath( ::_getpid( ) );
+	if ( !fs::exists( _globals.CurrentPath + xorstr_( "\\Players" ) ) ) {
+		fs::create_directory( _globals.CurrentPath + xorstr_( "\\Players" ) );
 	}
 
 
 	//filter port allocation
 
 	std::thread( &Server::threadfunction , &connection_server ).detach( );
-	while ( !globals::Get( ).ServerOpen ) {
+	while ( !_globals.ServerOpen ) {
 		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
 	}
 
-	if ( globals::Get( ).Usebot ) {
+	if ( _globals.Usebot ) {
 
-		globals::Get( ).whook.SetServerAddress( &connection_server );
-		globals::Get( ).whook.InitBot( );
+		_globals.whook.SetServerAddress( &connection_server );
+		_globals.whook.InitBot( );
 
 
-		while ( !globals::Get( ).whook.BotReady ) {
+		while ( !_globals.whook.BotReady ) {
 			std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
 		}
 
-		globals::Get( ).whook.SendWebHookMessage( xorstr_( "Server initialized!" ) , xorstr_( "Server Message" ) , 0x00FFFF );
+		_globals.whook.SendWebHookMessage( xorstr_( "Server initialized!" ) , xorstr_( "Server Message" ) , 0x00FFFF );
 	}
 
 
 
-	if ( globals::Get( ).LockConnections ) {
+	if ( _globals.LockConnections ) {
 
 		HANDLE handle = INVALID_HANDLE_VALUE;
 		WINDIVERT_ADDRESS addr;
@@ -230,13 +346,6 @@ int main( int argc , char * argv[ ] ) {
 		UINT packetLen;
 
 		int Error = 0;
-
-		// Armazenar SelfIP localmente
-		std::string selfIPStr;
-		{
-			std::lock_guard<std::mutex> lock( connection_server.connectionMutex );
-			selfIPStr = globals::Get( ).SelfIP;
-		}
 
 		{
 			std::string DefaultFilter;
@@ -259,9 +368,8 @@ int main( int argc , char * argv[ ] ) {
 		}
 
 
-		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Sucessfully started packet capture on port " ) + std::to_string( config::Get( ).GetCapturePort( ) ) , LIGHT_GREEN );
+		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Sucessfully started packet capture on port " ) + std::to_string( _config.GetCapturePort( ) ) , LIGHT_GREEN );
 
-		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Self IP: " ) + selfIPStr , GRAY );
 
 
 		//Loop de monitoramento de pacotes
@@ -288,11 +396,11 @@ int main( int argc , char * argv[ ] ) {
 				srcIPStr = ipToStr( ntohl( ipHeader->SrcAddr ) );
 				if ( udpHeader ) {
 
-					if ( udpHeader->DstPort == config::Get( ).GetCapturePort( ) ) {
+					if ( udpHeader->DstPort == _config.GetCapturePort( ) ) {
 						bool found = false;
 						{
 							std::lock_guard<std::mutex> lock( connection_server.connectionMutex );
-							found = globals::Get( ).ConnectionMap.find( srcIPStr ) != globals::Get( ).ConnectionMap.end( );
+							found = _globals.ConnectionMap.find( srcIPStr ) != _globals.ConnectionMap.end( );
 						}
 						if ( !found ) {
 							//utils::Get( ).WarnMessage( _SERVER , xorstr_( "blocked packet from " ) + srcIPStr , RED );

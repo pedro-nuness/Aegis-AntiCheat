@@ -153,12 +153,12 @@ Triggers::~Triggers( ) {
 
 bool Triggers::isRunning( ) const {
 	if ( this->ThreadObject->IsThreadSuspended( this->ThreadObject->GetHandle( ) ) ) {
-		client::Get( ).SendPunishToServer( xorstr_( "Triggers thread was found suspended, abormal execution" ) , true );
+		_client.SendPunishToServer( xorstr_( "Triggers thread was found suspended, abormal execution" ) , BAN );
 		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
 	}
 
 	if ( !this->ThreadObject->IsThreadRunning( this->ThreadObject->GetHandle( ) ) && !this->ThreadObject->IsShutdownSignalled( ) ) {
-		client::Get( ).SendPunishToServer( xorstr_( "Triggers thread was found terminated, abormal execution" ) , true );
+		_client.SendPunishToServer( xorstr_( "Triggers thread was found terminated, abormal execution" ) , BAN );
 		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
 	}
 
@@ -233,7 +233,7 @@ void Triggers::DigestTriggers( ) {
 	std::vector<Trigger> NewTriggers = GetDifferent( this->LastTriggers , this->FoundTriggers );
 
 	if ( !NewTriggers.empty( ) ) {
-		client::Get( ).SendPunishToServer( GenerateWarningStatus( NewTriggers ) , false );
+		_client.SendPunishToServer( GenerateWarningStatus( NewTriggers ) , WARN );
 	}
 
 	this->LastTriggers = this->FoundTriggers;

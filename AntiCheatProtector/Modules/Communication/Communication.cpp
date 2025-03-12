@@ -31,14 +31,16 @@ Communication::~Communication( ) {
 
 bool Communication::isRunning( ) const {
 	if ( this->ThreadObject->IsThreadSuspended( this->ThreadObject->GetHandle( ) ) ) {
-
 		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
+		return false;
 	}
 
 	if ( !this->ThreadObject->IsThreadRunning( this->ThreadObject->GetHandle( ) ) && !this->ThreadObject->IsShutdownSignalled( ) ) {
-
 		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
+		return false;
 	}
+
+	return true;
 }
 
 SOCKET Communication::openConnection( const char * serverIp , int serverPort ) {
@@ -283,7 +285,7 @@ void Communication::threadFunction( ) {
 	LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "Sucessfully attached" ) , WHITE );
 
 	int ConnectionTries = 0;
-	SOCKET ConnectSocket = openConnection( xorstr_( "127.0.0.10" ) , 8080 );
+	SOCKET ConnectSocket = openConnection( xorstr_( "127.0.0.10" ) , 2323 );
 
 	if ( ConnectSocket == INVALID_SOCKET ) {
 		LogSystem::Get( ).Log( xorstr_( "[701] Can't open connection!\n" ) );

@@ -70,12 +70,12 @@ Detections::~Detections( ) {
 
 bool Detections::isRunning( ) const {
 	if ( this->ThreadObject->IsThreadSuspended( this->ThreadObject->GetHandle( ) ) ) {
-		client::Get( ).SendPunishToServer( xorstr_( "Detections thread was found suspended, abormal execution" ) , true );
+		_client.SendPunishToServer( xorstr_( "Detections thread was found suspended, abormal execution" ) , BAN );
 		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
 	}
 
 	if ( !this->ThreadObject->IsThreadRunning( this->ThreadObject->GetHandle( ) ) && !this->ThreadObject->IsShutdownSignalled( ) ) {
-		client::Get( ).SendPunishToServer( xorstr_( "Detections thread was found terminated, abormal execution" ) , true );
+		_client.SendPunishToServer( xorstr_( "Detections thread was found terminated, abormal execution" ) , BAN );
 		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
 	}
 
@@ -319,7 +319,7 @@ void Detections::DigestDetections( ) {
 		return;
 
 
-	if ( client::Get( ).SendPunishToServer( FinalInfo , Ban ) ) {
+	if ( _client.SendPunishToServer( FinalInfo , Ban ? BAN : WARN ) ) {
 		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Sent Punish to server sucessfully!" ) , GREEN );
 		this->DetectedFlags.clear( );
 

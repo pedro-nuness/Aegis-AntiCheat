@@ -15,8 +15,8 @@ public:
 	bool GetUniqueUID( std::string * buffer, std::string ID = "" );
 	bool GetVersionUID( std::string * buffer );
 
-	void GenerateInitialCache( );
-	void EndCacheGeneration( );
+	bool GenerateInitialCache( );
+	bool EndCacheGeneration( );
 
 };
 

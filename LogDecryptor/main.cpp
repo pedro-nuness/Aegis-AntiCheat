@@ -8,6 +8,11 @@
 #include <string>
 #include <vector>
 
+
+#include <nlohmann/json.hpp>
+
+using nlohmann::json;
+
 std::string removeNonAlphanumeric( const std::string & input ) {
 	std::string result = input;
 	// Remove caracteres que não sejam alfanuméricos
@@ -55,57 +60,60 @@ bool decryptMessage( const std::string & ciphertext , std::string & plaintext , 
 
 #define log_key "fmu843q0fpgonamgfjkang08fgd94qgn"
 
+std::vector<std::string> ReconstructString( std::vector<std::vector<int>> Lines ) {
+	std::vector<std::string> Result;
+	if ( Lines.empty( ) ) {
+		return Result;
+	}
+
+	for ( int i = 0; i < Lines.size( ); i++ ) {
+		std::string Line;
+		for ( int j = 0; j < Lines.at( i ).size( ); j++ ) {
+			Line += ( char ) Lines.at( i ).at( j );
+		}
+		Result.emplace_back( Line );
+	}
+}
+
 int main( int argc , char * argv[ ] ) {
 
 	if ( argc <= 1 )
 		return 0;
 
-	int FileLines = 0;
 
 	std::string InputFilePath = argv[ 1 ];
 	File InputFile( argv[ 1 ] );
 	if ( !InputFile.Exists( ) )
 		return 0;
 
-	if ( argc > 2 )
-		FileLines = std::stoi(argv[ 2 ]);
+	std::string JsonFromFile = InputFile.Read( );
 
+	json js;
+	try {
+		js = json::parse( JsonFromFile );
+	}
+	catch ( json::parse_error error ) {
+		std::cout << "Failed to parse json!\n";
+		system( "pause" );
+		return false;
+	}
 	std::string IV , FinalLog;
 
-	std::vector<std::string> EncryptedLines;
+	std::vector<std::vector<int>> EncryptedLines;
 
-	if(!FileLines )
-		FileLines = InputFile.GetNumLines( );
+	IV = js[ "IV" ];
+	FinalLog = js[ "Final" ];
+	EncryptedLines = js[ "Log" ];
 
-	std::cout << "File lines: " << FileLines << std::endl;
 
-	for ( int i = 1; i <= FileLines; i++ ) {
-		std::string Line = InputFile.ReadLine( i );
-
-		if ( i == 1 ) {
-			Line.erase( std::remove( Line.begin( ) , Line.end( ) , '\n' ) , Line.end( ) );
-			IV = Line;
-			std::cout << "iv: " << IV << "\n";
-			continue;
-		}
-		if ( i == FileLines ) {
-			Line.erase( std::remove( Line.begin( ) , Line.end( ) , '\n' ) , Line.end( ) );
-			FinalLog = Line;
-			std::cout << "Final: " << FinalLog << "\n";
-			continue;
-		}
-
-		Line.erase( Line.size( ) - 1 );
-		EncryptedLines.emplace_back( Line );
-	}
+	std::vector<std::string> ReconstructedLog = ReconstructString( EncryptedLines );
 
 
 	File OutputFile( "output.txt" );
 	OutputFile.Create( );
-	OutputFile.Write( IV );
-	for ( int i = 0; i < EncryptedLines.size( ); i++ ) {
+	for ( int i = 0; i < ReconstructedLog.size( ); i++ ) {
 		std::string DecryptedLine;
-		if ( !decryptMessage( EncryptedLines.at( i ) , DecryptedLine , log_key , IV ) ) {
+		if ( !decryptMessage( ReconstructedLog.at( i ) , DecryptedLine , log_key , IV ) ) {
 			std::cout << "Failed on " << i << std::endl;
 			system( "pause" );
 			return 0;

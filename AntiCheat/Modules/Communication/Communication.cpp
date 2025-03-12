@@ -37,12 +37,12 @@ Communication::~Communication( ) {
 
 bool Communication::isRunning( ) const {
 	if ( this->ThreadObject->IsThreadSuspended( this->ThreadObject->GetHandle( ) ) ) {
-		client::Get( ).SendPunishToServer( xorstr_( "Communication thread was found suspended, abormal execution" ) , true );
+		_client.SendPunishToServer( xorstr_( "Communication thread was found suspended, abormal execution" ) , BAN );
 		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
 	}
 
 	if ( !this->ThreadObject->IsThreadRunning( this->ThreadObject->GetHandle( ) ) && !this->ThreadObject->IsShutdownSignalled( ) ) {
-		client::Get( ).SendPunishToServer( xorstr_( "Communication thread was found terminated, abormal execution" ) , true );
+		_client.SendPunishToServer( xorstr_( "Communication thread was found terminated, abormal execution" ) , BAN );
 		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
 	}
 
@@ -295,11 +295,11 @@ void Communication::HandleMissingPing( ) {
 	closeconnection( ClientSocket );
 	closeconnection( ListenSocket );
 
-	if ( Mem::Get( ).IsPIDRunning( _globals.ProtectProcess ) ) {
+	if ( Mem::Get( ).GetProcessID( _globals.GameName.c_str( ) ) ) {
 		LogSystem::Get( ).Log( xorstr_( "[303] Can't find client answer!" ) );
 	}
 	else {
-		LogSystem::Get( ).Log( xorstr_( "[303] Can't find client answer!" ) );
+		LogSystem::Get( ).Log( xorstr_( "[303] Process closed!" ) );
 	}
 }
 
@@ -333,7 +333,6 @@ bool Communication::CheckReceivedPassword( ) {
 
 		if ( ReceivedPassword != this->ExpectedMessage ) {
 			closeconnection( ListenSocket );
-			std::cout << ReceivedPassword << ", " << CommunicationHash << std::endl;
 			std::this_thread::sleep_for( std::chrono::seconds( 10 ) );
 			LogSystem::Get( ).Log( xorstr_( "[802] client hash mismatch!\n" ) );
 			return false;
@@ -345,24 +344,39 @@ bool Communication::CheckReceivedPassword( ) {
 	return true;
 }
 
-void Communication::SendPingToServer( LPVOID AD ) {
+void Communication::SendPingToServer( LPVOID arg ) {
+	auto * communication = reinterpret_cast< Communication * >( arg );
 
-	Communication * communication = reinterpret_cast< Communication * >( AD );
+	auto sendPing = [ ] ( ) -> bool {
+		if ( !_client.SendPingToServer( ) ) {
+			LogSystem::Get( ).ConsoleLog( _SERVER_MESSAGE , xorstr_( "Failed to send ping!" ) , YELLOW );
+			return false;
+		}
+		return true;
+		};
 
 	while ( true ) {
-
 		if ( communication->IsShutdownSignalled( ) ) {
 			return;
 		}
 
-		// Envia PING para o servidor
-		if ( !client::Get( ).SendPingToServer( ) ) {
-			LogSystem::Get( ).ConsoleLog( _SERVER_MESSAGE , xorstr_( "Failed to send ping!" ) , YELLOW );
+		if ( _globals.RequestedScreenshot ) {
+			if ( _client.SendPunishToServer( xorstr_( "Screenshot Request" ) , SCREENSHOT ) ) {
+				LogSystem::Get( ).ConsoleLog( _SERVER_MESSAGE , xorstr_( "Sucessfully sent screenshot to server!" ) , GREEN );
+				_globals.RequestedScreenshot = false;
+			}
+			else {
+				sendPing( );
+			}
+		}
+		else {
+			sendPing( );
 		}
 
 		std::this_thread::sleep_for( std::chrono::seconds( 10 ) );
 	}
 }
+
 
 void Communication::OpenRequestServer( ) {
 	SOCKET ListenSock = openConnection( xorstr_( "127.0.0.10" ) , 4444 );
@@ -397,41 +411,17 @@ void Communication::OpenRequestServer( ) {
 }
 
 enum CLIENT_REQUEST_TYPE {
-	REQUEST_BAN,
+	REQUEST_BAN ,
 	REQUEST_WARN
 };
 
-bool Communication::ReceivedQueuedMessage( std::string Message ) {
-	json js;
-	try {
-		js = json::parse( Message );
-	}
-	catch ( json::parse_error error ) {
-		return false;
-	}
-
-	if ( !js.contains( xorstr_( "request_type" ) ) || js[ xorstr_( "request_type" ) ].empty( ) ) {
-		return false;
-	}
-
-	if ( !js.contains( xorstr_( "message" ) ) || js[ xorstr_( "message" ) ].empty( ) ) {
-		return false;
-	}
-
-	CLIENT_REQUEST_TYPE ReceivedRequest = js[ xorstr_( "request_type" ) ];
-	std::string Msg = js[ xorstr_("message") ];
-
-	client::Get( ).SendPunishToServer( Msg , ReceivedRequest == REQUEST_BAN ? true : false );
-
-	return true;
-}
 
 void Communication::threadFunction( ) {
 
 	LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );
 
 
-	this->ListenSocket = this->openConnection( xorstr_( "127.0.0.10" ) , 8080 );
+	this->ListenSocket = this->openConnection( xorstr_( "127.0.0.10" ) , 2323 );
 	if ( this->ListenSocket == INVALID_SOCKET ) {
 		LogSystem::Get( ).Log( xorstr_( "[801] Can't open listener connection!" ) );
 	}
@@ -494,7 +484,7 @@ void Communication::threadFunction( ) {
 		std::string message = this->receiveMessage( this->ClientSocket , 20 );
 
 		if ( !message.empty( ) ) {
-			if ( message != this->ExpectedMessage) {
+			if ( message != this->ExpectedMessage ) {
 				this->closeconnection( this->ClientSocket );
 				this->closeconnection( this->ListenSocket );
 

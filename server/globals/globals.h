@@ -10,6 +10,10 @@
 
 
 
+#define default_encrypt_salt "FMJ892FJfni8HNGFJADO432190GFSAMG"
+#define server_key xorstr_("ib33o5m8zsqlcgys3w46cfmtn8ztg1kn") // 32 bytes para AES-256
+#define server_iv xorstr_("ume9ugz3m7lgch1z") // 16 bytes para AES
+
 class Connection {
 	std::vector<std::string> MAC;
 	std::string Motherboard;
@@ -18,6 +22,14 @@ class Connection {
 	std::string Nickname;
 	std::vector<std::string> SteamID;
 	std::time_t LastPing;
+	std::string LastIV;
+	std::string SessionID;
+	
+
+	void InitializeSession( );
+
+
+
 public:
 	Connection( ) {
 		this->LastPing = std::time( 0 );
@@ -25,9 +37,10 @@ public:
 		this->Motherboard = "";
 		this->DiskID = "";
 		this->Ip = "";
-	} 
+		InitializeSession( );
+	}
 
-	Connection( std::string Nick, std::vector<std::string> Steam, std::vector<std::string> MAC , std::string Mb , std::string Disk , std::string _Ip , std::time_t Ping ) {
+	Connection( std::string Nick , std::vector<std::string> Steam , std::vector<std::string> MAC , std::string Mb , std::string Disk , std::string _Ip , std::time_t Ping ) {
 		this->Nickname = Nick;
 		this->SteamID = Steam;
 		this->MAC = MAC;
@@ -35,8 +48,16 @@ public:
 		this->DiskID = Disk;
 		this->LastPing = std::time( 0 );
 		this->Ip = _Ip;
+		InitializeSession( );
 	}
+
+	bool WhiteListed = false;
+
+	void UpdateIVCode( );
+
 	std::string GetIp( ) { return this->Ip; }
+	std::string GetLastIV( ) { return this->LastIV; }
+	std::string GetSessionID( ) { return this->SessionID; }
 	std::vector<std::string> GetMac( ) { return this->MAC; }
 	std::string GetMotherboard( ) { return this->Motherboard; }
 	std::string GetDiskID( ) { return this->DiskID; }
@@ -49,16 +70,18 @@ public:
 };
 
 
-class globals : public CSingleton<globals>
+class globals
 {
 public:
 	std::unordered_map<std::string , Connection> ConnectionMap;
 	std::unordered_map<std::string, Connection> BannedPlayers;
+	std::vector<std::string> WhiteListedIps;
 
 	std::unordered_set<std::string> blockedBIOS;
 	std::unordered_set<std::string> blockedDisks;
 	std::unordered_set<std::string> blockedMacs;
 	std::unordered_set<std::string> blockedSteamID;
+	std::unordered_set<std::string> RequestedScreenshot;
 
 	bool ServerOpen = false;
 	bool AcessingMap = false;
@@ -69,7 +92,8 @@ public:
 	bool Usebot = true;
 	std::string SelfIP;
 	std::string VerifiedSessionID;
+	std::string CurrentPath;
 	WebHook whook;
 
 };
-
+extern globals _globals;

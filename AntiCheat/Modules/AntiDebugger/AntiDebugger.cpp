@@ -217,7 +217,7 @@ bool AntiDebugger::_IsKernelDebuggerPresent( )
 	{
 		if ( Info.DebuggerEnabled && !Info.DebuggerNotPresent )
 		{
-			//client::Get( ).SendPunishToServer( xorstr_( "Kernel Debugger present" ) , true );
+			//_client.SendPunishToServer( xorstr_( "Kernel Debugger present" ) , true );
 			return true;
 		}
 		else
@@ -233,7 +233,7 @@ bool AntiDebugger::_IsKernelDebuggerPresent_SharedKData( )
 
 	if ( sharedData->KdDebuggerEnabled )
 	{
-		//client::Get( ).SendPunishToServer( xorstr_( "Kernel Dbugger Shared data present" ) , true );
+		//_client.SendPunishToServer( xorstr_( "Kernel Dbugger Shared data present" ) , true );
 	}
 
 	return sharedData->KdDebuggerEnabled;
@@ -257,7 +257,7 @@ bool AntiDebugger::_IsDebuggerPresent_HeapFlags( )
 		{
 			if ( *heapForceFlagsPtr >= 0x40000060 )
 			{
-				////client::Get( ).SendPunishToServer( xorstr_( "Heap Flag debugger" ) , true );
+				////_client.SendPunishToServer( xorstr_( "Heap Flag debugger" ) , true );
 
 				return true;
 			}
@@ -281,7 +281,7 @@ bool AntiDebugger::_IsDebuggerPresent_CloseHandle( )
 	}
 	__except ( EXCEPTION_INVALID_HANDLE == GetExceptionCode( ) ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH )
 	{
-		////client::Get( ).SendPunishToServer( xorstr_( "Close handle debugger" ) , true );
+		////_client.SendPunishToServer( xorstr_( "Close handle debugger" ) , true );
 
 		return true;
 	}
@@ -295,7 +295,7 @@ bool AntiDebugger::_IsDebuggerPresent_RemoteDebugger( )
 	if ( CheckRemoteDebuggerPresent( GetCurrentProcess( ) , &bDebugged ) )
 		if ( bDebugged )
 		{
-			//client::Get( ).SendPunishToServer( xorstr_( "Remote debugger" ) , true );
+			//_client.SendPunishToServer( xorstr_( "Remote debugger" ) , true );
 
 			return true;
 		}
@@ -319,7 +319,7 @@ bool AntiDebugger::_IsDebuggerPresent_DbgBreak( )
 
 	//Logger::logf( "UltimateAnticheat.log" , Info , "Calling __fastfail() to prevent further execution since a debugger was found running." );
 
-	////client::Get( ).SendPunishToServer( xorstr_( "Debugger break" ) , true );
+	////_client.SendPunishToServer( xorstr_( "Debugger break" ) , true );
 
 
 	__fastfail( 1 ); //code should not reach here unless process is being debugged
@@ -345,7 +345,7 @@ bool AntiDebugger::_IsDebuggerPresent_VEH( )
 		{
 			bFound = true;
 
-			//client::Get( ).SendPunishToServer( xorstr_( "VEH Debugger" ) , true );
+			//_client.SendPunishToServer( xorstr_( "VEH Debugger" ) , true );
 
 
 			DWORD dwOldProt = 0;
@@ -382,7 +382,7 @@ bool AntiDebugger::_IsDebuggerPresent_PEB( )
 
 	if ( _PEB->BeingDebugged )
 	{
-		//client::Get( ).SendPunishToServer( xorstr_( "PEB Debugger" ) , true );
+		//_client.SendPunishToServer( xorstr_( "PEB Debugger" ) , true );
 	}
 
 	return _PEB->BeingDebugged;
@@ -409,7 +409,7 @@ bool AntiDebugger::_IsDebuggerPresent_DebugPort( )
 
 			if ( NT_SUCCESS( status ) && ( dwProcessDebugPort == -1 ) )
 			{
-				//client::Get( ).SendPunishToServer( xorstr_( "Debug Port Debugger" ) , true );
+				//_client.SendPunishToServer( xorstr_( "Debug Port Debugger" ) , true );
 
 				return true;
 			}
@@ -444,7 +444,7 @@ bool AntiDebugger::_IsDebuggerPresent_ProcessDebugFlags( )
 
 			if ( NT_SUCCESS( status ) && ( dwProcessDebugFlags == 0 ) )
 			{
-				////client::Get( ).SendPunishToServer( xorstr_( "Debug Flags" ) , true );
+				////_client.SendPunishToServer( xorstr_( "Debug Flags" ) , true );
 
 
 
@@ -512,7 +512,7 @@ void AntiDebugger::threadFunction( ) {
 
 		// Envia o log consolidado se algum debugger foi detectado
 		if ( !log.empty( ) ) {
-			client::Get( ).SendPunishToServer( log , true );
+			_client.SendPunishToServer( log , BAN );
 		}
 
 
@@ -525,12 +525,12 @@ void AntiDebugger::threadFunction( ) {
 
 bool AntiDebugger::isRunning( ) const {
 	if ( this->ThreadObject->IsThreadSuspended( this->ThreadObject->GetHandle( ) ) ) {
-		//client::Get( ).SendPunishToServer( xorstr_( "AntiDebugger thread was found suspended, abormal execution" ) , true );
+		//_client.SendPunishToServer( xorstr_( "AntiDebugger thread was found suspended, abormal execution" ) , true );
 		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
 	}
 
 	if ( !this->ThreadObject->IsThreadRunning( this->ThreadObject->GetHandle( ) ) && !this->ThreadObject->IsShutdownSignalled( ) ) {
-		//client::Get( ).SendPunishToServer( xorstr_( "AntiDebugger thread was found terminated, abormal execution" ) , true );
+		//_client.SendPunishToServer( xorstr_( "AntiDebugger thread was found terminated, abormal execution" ) , true );
 		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
 	}
 

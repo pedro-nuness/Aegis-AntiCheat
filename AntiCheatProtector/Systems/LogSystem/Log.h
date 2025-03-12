@@ -43,8 +43,10 @@ class LogSystem : public CSingleton<LogSystem>
 	void ColoredText( std::string text , COLORS color );
 	void Warn( COLORS color , std::string custom_text = "" );
 
+
 public:
-	void Log( std::string Message, std::string File = "" );
+	void Log( std::string Message , bool Async = false);
+	void SaveCachedLogsToFile( std::string LastLog );
 	void ConsoleLog( MODULE_SENDER Sender , std::string Message , COLORS _col );
 };
 

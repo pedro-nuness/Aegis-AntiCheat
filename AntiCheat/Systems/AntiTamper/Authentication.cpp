@@ -56,36 +56,36 @@ AUTHENTICATION_RESPONSE Authentication::VerifyEmbeddedSignature( std::string fil
 		break;
 
 	case TRUST_E_NOSIGNATURE:
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Embedded] The file is not signed or the signature is invalid." ) , RED );
+		//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Embedded] The file is not signed or the signature is invalid." ) , RED );
 		response = NOT_AUTHENTICATED;
 		break;
 
 	case TRUST_E_SUBJECT_FORM_UNKNOWN:
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Embedded] The subject type is not recognized." ) , RED );
+		//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Embedded] The subject type is not recognized." ) , RED );
 		response = NOT_AUTHENTICATED;
 		break;
 
 	case TRUST_E_PROVIDER_UNKNOWN:
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Embedded] The trust provider is not recognized." ) , RED );
+		//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Embedded] The trust provider is not recognized." ) , RED );
 		response = NOT_AUTHENTICATED;
 		break;
 
 	case TRUST_E_SUBJECT_NOT_TRUSTED:
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Embedded] The subject is not trusted." ) , RED );
+		//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Embedded] The subject is not trusted." ) , RED );
 		response = NOT_AUTHENTICATED;
 		break;
 
 	case TRUST_E_ACTION_UNKNOWN:
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Embedded] The trust action is not supported." ) , RED );
+		//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Embedded] The trust action is not supported." ) , RED );
 		response = FAILED_TO_GET;
 		break;
 
 	case CRYPT_E_FILE_ERROR:
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Embedded] There was a file error during verification." ) , RED );
+		//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Embedded] There was a file error during verification." ) , RED );
 		response = FAILED_TO_GET;
 		break;
 	default:
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Embedded] Unknown error during file verification." ) , RED );
+		//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Embedded] Unknown error during file verification." ) , RED );
 		response = NOT_AUTHENTICATED;
 		break;
 	}
@@ -94,10 +94,10 @@ AUTHENTICATION_RESPONSE Authentication::VerifyEmbeddedSignature( std::string fil
 	case AUTHENTICATED:
 		break;
 	case NOT_AUTHENTICATED:
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "EmbeddedSignature Signature: " ) + filePath , RED );
+		//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "EmbeddedSignature Signature: " ) + filePath , RED );
 		break;
 	case FAILED_TO_GET:
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "EmbeddedSignature Signature: " ) + filePath , YELLOW );
+		//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "EmbeddedSignature Signature: " ) + filePath , YELLOW );
 		break;
 	}
 
@@ -195,36 +195,36 @@ AUTHENTICATION_RESPONSE Authentication::VerifyCatalogSignature( std::string file
 		response = AUTHENTICATED;
 		break;
 	case TRUST_E_NOSIGNATURE:
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Catalog] The file is not signed or the signature is invalid." ) , RED );
+		//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Catalog] The file is not signed or the signature is invalid." ) , RED );
 		response = NOT_AUTHENTICATED;
 		break;
 
 	case TRUST_E_SUBJECT_FORM_UNKNOWN:
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Catalog] The subject type is not recognized." ) , RED );
+		//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Catalog] The subject type is not recognized." ) , RED );
 		response = NOT_AUTHENTICATED;
 		break;
 
 	case TRUST_E_PROVIDER_UNKNOWN:
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Catalog] The trust provider is not recognized." ) , RED );
+		//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Catalog] The trust provider is not recognized." ) , RED );
 		response = NOT_AUTHENTICATED;
 		break;
 
 	case TRUST_E_SUBJECT_NOT_TRUSTED:
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Catalog] The subject is not trusted." ) , RED );
+		//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Catalog] The subject is not trusted." ) , RED );
 		response = NOT_AUTHENTICATED;
 		break;
 
 	case TRUST_E_ACTION_UNKNOWN:
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Catalog] The trust action is not supported." ) , RED );
+		//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Catalog] The trust action is not supported." ) , RED );
 		response = FAILED_TO_GET;
 		break;
 
 	case CRYPT_E_FILE_ERROR:
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Catalog] There was a file error during verification." ) , RED );
+		//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Catalog] There was a file error during verification." ) , RED );
 		response = FAILED_TO_GET;
 		break;
 	default:
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Catalog] Unknown error during file verification." ) , RED );
+		//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "[Catalog] Unknown error during file verification." ) , RED );
 		response = NOT_AUTHENTICATED;
 		break;
 	}
@@ -233,10 +233,10 @@ AUTHENTICATION_RESPONSE Authentication::VerifyCatalogSignature( std::string file
 	case AUTHENTICATED:
 		break;
 	case NOT_AUTHENTICATED:
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Catalog Signature: " ) + filePath , RED );
+		//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Catalog Signature: " ) + filePath , RED );
 		break;
 	case FAILED_TO_GET:
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Catalog Signature: " ) + filePath , YELLOW );
+		//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Catalog Signature: " ) + filePath , YELLOW );
 		break;
 	}
 

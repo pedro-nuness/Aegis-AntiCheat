@@ -43,7 +43,7 @@ enum class ApiAnswer {
 
 
 bool Api::Login( std::string * buffer) {
-	const std::string Apikey = config::Get( ).GetApiKey( );
+	const std::string Apikey = _config.GetApiKey( );
 	const std::string json_data = R"({"username": "admin", "password": "password"})";
 
 	CURL * curl;
@@ -63,10 +63,10 @@ bool Api::Login( std::string * buffer) {
 		struct curl_slist * headers = NULL;
 
 		headers = curl_slist_append( headers , xorstr_( "Content-Type: application/json" ) );
-		headers = curl_slist_append( headers , ( xorstr_( "holder: " ) + config::Get( ).GetUsername( ) ).c_str( ) );
+		headers = curl_slist_append( headers , ( xorstr_( "holder: " ) + _config.GetUsername( ) ).c_str( ) );
 
 		{
-			std::string temp_x_api_key = xorstr_( "x-api-key: " ) + config::Get( ).GetApiKey( );
+			std::string temp_x_api_key = xorstr_( "x-api-key: " ) + _config.GetApiKey( );
 			headers = curl_slist_append( headers , temp_x_api_key.c_str( ) );
 			// Sobrescreve os dados na memória com zeros antes de liberar
 			std::fill( temp_x_api_key.begin( ) , temp_x_api_key.end( ) , '\0' );
@@ -107,7 +107,105 @@ bool Api::Login( std::string * buffer) {
 
 		switch ( ( ApiAnswer ) http_code ) {
 		case ApiAnswer::Success:
-			globals::Get( ).LoggedIn = true;
+			_globals.LoggedIn = true;
+			break;
+		default:
+			LogSystem::Get( ).LogWithMessageBox( xorstr_( "Error" ) , js[ xorstr_( "message" ) ] );
+			break;
+		}
+
+		if ( buffer != nullptr )
+		{
+			*buffer = js[ xorstr_( "message" ) ];
+		}
+
+
+		// Limpeza
+		curl_slist_free_all( headers );
+		curl_easy_cleanup( curl );
+	}
+	else {
+		return false;
+	}
+	return true;
+}
+
+
+bool Api::UpdateSessionID( std::string * buffer, std::string sessionid ) {
+	const std::string Apikey = _config.GetApiKey( );
+	const std::string json_data = R"({"username": "admin", "password": "password"})";
+
+	CURL * curl;
+	CURLcode res;
+	std::string readBuffer;
+
+	long http_code = 0;
+
+	curl = curl_easy_init( );
+	if ( curl ) {
+		// Configurações básicas da cURL
+		curl_easy_setopt( curl , CURLOPT_URL , xorstr_( "https://353boacx50.execute-api.us-east-2.amazonaws.com/Production/updatesessionid" ) );
+		curl_easy_setopt( curl , CURLOPT_POST , 1L );
+		curl_easy_setopt( curl , CURLOPT_POSTFIELDS , json_data.c_str( ) );
+
+		// Definindo os cabeçalhos
+		struct curl_slist * headers = NULL;
+
+		headers = curl_slist_append( headers , xorstr_( "Content-Type: application/json" ) );
+		headers = curl_slist_append( headers , ( xorstr_( "holder: " ) + _config.GetUsername( ) ).c_str( ) );
+
+		{
+			std::string temp_x_api_key = xorstr_( "x-api-key: " ) + _config.GetApiKey( );
+			headers = curl_slist_append( headers , temp_x_api_key.c_str( ) );
+			// Sobrescreve os dados na memória com zeros antes de liberar
+			std::fill( temp_x_api_key.begin( ) , temp_x_api_key.end( ) , '\0' );
+			temp_x_api_key.clear( );
+		}
+		{
+			std::string temp_authorization = xorstr_( "authorization: vZ9Is52j3aXUSq7qgZWfH0oZwPNDzPr9" );
+			headers = curl_slist_append( headers , temp_authorization.c_str( ) );
+
+			std::fill( temp_authorization.begin( ) , temp_authorization.end( ) , '\0' );
+			temp_authorization.clear( );
+		}
+		{
+			std::string temp_sessionid = xorstr_( "sessionid: " ) + sessionid;
+			headers = curl_slist_append( headers , temp_sessionid.c_str( ) );
+
+			std::fill( temp_sessionid.begin( ) , temp_sessionid.end( ) , '\0' );
+			temp_sessionid.clear( );
+		}
+
+
+
+		// Adicionando headers e configurando callback
+		curl_easy_setopt( curl , CURLOPT_HTTPHEADER , headers );
+		curl_easy_setopt( curl , CURLOPT_WRITEFUNCTION , WriteCallback );
+		curl_easy_setopt( curl , CURLOPT_WRITEDATA , &readBuffer );
+
+		// Executando a requisição
+		res = curl_easy_perform( curl );
+
+		if ( res != CURLE_OK ) {
+			LogSystem::Get( ).LogWithMessageBox( xorstr_( "Error" ) , curl_easy_strerror( res ) );
+		}
+
+		curl_easy_getinfo( curl , CURLINFO_RESPONSE_CODE , &http_code );
+
+		json js;
+
+		try {
+			js = json::parse( readBuffer );
+		}
+		catch ( const json::parse_error & e ) {
+			std::cout << xorstr_( "Failed to parse JSON: " ) << e.what( ) << std::endl;
+			return false;
+		}
+
+
+		switch ( ( ApiAnswer ) http_code ) {
+		case ApiAnswer::Success:
+			*buffer = "Updated session id sucessfully!";
 			break;
 		default:
 			LogSystem::Get( ).LogWithMessageBox( xorstr_( "Error" ) , js[ xorstr_( "message" ) ] );

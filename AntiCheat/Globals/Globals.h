@@ -25,11 +25,13 @@ public:
 	std::string GeneralUID;
 
 	bool VerifiedSession = false;
+	bool RequestedScreenshot = false;
+	bool LoggedIn = false;
 
 	std::string Nickname;
 	std::string NicknameHash;
 	std::string OriginalProcessHash;
-
+	std::string GameName;
 
 	std::string CLIENT_NAME;
 	std::string DUMPER_NAME;

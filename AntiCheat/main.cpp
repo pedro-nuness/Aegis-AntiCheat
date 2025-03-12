@@ -76,7 +76,7 @@ void Startup( ) {
 		}
 		else if ( monitor.ThreadObject->IsShutdownSignalled( ) ) {
 			LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "thread monitor signalled shutdown, shutting down main module!" ) , YELLOW );
-			break;
+			return;
 		}
 		std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
 	}
@@ -118,91 +118,96 @@ using nlohmann::json;
 
 int main( int argc , char * argv[ ] ) {
 
-
+	_globals.GameName = xorstr_( "DayZ_x64.exe" );
+	FreeConsole( );
 	//Init anti-cheat
 	{
 		//Request MB and Disk ID
-		hardware::Get( ).GenerateInitialCache( );
+		if ( !hardware::Get( ).GenerateInitialCache( ) ) {
+			LogSystem::Get( ).Log( xorstr_( "[401] Failed to generate initial hardware cache" ) , false );
+			return 0;
+		}
+
 		//Initialize in case preventions module has to add a external detection
 		_globals.DetectionsPointer = &DetectionEvent;
+
 		//Deploy Preventions
-		Preventions::Get( ).Deploy( );
-		//Ignore errors caused in process
-		SetErrorMode( SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX ); \
-			//End HWID cache generation, unique id, version, ip, etc..
-		hardware::Get( ).EndCacheGeneration( );
-		std::string VersionID;
-		if ( hardware::Get( ).GetVersionUID( &VersionID ) )
-		{
-			LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "VersionID: " ) + VersionID , YELLOW );
+		int PreventionsResult = Preventions::Get( ).Deploy( );
+		if ( PreventionsResult != 903 ) {
+			LogSystem::Get( ).Log( xorstr_( "[401] Failed to deploy prevention " ) + std::to_string( PreventionsResult ) , false );
+			return 0;
 		}
+		//Ignore errors caused in process
+		SetErrorMode( SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX );
+
+		DWORD myProcessID = GetCurrentProcessId( ); // Get the current process ID
+		DWORD ParentProcessId = GetParentProcessID( myProcessID ); // Get the parent process ID
+
+		if ( !ParentProcessId ) {
+			LogSystem::Get( ).Log( xorstr_( "[401] Initialization failed no parent" ) , false );
+			return 0;
+		}
+		_globals.OriginalProcess = ParentProcessId;
+
+		DWORD GameProcessID = Mem::Get( ).GetProcessID( _globals.GameName.c_str( ) );
+		if ( !GameProcessID ) {
+			LogSystem::Get( ).Log( xorstr_( "[401] Game not found" ) , false );
+			return 0;
+		}
+		_globals.ProtectProcess = GameProcessID;
+
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Parent: " ) + Mem::Get( ).GetProcessName( ParentProcessId ) , GRAY );
+
+
+
+		if ( !hardware::Get( ).EndCacheGeneration( ) ) {
+			LogSystem::Get( ).Log( xorstr_( "[401] Failed to end hardware cache" ) , false );
+			return 0;
+		}
+
+		std::string VersionID;
+		if ( !hardware::Get( ).GetVersionUID( &VersionID ) )
+		{
+			LogSystem::Get( ).Log( xorstr_( "[401] Failed to get version ID" ) , false );
+			return 0;
+		}
+		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "VersionID: " ) + VersionID , YELLOW );
+
 	}
 
-	::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
+	// ::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
 
 	_globals.SelfID = ::_getpid( );
-	
+
 #if true
 
-	DWORD myProcessID = GetCurrentProcessId( ); // Get the current process ID
-	DWORD ParentProcessId = GetParentProcessID( myProcessID ); // Get the parent process ID
 
-	if ( !ParentProcessId ) {
-		LogSystem::Get( ).Log( xorstr_( "[401] Initialization failed no parent" ) , false );
-		return 0;
-	}
 
-	std::string ParentHash = Mem::Get( ).GetFileHash( Mem::Get( ).GetProcessExecutablePath( ParentProcessId ) );
+
 	//std::cout << "Parent hash:  " << ParentHash << "\n";
 	//[system( "pause" ); ]
 
 	//FreeConsole( );
 	//::ShowWindow( ::GetConsoleWindow( ) , SW_HIDE );
-	if ( argc < 3 ) {
-		LogSystem::Get( ).Log( xorstr_( "[401] Initialization failed" ) , false );
-		return 0;
-	}
-
-	if ( !Utils::Get( ).isNumber( argv[ 1 ] ) || !Utils::Get( ).isNumber( argv[ 2 ] ) ) {
-		LogSystem::Get( ).Log( xorstr_( "[401] Invalid Input" ) , false );
-		return 0;
-	}
-	_globals.OriginalProcess = stoi( ( std::string ) argv[ 1 ] );
-	_globals.ProtectProcess = stoi( ( std::string ) argv[ 2 ] );
 
 	if ( !FileChecking::Get( ).ValidateFiles( ) ) {
-		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Can't validate files" ) , RED );
-		goto idle;
+		LogSystem::Get( ).Log( xorstr_( "[401] Can't validate files" ) , false );
+		return 0;
 	}
 
-	if ( !client::Get( ).SendPingToServer( ) ) {
-		goto idle;
+	if ( !_client.SendPingToServer( ) ) {
+		LogSystem::Get( ).Log( xorstr_( "[401] Can't connect to server" ) , false );
 	}
 
-	/*if ( !Communication::InitializeClient( ) ) {
-		LogSystem::Get( ).Log( xorstr_( "Can't init client" ) , false );
-	}
-	else {*/
-		
 
-		//Start client module
-		TerminateProcess( Mem::Get( ).GetProcessHandle( _globals.OriginalProcess ) , 1 );
+	//Start client module
+	TerminateProcess( Mem::Get( ).GetProcessHandle( _globals.OriginalProcess ) , 1 );
 
-#else
-	_globals.OriginalProcess = Mem::Get( ).GetProcessID( "explorer.exe" );
-	_globals.ProtectProcess = Mem::Get( ).GetProcessID( "notepad.exe" );
-
-	if ( !Communication::InitializeClient( ) ) {
-		LogSystem::Get( ).Log( xorstr_( "Can't init client" ) );
-	}
-	else {
-		::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
-#endif // !DEBUG
+#endif 
 
 
+	Startup( );
 
-		Startup( );
-	//}
 
 
 idle:

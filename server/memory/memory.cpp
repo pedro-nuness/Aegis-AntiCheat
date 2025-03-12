@@ -5,7 +5,9 @@
 #include <Psapi.h>
 #include <locale>
 #include <codecvt>
+#include <fstream>
 
+#include "sha1.h"
 
 // Função auxiliar para converter std::string para std::wstring
 std::wstring ConvertToWString( const std::string & str ) {
@@ -43,4 +45,53 @@ std::string memory::GetProcessPath( DWORD processID ) {
     }
 
     return result;
+}
+
+bool memory::ReadFileToMemory( const std::string & file_path , std::vector<uint8_t> * out_buffer )
+{
+    std::ifstream file_ifstream( file_path , std::ios::binary );
+
+    if ( !file_ifstream )
+        return false;
+
+    out_buffer->assign( ( std::istreambuf_iterator<char>( file_ifstream ) ) , std::istreambuf_iterator<char>( ) );
+    file_ifstream.close( );
+
+    return true;
+}
+
+std::string memory::GetProcessExecutablePath( DWORD processID ) {
+    std::string processPath;
+    HANDLE hProcess = OpenProcess( PROCESS_QUERY_INFORMATION | PROCESS_VM_READ , FALSE , processID );
+
+    if ( hProcess != NULL ) {
+        char exePath[ MAX_PATH ];
+        if ( GetModuleFileNameEx( hProcess , NULL , exePath , MAX_PATH ) ) {
+            processPath = exePath;
+        }
+        CloseHandle( hProcess );
+    }
+
+    return processPath;
+}
+
+std::string memory::GetFileHash( std::string path )
+{
+    std::vector<uint8_t> CurrentBytes;
+    if ( !ReadFileToMemory( path , &CurrentBytes ) )
+    {
+        Sleep( 1000 );
+        exit( 0 );
+    }
+
+    SHA1 sha1;
+    sha1.add( CurrentBytes.data( ) + 0 , CurrentBytes.size( ) );
+    return sha1.getHash( );
+}
+
+
+std::string memory::GenerateHash( std::string msg ) {
+    SHA1 sha1;
+    sha1.add( msg.data( ) , msg.size( ) );
+    return sha1.getHash( );
 }

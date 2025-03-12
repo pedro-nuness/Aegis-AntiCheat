@@ -37,12 +37,12 @@ using json = nlohmann::json;
 
 bool Listener::isRunning( ) const {
 	if ( this->ThreadObject->IsThreadSuspended( this->ThreadObject->GetHandle( ) ) ) {
-		client::Get( ).SendPunishToServer( xorstr_( "Listener thread was found suspended, abormal execution" ) , true );
+		_client.SendPunishToServer( xorstr_( "Listener thread was found suspended, abormal execution" ) , BAN );
 		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
 	}
 
 	if ( !this->ThreadObject->IsThreadRunning( this->ThreadObject->GetHandle( ) ) && !this->ThreadObject->IsShutdownSignalled( ) ) {
-		client::Get( ).SendPunishToServer( xorstr_( "Listener thread was found terminated, abormal execution" ) , true );
+		_client.SendPunishToServer( xorstr_( "Listener thread was found terminated, abormal execution" ) , BAN );
 		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
 	}
 
@@ -336,13 +336,11 @@ void Listener::handleClient( SOCKET clientSock ) {
 
 	switch ( Type ) {
 	case BAN:
-		sent = client::Get( ).SendPunishToServer( Message , true );
-		break;
 	case WARN:
-		sent = client::Get( ).SendPunishToServer( Message , false );
+		sent = _client.SendPunishToServer( Message , Type );
 		break;
 	case MESSAGE:
-		sent = client::Get( ).SendMessageToServer( Message );
+		sent = _client.SendMessageToServer( Message );
 		break;
 	}
 

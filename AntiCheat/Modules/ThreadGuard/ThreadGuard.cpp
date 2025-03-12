@@ -41,12 +41,12 @@ std::vector<HANDLE> ThreadGuard::GetRunningThreadHandle( ) {
 
 bool ThreadGuard::isRunning( ) const {
 	if ( this->ThreadObject->IsThreadSuspended( this->ThreadObject->GetHandle( ) ) ) {
-		client::Get( ).SendPunishToServer( xorstr_( "ThreadGuard thread was found suspended, abormal execution" ) , true );
+		_client.SendPunishToServer( xorstr_( "ThreadGuard thread was found suspended, abormal execution" ) , BAN );
 		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
 	}
 
 	if ( !this->ThreadObject->IsThreadRunning( this->ThreadObject->GetHandle( ) ) && !this->ThreadObject->IsShutdownSignalled( ) ) {
-		client::Get( ).SendPunishToServer( xorstr_( "ThreadGuard thread was found terminated, abormal execution" ) , true );
+		_client.SendPunishToServer( xorstr_( "ThreadGuard thread was found terminated, abormal execution" ) , BAN );
 		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
 	}
 

@@ -19,6 +19,7 @@
 
 #include <Windows.h>
 #include <iostream>
+#include <thread>
 
 bool Preventions::RestrictProcessAccess( ) {
 	HANDLE hProcess = GetCurrentProcess( );
@@ -487,6 +488,7 @@ HANDLE WINAPI MyCreateThread(
 	{
 		if ( mbi.Type != MEM_IMAGE ) {
 			LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Invalid thread creation attempted" ) , YELLOW );
+			std::this_thread::sleep_for( std::chrono::seconds( 2 ) );
 			return NULL;
 		}
 	}
@@ -589,10 +591,10 @@ void Preventions::Deploy( ) {
 		LogSystem::Get( ).Log( xorstr_( "[0] Failed to protect process" ) );*/
 
 	if ( !Preventions::Get( ).EnableApiHooks( ) )
-		LogSystem::Get( ).Log( xorstr_( "[1] Failed to protect process" ) );
+		LogSystem::Get( ).Log( xorstr_( "[0] Failed to protect process" ) );
 
-	if ( !Preventions::Get( ).RandomizeModuleName( ) )
-		LogSystem::Get( ).Log( xorstr_( "[1] Failed to protect process" ) );
+	//if ( !Preventions::Get( ).RandomizeModuleName( ) )
+	//	LogSystem::Get( ).Log( xorstr_( "[1] Failed to protect process" ) );
 
 	//if ( !Preventions::Get( ).PreventDllInjection( ) )
 	//	LogSystem::Get( ).Log( xorstr_( "[2] Failed to protect process" ) );

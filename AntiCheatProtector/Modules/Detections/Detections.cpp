@@ -89,12 +89,15 @@ Detections::~Detections( ) {}
 bool Detections::isRunning( ) const {
 	if ( this->ThreadObject->IsThreadSuspended( this->ThreadObject->GetHandle( ) ) ) {
 		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
+		return false;
 	}
 
 	if ( !this->ThreadObject->IsThreadRunning( this->ThreadObject->GetHandle( ) ) && !this->ThreadObject->IsShutdownSignalled( ) ) {
-
 		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
+		return false;
 	}
+
+	return true;
 }
 
 

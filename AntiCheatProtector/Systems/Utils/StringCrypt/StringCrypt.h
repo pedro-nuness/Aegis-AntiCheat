@@ -9,7 +9,7 @@ struct CryptedChar {
 	char Letter;
 };
 
-struct CryptedString{
+struct CryptedString {
 	std::string Hash;
 	std::vector<CryptedChar> EncryptedString;
 };
@@ -17,16 +17,17 @@ struct CryptedString{
 class StringCrypt : public CSingleton<StringCrypt>
 {
 	std::vector<CryptedString> Strings;
-	
+	void Init( );
+	std::vector<char> GeneratePlain( std::string cStr );
+	void SaveEncryptedStringsToFile( std::string  filename , CryptedString Str );
 public:
 	StringCrypt( ) { Init( ); }
 
-	void Init( );
-	std::string EncryptString( std::string STR);
-	std::string * DecryptString( std::string hash);
+	CryptedString EncryptString( std::string STR );
+	CryptedString EncryptString( std::string * STR );
+	std::string * DecryptString( std::string hash );
 	std::string * DecryptString( CryptedString string );
 	bool CleanString( std::string * sPtr );
 	CryptedString GetCryptString( std::string Hash );
-	void SaveEncryptedStringsToFile( std::string  filename );
 };
 

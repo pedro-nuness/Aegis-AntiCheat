@@ -6,17 +6,10 @@
 #include <unordered_map>
 
 using json = nlohmann::json;
+config _config;
 
-
-// Função auxiliar para exibir mensagens de erro e encerrar
 void ShowErrorAndExit( const std::string & errorMessage ) {
-	// Determinar o tamanho necessário para a string wide
-	int sizeNeeded = MultiByteToWideChar( CP_UTF8 , 0 , errorMessage.c_str( ) , -1 , NULL , 0 );
-	std::wstring wideMessage( sizeNeeded , 0 );
-	// Converter a string
-	MultiByteToWideChar( CP_UTF8 , 0 , errorMessage.c_str( ) , -1 , &wideMessage[ 0 ] , sizeNeeded );
-
-	MessageBoxW( NULL , wideMessage.c_str( ) , L"Error" , MB_OK | MB_ICONWARNING );
+	MessageBox( NULL , errorMessage.c_str( ) , "Error" , MB_OK | MB_ICONWARNING );
 	exit( 0 );
 }
 
@@ -27,6 +20,51 @@ bool is_number( const json & j ) {
 
 bool is_string( const json & j ) {
 	return j.is_string( );
+}
+
+void config::LoadWhiteListedPlayers( ) {
+	File WhiteListFile( xorstr_( "whitelist.txt" ) );
+	if ( !WhiteListFile.Exists( ) ) {
+		WhiteListFile.Create( );
+	}
+
+	std::unordered_set<std::string> TempWhitelistedIps;
+	TempWhitelistedIps.insert( "0.0.0.0" );
+
+	std::string FileContent = WhiteListFile.Read( );
+	if ( FileContent.empty( ) ) {
+		json TempJson;
+		TempJson[ xorstr_( "IPs" ) ] = TempWhitelistedIps;
+		WhiteListFile.Write( TempJson.dump( 4 ) );
+		return;
+	}
+
+	json Whitelisted;
+	try {
+		Whitelisted = json::parse( FileContent );
+	}
+	catch ( const json::parse_error & ) {
+		ShowErrorAndExit( xorstr_( "Failed to parse whitelist file to json, please reconstruct the file with the correct parameters!" ) );
+	}
+
+	// Ensure "IPs" is an array
+	if ( !Whitelisted.contains( "IPs" ) || !Whitelisted[ "IPs" ].is_array( ) ) {
+		ShowErrorAndExit( xorstr_( "Whitelist file is missing a valid 'IPs' array." ) );
+	}
+
+	// Explicitly convert JSON array to vector of strings
+
+	for ( const auto & ip : Whitelisted[ "IPs" ] ) {
+		if ( ip.is_string( ) ) { // Ensure each entry is a string
+			TempWhitelistedIps.insert( ip.get<std::string>( ) );
+		}
+		else {
+			ShowErrorAndExit( xorstr_( "Invalid entry in 'IPs' array. Expected only strings." ) );
+		}
+	}
+
+	// Assign the validated vector
+	this->WhitelistedIps = TempWhitelistedIps;
 }
 
 void config::LoadConfig( ) {
@@ -52,7 +90,7 @@ void config::LoadConfig( ) {
 
 	// Verifica se o arquivo de configuração está vazio
 	if ( FileContent.empty( ) ) {
-		ConfigFile.Write( DefaultConfig.dump( ) );
+		ConfigFile.Write( DefaultConfig.dump( 4 ) );
 		ShowErrorAndExit( xorstr_( "config.json is empty, please configure the server!" ) );
 	}
 
@@ -62,7 +100,7 @@ void config::LoadConfig( ) {
 	}
 	catch ( const json::parse_error & ) {
 		ConfigFile.Clear( );
-		ConfigFile.Write( DefaultConfig.dump( ) );
+		ConfigFile.Write( DefaultConfig.dump( 4 ) );
 		ShowErrorAndExit( xorstr_( "Failed to parse config.json content!" ) );
 	}
 
@@ -91,4 +129,8 @@ void config::LoadConfig( ) {
 	this->DiscordChannel = Config[ xorstr_( "DiscordChannel" ) ];
 	this->Username = Config[ xorstr_( "Username" ) ];
 	this->CapturePort = Config[ xorstr_( "ServerPort" ) ];
+
+	LoadWhiteListedPlayers( );
 }
+
+

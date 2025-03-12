@@ -154,7 +154,6 @@ enum voice_websocket_opcode_t : uint8_t {
 	voice_opcode_connection_hello = 8,
 	voice_opcode_connection_resumed = 9,
 	voice_opcode_multiple_clients_connect = 11,
-	voice_opcode_client_connect = 12,
 	voice_opcode_client_disconnect = 13,
 	voice_opcode_media_sink = 15,
 	voice_client_flags = 18,
@@ -167,7 +166,7 @@ enum voice_websocket_opcode_t : uint8_t {
 	voice_client_dave_mls_key_package = 26,
 	voice_client_dave_mls_proposals = 27,
 	voice_client_dave_mls_commit_message = 28,
-	voice_client_dave_announce_commit_transaction = 29,
+	voice_client_dave_announce_commit_transition = 29,
 	voice_client_dave_mls_welcome = 30,
 	voice_client_dave_mls_invalid_commit_welcome = 31,
 };
@@ -207,7 +206,7 @@ struct dave_binary_header_t {
 	[[nodiscard]] std::vector<uint8_t> get_data() const;
 
 	/**
-	 * Get transition ID for process_welcome
+	 * Get transition ID for process_commit and process_welcome
 	 *
 	 * @return Transition ID
 	 */
@@ -216,7 +215,7 @@ struct dave_binary_header_t {
 private:
 	/**
 	 * @brief Transition id, only valid when the opcode is
-	 * welcome state. Use get_transition_id() to obtain value.
+	 * commit and welcome state. Use get_transition_id() to obtain value.
 	 */
 	uint16_t transition_id;
 };
@@ -240,6 +239,11 @@ class DPP_EXPORT discord_voice_client : public websocket_client
 	 * @brief Clean up resources
 	 */
 	void cleanup();
+
+	/**
+	 * @brief A frame of silence packet
+	 */
+	static constexpr uint8_t silence_packet[3] = { 0xf8, 0xff, 0xfe };
 
 	/**
 	 * @brief Mutex for outbound packet stream
@@ -435,6 +439,13 @@ class DPP_EXPORT discord_voice_client : public websocket_client
 	 */
 	bool paused;
 
+	/**
+	 * @brief Whether has sent 5 frame of silence before stopping on pause.
+	 *
+	 * This is to avoid unintended Opus interpolation with subsequent transmissions.
+	 */
+	bool sent_stop_frames;
+
 #ifdef HAVE_VOICE
 	/**
 	 * @brief libopus encoder
@@ -476,7 +487,13 @@ class DPP_EXPORT discord_voice_client : public websocket_client
 	 * @brief The list of users that have E2EE potentially enabled for
 	 * DAVE protocol.
 	 */
-	std::set<std::string> dave_mls_user_list;
+	std::set<dpp::snowflake> dave_mls_user_list;
+
+	/**
+	 * @brief The list of users that have left the voice channel but
+	 * not yet removed from MLS group.
+	 */
+	std::set<dpp::snowflake> dave_mls_pending_remove_list;
 
 	/**
 	 * @brief File descriptor for UDP connection
@@ -580,6 +597,13 @@ class DPP_EXPORT discord_voice_client : public websocket_client
 	dave_version_t dave_version;
 
 	/**
+	 * @brief Destination address for where packets go
+	 * on the UDP socket
+	 */
+	address_t destination{};
+
+
+	/**
 	 * @brief Send data to UDP socket immediately.
 	 * 
 	 * @param data data to send
@@ -638,8 +662,10 @@ class DPP_EXPORT discord_voice_client : public websocket_client
 	 * @param packet packet data
 	 * @param len length of packet
 	 * @param duration duration of opus packet
+	 * @param send_now send this packet right away without buffering.
+	 * Do NOT set send_now to true outside write_ready.
 	 */
-	void send(const char* packet, size_t len, uint64_t duration);
+	void send(const char* packet, size_t len, uint64_t duration, bool send_now = false);
 
 	/**
 	 * @brief Queue a message to be sent via the websocket
@@ -677,6 +703,12 @@ class DPP_EXPORT discord_voice_client : public websocket_client
 	 * @throw dpp::voice_exception If data length to encode is invalid or voice support not compiled into D++
 	 */
 	size_t encode(uint8_t *input, size_t inDataSize, uint8_t *output, size_t &outDataSize);
+
+	/**
+	 * Updates DAVE MLS ratchets for users in the VC
+	 * @param force True to force updating of ratchets regardless of state
+	 */
+	void update_ratchets(bool force = false);
 
 public:
 
@@ -944,6 +976,10 @@ public:
 	 * @param duration Generally duration is 2.5, 5, 10, 20, 40 or 60
 	 * if the timescale is 1000000 (1ms) 
 	 * 
+	 * @param send_now Send this packet right away without buffering,
+	 * this will skip duration calculation for the packet being sent
+	 * and only safe to be set to true in write_ready.
+	 *
 	 * @return discord_voice_client& Reference to self
 	 * 
 	 * @note It is your responsibility to ensure that packets of data 
@@ -954,7 +990,7 @@ public:
 	 * 
 	 * @throw dpp::voice_exception If data length is invalid or voice support not compiled into D++
 	 */
-	discord_voice_client& send_audio_opus(uint8_t* opus_packet, const size_t length, uint64_t duration);
+	discord_voice_client& send_audio_opus(const uint8_t* opus_packet, const size_t length, uint64_t duration, bool send_now = false);
 
 	/**
 	 * @brief Send opus packets to the voice channel
@@ -981,7 +1017,7 @@ public:
 	 * 
 	 * @throw dpp::voice_exception If data length is invalid or voice support not compiled into D++
 	 */
-	discord_voice_client& send_audio_opus(uint8_t* opus_packet, const size_t length);
+	discord_voice_client& send_audio_opus(const uint8_t* opus_packet, const size_t length);
 
 	/**
 	 * @brief Send silence to the voice channel
@@ -993,6 +1029,19 @@ public:
 	 * @throw dpp::voice_exception if voice support is not compiled into D++
 	 */
 	discord_voice_client& send_silence(const uint64_t duration);
+
+	/**
+	 * @brief Send stop frames to the voice channel.
+	 *
+	 * @param send_now send this packet right away without buffering.
+	 * Do NOT set send_now to true outside write_ready.
+	 * Also make sure you're not locking stream_mutex if you
+	 * don't set send_now to true.
+	 * 
+	 * @return discord_voice_client& Reference to self
+	 * @throw dpp::voice_exception if voice support is not compiled into D++
+	 */
+	discord_voice_client& send_stop_frames(bool send_now = false);
 
 	/**
 	 * @brief Sets the audio type that will be sent with send_audio_* methods.
@@ -1184,7 +1233,43 @@ public:
 	 * which internally uses scrypt.
 	 */
 	void get_user_privacy_code(const dpp::snowflake user, privacy_code_callback_t callback) const;
+
+	/**
+	 * @brief Notify gateway ready for a DAVE transition.
+	 *
+	 * Fires Voice Ready event when appropriate.
+	 *
+	 * https://daveprotocol.com/#commit-handling
+	 *
+	 * @param data Websocket frame data
+	 */
+	void ready_for_transition(const std::string &data);
+
+	/**
+	 * @brief Reset dave session, send voice_client_dave_mls_invalid_commit_welcome
+	 * payload with current transition Id and our new key package to gateway.
+	 *
+	 * https://daveprotocol.com/#recovery-from-invalid-commit-or-welcome
+	 */
+	void recover_from_invalid_commit_welcome();
+
+	/**
+	 * @brief Execute pending protocol upgrade/downgrade to/from dave.
+	 * @return true if did an upgrade/downgrade
+	 */
+	bool execute_pending_upgrade_downgrade();
+
+	/**
+	 * @brief Reset dave session and prepare initial session group.
+	 */
+	void reinit_dave_mls_group();
+
+	/**
+	 * @brief Process roster map from commit/welcome.
+	 * @param rmap Roster map
+	 */
+	void process_mls_group_rosters(const std::map<uint64_t, std::vector<uint8_t>>& rmap);
 };
 
-} // namespace dpp
+}
 

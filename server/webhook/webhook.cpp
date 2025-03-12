@@ -10,6 +10,8 @@
 #include "../server/server.h"
 #include "../config/config.h"
 
+#include "../utils/File/File.h"
+
 std::string ban_prefix = "_ban";
 std::string unban_prefix = "unban";
 
@@ -18,10 +20,28 @@ std::string unban_prefix = "unban";
 using json = nlohmann::json;
 
 WebHook::WebHook( ) {
-	this->wHook = config::Get( ).GetBotToken( );
 	this->BOT = nullptr;
 	this->ServerPtr = nullptr;
 }
+
+
+bool isLargerThan( const std::string & str, int MB ) {
+	size_t LIMIT = MB * 1024 * 1024; // 8MB em bytes
+	return str.size( ) > LIMIT;
+}
+
+
+int WebHook::GetFileUpdateLimit( ) {
+	switch ( this->PremiumTier ) {
+	case 2:
+		return 50;
+	case 3:
+		return 100;
+	}
+
+	return 10;
+}
+
 
 
 void WebHook::SendWebHookPunishMent( std::string Message , std::string ScreenshotPath , std::string IP , bool already_banned ) {
@@ -35,9 +55,22 @@ void WebHook::SendWebHookPunishMent( std::string Message , std::string Screensho
 		try {
 			js = json::parse( Message );
 		}
+
 		catch ( const json::parse_error & e ) {
 			std::cout << xorstr_( "Failed to parse JSON: " ) << e.what( ) << std::endl;
 			return;
+		}
+
+		dpp::message msg( _config.GetDiscordChannel( ) , "" );
+		
+	
+
+		std::string File = dpp::utility::read_file( ScreenshotPath );
+		if ( !isLargerThan( File, GetFileUpdateLimit() ) ) {
+			msg.add_file( ScreenshotPath , File );
+		}
+		else {
+			js[ xorstr_( "message" ) ] += xorstr_( " File is larger than 8mb!, check it out on the server storage.\n" );
 		}
 
 
@@ -51,12 +84,11 @@ void WebHook::SendWebHookPunishMent( std::string Message , std::string Screensho
 			.add_field( ( "AntiCheat Message" ) , js[ xorstr_( "message" ) ] , true )
 			.set_timestamp( time( 0 ) );
 
-		dpp::message msg( config::Get( ).GetDiscordChannel( ) , "" );
+		
 		msg.add_embed( embed );
 
 		// Ler o arquivo e adicioná-lo à mensagem
-		std::string File = dpp::utility::read_file( ScreenshotPath );
-		msg.add_file( ScreenshotPath , File );
+		
 
 		msg.add_component(
 			dpp::component {}.add_component(
@@ -121,11 +153,40 @@ void WebHook::SendWebHookMessage( std::string Message , std::string TOPIC , uint
 			.set_timestamp( time( 0 ) );
 
 
-		dpp::message msg( config::Get( ).GetDiscordChannel( ) , "" );
+		dpp::message msg( _config.GetDiscordChannel( ) , "" );
 		msg.add_embed( embed );
 
+
+
 		// Enviar a mensagem com o webhook= 
-		reinterpret_cast< dpp::cluster * >( this->BOT )->message_create( msg );
+		reinterpret_cast< dpp::cluster * >( this->BOT )->message_create( msg , [ & ] ( const dpp::confirmation_callback_t & result ) {
+			if ( result.is_error( ) || this->GuildID != -1 && this->PremiumTier != -1 ) {
+				// Tratar o erro			
+				return;
+			}
+
+			// Extrai o objeto guild do resultado
+			dpp::message msg = result.get<dpp::message>( );
+			// Agora você pode utilizar o objeto guild
+			this->GuildID = msg.guild_id;
+
+			reinterpret_cast< dpp::cluster * >( this->BOT )->guild_get( msg.guild_id , [ & ] ( const dpp::confirmation_callback_t & result_guild ) {
+				if ( result_guild.is_error( ) ) {
+					// Tratar o erro
+					std::cerr << "Erro ao obter guild: " << result.get_error( ).message << std::endl;
+					return;
+				}
+				// Extrai o objeto guild do resultado
+				dpp::guild guild = result_guild.get<dpp::guild>( );
+				Message = guild.name;
+				// Agora você pode utilizar o objeto guild
+				std::cout << "Guild nome: " << guild.name << std::endl;
+
+				this->PremiumTier = ( int ) guild.premium_tier;
+				std::cout << "Guild Premium Tier (int): " << this->PremiumTier << "\n";
+
+				} );
+		} );
 
 		utils::Get( ).WarnMessage( WEBHOOK , xorstr_( "Webhook message sent sucessfuly" ) , GREEN );
 	}
@@ -153,12 +214,23 @@ void WebHook::SendWebHookMessageWithFile( std::string Message , std::string File
 
 		if ( Filename.empty( ) ) {
 			js[ xorstr_( "message" ) ] += xorstr_( "\n Can't retrieve file!\n" );
+
 		}
+		dpp::message msg( _config.GetDiscordChannel( ) , "" );
+
+		std::string File = dpp::utility::read_file( Filename );
+		if ( !isLargerThan( File, GetFileUpdateLimit( ) ) ) {
+			msg.add_file( Filename , File );
+		}
+		else {
+			js[ xorstr_( "message" ) ] += xorstr_( " File is larger than 8mb!, check it out on the server storage.\n" );
+		}
+
 
 		// Criar um embed
 		utils::Get( ).WarnMessage( WEBHOOK , xorstr_( "Sending webhook message" ) , LIGHTER_BLUE );
 		dpp::embed embed;
-		embed.set_color( Color == NULL ? dpp::colors::red : Color )
+		embed.set_color( Color == NULL ? dpp::colors::blue_angel : Color )
 			.set_title( ( "Aegis UAC" ) )
 			.set_thumbnail( ( "https://raw.githubusercontent.com/pedro-nuness/pedro-nuness/main/aegis.webp" ) )
 			.set_description( ( "Created by pedro.nuness | Kun#6394" ) )
@@ -166,13 +238,9 @@ void WebHook::SendWebHookMessageWithFile( std::string Message , std::string File
 			.add_field( ( "AntiCheat Message" ) , js[ xorstr_( "message" ) ] , true )
 			.set_timestamp( time( 0 ) );
 
-		dpp::message msg( config::Get( ).GetDiscordChannel( ) , "" );
 		msg.add_embed( embed );
 
-		// Ler o arquivo e adicioná-lo à mensagem
-		std::string File = dpp::utility::read_file( Filename );
-		if ( !File.empty( ) )
-			msg.add_file( Filename , File );
+	
 		// Enviar a mensagem com o webhook= 
 		reinterpret_cast< dpp::cluster * >( this->BOT )->message_create( msg );
 
@@ -207,7 +275,7 @@ void WebHook::Start( ) {
 	/* The event is fired when someone issues your commands */
 	bot.on_slashcommand( [ this , &bot ] ( const dpp::slashcommand_t & event ) {
 		/* Check which command they ran */
-		if ( event.command.channel_id != config::Get( ).GetDiscordChannel( ) ) {
+		if ( event.command.channel_id != _config.GetDiscordChannel( ) ) {
 			event.reply( xorstr_( "Sorry, but i can't answer your request!" ) );
 			return;
 		}
@@ -226,6 +294,7 @@ void WebHook::Start( ) {
 
 			/* Reply to the user with the message, with our file attached. */
 			event.reply( msg );
+
 		}
 
 		if ( event.command.get_command_name( ) == "listplayers" ) {
@@ -306,35 +375,49 @@ void WebHook::Start( ) {
 		} );
 
 	bot.on_ready( [ &bot , this ] ( const dpp::ready_t & event ) {
+		
+		try {
+			std::cout << "Bot is ready!" << std::endl;
+			// Código de criação de comandos...
+
 
 		/* Create and register a command when the bot is ready */
 
+			if ( dpp::run_once<struct register_bot_commands>( ) ) {
+				dpp::slashcommand ScreenshotCommand( "screenshot" , "get a screnshot of a player" , bot.me.id );
+				ScreenshotCommand.add_option(
+					dpp::command_option( dpp::co_string , "ip" , "player ip" , true )
+				);
 
-		if ( dpp::run_once<struct register_bot_commands>( ) ) {
-			dpp::slashcommand ScreenshotCommand( "screenshot" , "get a screnshot of a player" , bot.me.id );
-			ScreenshotCommand.add_option(
-				dpp::command_option( dpp::co_string , "ip" , "player ip" , true )
-			);
+				dpp::slashcommand BanCommand( "ban" , "Ban player" , bot.me.id );
+				BanCommand.add_option(
+					dpp::command_option( dpp::co_string , "ip" , "player ip" , true )
+				);
 
-			dpp::slashcommand BanCommand( "ban" , "Ban player" , bot.me.id );
-			BanCommand.add_option(
-				dpp::command_option( dpp::co_string , "ip" , "player ip" , true )
-			);
+				dpp::slashcommand UnbanCommand( "unban" , "Unban player" , bot.me.id );
+				UnbanCommand.add_option(
+					dpp::command_option( dpp::co_string , "ip" , "player ip" , true )
+				);
 
-			dpp::slashcommand UnbanCommand( "unban" , "Unban player" , bot.me.id );
-			UnbanCommand.add_option(
-				dpp::command_option( dpp::co_string , "ip" , "player ip" , true )
-			);
+				dpp::slashcommand ListPlayersCommand( "listplayers" , "Generate a list of the connected players" , bot.me.id );
 
-			dpp::slashcommand ListPlayersCommand( "listplayers" , "Generate a list of the connected players" , bot.me.id );
+				bot.global_command_create( ScreenshotCommand );
+				bot.global_command_create( ListPlayersCommand );
+				bot.global_command_create( BanCommand );
+				bot.global_command_create( UnbanCommand );
 
-			bot.global_command_create( ScreenshotCommand );
-			bot.global_command_create( ListPlayersCommand );
-			bot.global_command_create( BanCommand );
-			bot.global_command_create( UnbanCommand );
+				this->BotReady = true;
 
-			this->BotReady = true;
+			}
 		}
+		catch ( const std::exception & e ) {
+			std::cerr << "Erro em on_ready: " << e.what( ) << std::endl;
+		}
+		catch ( ... ) {
+			std::cerr << "Erro desconhecido em on_ready!" << std::endl;
+		}
+
+
 		} );
 
 
@@ -385,7 +468,7 @@ void WebHook::Start( ) {
 			.add_field( "Ban event" , message , true )
 			.set_timestamp( time( 0 ) );
 
-		dpp::message msg( config::Get( ).GetDiscordChannel( ) , "" );
+		dpp::message msg( _config.GetDiscordChannel( ) , "" );
 		msg.add_embed( embed );
 
 		// Somente adicionar o botão se o comando for bem-sucedido
@@ -410,12 +493,12 @@ void WebHook::Start( ) {
 
 	bot.on_log( dpp::utility::cout_logger( ) );
 
-
-
-
+	std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
 	bot.start( dpp::st_wait );
 }
 
 void WebHook::InitBot( ) {
+
+	this->wHook = _config.GetBotToken( );
 	std::thread( &WebHook::Start , this ).detach( );
 }

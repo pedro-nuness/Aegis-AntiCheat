@@ -135,7 +135,12 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="memory\memory.cpp" />
     <ClCompile Include="server\server.cpp" />
+    <ClCompile Include="server\server_command_handle.cpp" />
+    <ClCompile Include="server\server_file_handle.cpp" />
+    <ClCompile Include="server\server_request_handle.cpp" />
+    <ClCompile Include="server\server_socket_handle.cpp" />
     <ClCompile Include="utils\file\File.cpp" />
+    <ClCompile Include="memory\sha1.cpp" />
     <ClCompile Include="utils\utils.cpp" />
     <ClCompile Include="webhook\webhook.cpp" />
   </ItemGroup>
@@ -619,6 +624,7 @@
     <ClInclude Include="memory\memory.h" />
     <ClInclude Include="server\server.h" />
     <ClInclude Include="utils\file\File.h" />
+    <ClInclude Include="memory\sha1.h" />
     <ClInclude Include="utils\singleton.h" />
     <ClInclude Include="utils\utils.h" />
     <ClInclude Include="utils\xorstr.h" />

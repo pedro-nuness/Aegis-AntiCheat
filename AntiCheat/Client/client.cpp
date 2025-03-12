@@ -17,6 +17,7 @@
 #include "../Systems/Punishing/PunishSystem.h"
 #include "../Systems/LogSystem/Log.h"
 #include "../Systems/LogSystem/File/File.h"
+#include "../Systems/Memory/memory.h"
 #include "../../Globals/Globals.h"
 
 #pragma comment(lib, "wbemuuid.lib")
@@ -28,6 +29,9 @@
 
 using json = nlohmann::json;
 
+
+client _client;
+
 client::client( ) {}
 client::~client( ) {}
 
@@ -35,6 +39,7 @@ client::~client( ) {}
 #define key xorstr_("ib33o5m8zsqlcgys3w46cfmtn8ztg1kn")
 #define salt xorstr_("8d88db7a1cc2512169bc970c2e2e7498")
 #define IV xorstr_("ume9ugz3m7lgch1z")
+#define default_encrypt_salt xorstr_("FMJ892FJfni8HNGFJADO432190GFSAMG")
 
 std::mutex ServerSendMutex;
 
@@ -227,32 +232,45 @@ bool client::ReceiveInformation( std::string * buff ) {
 
 
 
-bool client::GetResponse( CommunicationResponse * response ) {
+bool client::GetResponse( Response * res_buff ) {
+	if ( res_buff == nullptr )
+		return false;
+
+
 	if ( this->CurrentSocket == INVALID_SOCKET ) {
 		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Invalid socket." ) , RED );
 		return false;
 	}
 
-	std::string Response;
-	if ( !ReceiveInformation( &Response ) ) {
+	std::string ResponseStr;
+	if ( !ReceiveInformation( &ResponseStr ) ) {
 		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to receive information" ) , RED );
 		return false;
 	}
 
-	int messageInt;
+	json js;
 	try {
-		messageInt = std::stoi( Response );
+		js = json::parse( ResponseStr );
 	}
-	catch ( const std::invalid_argument & e ) {
-		return false;
-	}
-	catch ( const std::out_of_range & e ) {
-		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Message out of range" ) , RED );
+	catch ( json::parse_error error ) {
+		LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "failed to parse message to json!" ) , YELLOW );
 		return false;
 	}
 
-	if ( response != nullptr )
-		*response = ( CommunicationResponse ) messageInt;
+	if ( !js.contains( xorstr_( "response" ) ) || js[ xorstr_( "response" ) ].empty( ) ) {
+		return false;
+	}
+
+	CommunicationResponse SvResponse = ( CommunicationResponse ) ( js[ xorstr_( "response" ) ] );
+	std::string SessionID = xorstr_( "" );
+	if ( js.contains( xorstr_( "sessionid" ) ) ) {
+		SessionID = js[ xorstr_( "sessionid" ) ];
+		if ( SessionID.empty( ) ) {
+			LogSystem::Get( ).ConsoleLog( _SERVER_MESSAGE , xorstr_( "Received session id but it's empty!" ) , YELLOW );
+		}
+	}
+
+	*res_buff = Response( SvResponse , SessionID );
 
 	return true;
 }
@@ -307,16 +325,16 @@ bool client::SendData( std::string data , CommunicationType type , bool encrypt 
 	return true;
 }
 
-enum SuccessStatus {
-	NOTHING ,
-	TRYAGAIN ,
-	DENIED ,
-	SUCCESS
-};
 
 
 
-bool client::SendDataToServer( std::string str , CommunicationType type ) {
+
+bool client::SendDataToServer( std::string str , CommunicationType type , Response * res_ptr ) {
+	if ( res_ptr == nullptr ) {
+		return SuccessStatus::NOTHING;
+	}
+
+
 	std::lock_guard<std::mutex> lock( ServerSendMutex );
 
 	/*json js;
@@ -331,8 +349,6 @@ bool client::SendDataToServer( std::string str , CommunicationType type ) {
 	SuccessStatus success = NOTHING;
 
 	for ( int i = 0; i < 3; i++ ) {
-		if ( success == SUCCESS )
-			break;
 
 		if ( !InitializeConnection( ) ) {
 			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to initialize connection!" ) , RED );
@@ -341,48 +357,39 @@ bool client::SendDataToServer( std::string str , CommunicationType type ) {
 
 		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Sending " ) + calculateStringSize( str ) + xorstr_( " to server!" ) , COLORS::GRAY );
 
-		if ( SendData( str , type , type == WARN || type == BAN ? false : true ) )
+		bool Encrypt = true;
+		switch ( type ) {
+		case WARN:
+		case BAN:
+		case SCREENSHOT:
+			Encrypt = false;
+			break;
+		}
+
+		if ( SendData( str , type , Encrypt ) )
 			success = SUCCESS;
 		else
 			success = TRYAGAIN;
 
+		Response ServerResponse( NORESPONSE , xorstr_( "" ) );
+
 		if ( success == SUCCESS ) {
-			CommunicationResponse response = NORESPONSE;
-			if ( !GetResponse( &response ) ) {
+			if ( !GetResponse( &ServerResponse ) ) {
 				success = TRYAGAIN;
 			}
-
-			switch ( response ) {
-			case RECEIVED:
-				break;
-			case RECEIVE_ERROR:
-				LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Ping failed!" ) , RED );
+			if ( ServerResponse.GetServerResponse( ) == RECEIVE_ERROR ) {
 				success = TRYAGAIN;
-				break;
-			case RECEIVE_BANNED:
-				LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "You have been banned!" ) , RED );
-				LogSystem::Get( ).LogWithMessageBox( xorstr_( "Server denied ping" ) , xorstr_( "You have been banned!" ) );
-				success = DENIED;
-				break;
-			case RECEIVE_INVALIDSESSION:
-				LogSystem::Get( ).LogWithMessageBox( xorstr_( "Unverified Session" ) , xorstr_( "Can't verify session integrity" ) );
-				success = DENIED;
-				break;
-			default:
-				success = TRYAGAIN;
-				break;
 			}
 		}
 
 		CloseConnection( );
-		if ( success != DENIED ) {
-			std::this_thread::sleep_for( std::chrono::seconds( 3 ) );
+		if ( success == SUCCESS ) {
+			*res_ptr = ServerResponse;
+			return true;
 		}
-		else
-			break;
 	}
 
-	return success;
+	return false;
 }
 
 
@@ -471,12 +478,101 @@ bool GetHWIDJson( json & js ) {
 bool client::SendPingToServer( ) {
 
 	json js;
-	if ( !GetHWIDJson( js ) ) {
-		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Can't get HWID!" ) , YELLOW );
-		return false;
+	if ( !_globals.LoggedIn ) {
+		if ( !GetHWIDJson( js ) ) {
+			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Can't get HWID!" ) , YELLOW );
+			return false;
+		}
+	}
+	else {
+		std::string Ip;
+
+		if ( !hardware::Get( ).GetIp( &Ip ) ) {
+			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "failed to get ip" ) , RED );
+			return false;
+		}
+
+		if ( Ip.empty( ) ) {
+			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "ip is empty" ) , RED );
+			return false;
+		}
+
+		js[ xorstr_( "ip" ) ] = Ip;
+
+		if ( GetIV( ).empty( ) ) {
+
+			if ( GetSessionID( ).empty( ) ) {
+				LogSystem::Get( ).Log( xorstr_( "[03] Session ID is empty" ) );
+				return false;
+			}
+
+			SetIV( Mem::Get( ).GenerateHash( GetSessionID( ) + default_encrypt_salt ) );
+		}
+		else {
+			SetIV( Mem::Get( ).GenerateHash( GetIV( ) + default_encrypt_salt ) );
+		}
+
+		js[ xorstr_( "authentication" ) ] = GetIV( );
+
+		LogSystem::Get( ).ConsoleLog( _SERVER_MESSAGE , xorstr_( "Authentication: " ) + GetIV( ) , GREEN );
+
 	}
 
-	return SendDataToServer( js.dump( ) , CommunicationType::PING );
+	Response ServerResponse( NORESPONSE , xorstr_( "" ) );
+
+	if ( !SendDataToServer( js.dump( ) , CommunicationType::PING , &ServerResponse ) )
+		return false;
+	else {
+		switch ( ServerResponse.GetServerResponse( ) ) {
+		case RECEIVE_LOGGEDIN:
+			_globals.LoggedIn = true;
+			LogSystem::Get( ).ConsoleLog( _SERVER_MESSAGE , xorstr_( "Logged In!" ) , GREEN );
+			if ( ServerResponse.GetSessionID( ).empty( ) ) {
+				LogSystem::Get( ).ConsoleLog( _SERVER_MESSAGE , xorstr_( "LoggedIn, but didn't received session id from server!" ) , RED );
+			}
+			else {
+				SetSessionID( ServerResponse.GetSessionID( ) );
+				LogSystem::Get( ).ConsoleLog( _SERVER_MESSAGE , xorstr_( "SessionID: " ) + ServerResponse.GetSessionID( ) , GREEN );
+			}
+			break;
+		case RECEIVE_BANNED:
+			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "You have been banned!" ) , RED );
+			LogSystem::Get( ).LogWithMessageBox( xorstr_( "Server denied ping" ) , xorstr_( "You have been banned!" ) );
+			return false;
+			break;
+
+		case RECEIVE_NOT_LOGGEDIN:
+			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Disconnected from server" ) , YELLOW );
+			_globals.LoggedIn = false;
+			SetIV( xorstr_( "" ) );
+			SetSessionID( xorstr_( "" ) );
+			break;
+
+		case RECEIVED_SCREENSHOTREQUEST:
+			_globals.RequestedScreenshot = true;
+			break;
+
+		case RECEIVE_ERROR:
+			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Ping failed!" ) , RED );
+			return false;
+			break;
+
+		case RECEIVED_WRONGAUTH:
+			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Wrong authentication code!" ) , RED );
+			return false;
+			break;
+
+		case RECEIVE_INVALIDSESSION:
+			LogSystem::Get( ).LogWithMessageBox( xorstr_( "Unverified Session" ) , xorstr_( "Can't verify session integrity" ) );
+			return false;
+			break;
+
+		}
+
+		return true;
+	}
+
+
 }
 
 bool client::SendMessageToServer( std::string Message ) {
@@ -492,14 +588,40 @@ bool client::SendMessageToServer( std::string Message ) {
 	}
 
 	js[ xorstr_( "message" ) ] = Message;
-	return SendDataToServer( js.dump( ) , CommunicationType::MESSAGE );
+
+	Response ServerResponse( NORESPONSE , xorstr_( "" ) );
+
+	if ( !SendDataToServer( js.dump( ) , CommunicationType::MESSAGE , &ServerResponse ) )
+		return false;
+	else {
+		switch ( ServerResponse.GetServerResponse( ) ) {
+		case RECEIVE_ERROR:
+			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Ping failed!" ) , RED );
+			return false;
+			break;
+		}
+		return true;
+	}
 }
 
+bool client::SendPunishToServer( std::string Message , CommunicationType Type ) {
 
+	switch ( Type ) {
+	case BAN:
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Sending BAN punisment to server!" ) , RED );
+		break;
 
-bool client::SendPunishToServer( std::string Message , bool Ban ) {
-	if ( !Ban )
-		PunishSystem::Get( ).UnsafeSession( );
+	case WARN:
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Sending WARN punisment to server!" ) , YELLOW );
+		break;
+	case SCREENSHOT:
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Sending SCREENSHOT to server!" ) , LIGHT_BLUE );
+		break;
+
+	default:
+		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Invalid PUNISH To Server Call?" ) , RED );
+		return false;
+	}
 
 
 	if ( Message.empty( ) ) {
@@ -528,7 +650,7 @@ bool client::SendPunishToServer( std::string Message , bool Ban ) {
 		return false;
 	}
 
-	std::vector<int> CompressedBitmapData = Monitoring::Get().CompressToIntermediate( bitmapData );
+	std::vector<int> CompressedBitmapData = Monitoring::Get( ).CompressToIntermediate( bitmapData );
 
 	if ( CompressedBitmapData.empty( ) ) {
 		LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Failed to compress bitmap" ) , YELLOW );
@@ -557,5 +679,17 @@ bool client::SendPunishToServer( std::string Message , bool Ban ) {
 	Info += js.dump( );
 
 
-	return SendDataToServer( Info , Ban ? CommunicationType::BAN : CommunicationType::WARN );
+	Response ServerResponse( NORESPONSE , xorstr_( "" ) );
+
+	if ( !SendDataToServer( Info , Type , &ServerResponse ) )
+		return false;
+	else {
+		switch ( ServerResponse.GetServerResponse( ) ) {
+		case RECEIVE_ERROR:
+			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Punish failed!" ) , RED );
+			return false;
+			break;
+		}
+		return true;
+	}
 }

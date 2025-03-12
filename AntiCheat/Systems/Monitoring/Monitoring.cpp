@@ -84,31 +84,44 @@ void Monitoring::SaveBitmapToFile( HBITMAP hBitmap , const std::string & filePat
 
 HBITMAP Monitoring::CaptureScreenBitmap( )
 {
+	// Obtém o DC da tela inteira
 	HDC hDC = GetDC( NULL );
 	HDC hMemDC = CreateCompatibleDC( hDC );
 
+	// Obtém a posição e o tamanho da tela virtual (todos os monitores)
 	INT x = GetSystemMetrics( SM_XVIRTUALSCREEN );
 	INT y = GetSystemMetrics( SM_YVIRTUALSCREEN );
-	INT lWidth = min( GetSystemMetrics( SM_CXVIRTUALSCREEN ) , 1920 );
-	INT lHeight = min( GetSystemMetrics( SM_CYVIRTUALSCREEN ) , 1080 );
+	INT lWidth = GetSystemMetrics( SM_CXVIRTUALSCREEN );
+	INT lHeight = GetSystemMetrics( SM_CYVIRTUALSCREEN );
 
+	// Configura o cabeçalho do bitmap para 24 bits (RGB)
 	BITMAPINFOHEADER biHeader = {};
 	biHeader.biSize = sizeof( BITMAPINFOHEADER );
-	biHeader.biBitCount = 24;
-	biHeader.biCompression = BI_RGB;
-	biHeader.biPlanes = 1;
 	biHeader.biWidth = lWidth;
 	biHeader.biHeight = lHeight;
+	biHeader.biPlanes = 1;
+	biHeader.biBitCount = 24;
+	biHeader.biCompression = BI_RGB;
 
 	BITMAPINFO bInfo = {};
 	bInfo.bmiHeader = biHeader;
 
+	// Cria o DIB Section que armazenará a imagem capturada
 	BYTE * bBits = NULL;
 	HBITMAP hBitmap = CreateDIBSection( hDC , &bInfo , DIB_RGB_COLORS , ( VOID ** ) &bBits , NULL , 0 );
+	if ( hBitmap == NULL )
+	{
+		// Trate erros, se necessário
+		DeleteDC( hMemDC );
+		ReleaseDC( NULL , hDC );
+		return NULL;
+	}
 
+	// Seleciona o bitmap no contexto de memória e copia a área da tela
 	SelectObject( hMemDC , hBitmap );
 	BitBlt( hMemDC , 0 , 0 , lWidth , lHeight , hDC , x , y , SRCCOPY );
 
+	// Libera os recursos utilizados
 	DeleteDC( hMemDC );
 	ReleaseDC( NULL , hDC );
 

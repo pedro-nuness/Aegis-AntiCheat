@@ -488,37 +488,37 @@ std::string GenerateInvalidThreadLog(
 {
 	std::ostringstream log;
 
-	log << xorstr_( "Thread Creation Details:\n");
+	log << xorstr_( "Thread Creation Details:\n" );
 
-	log << xorstr_( "lpThreadAttributes: ");
+	log << xorstr_( "lpThreadAttributes: " );
 	if ( lpThreadAttributes ) {
-		log << xorstr_( "Present (nLength: ") << lpThreadAttributes->nLength << xorstr_( ", lpSecurityDescriptor: ")
+		log << xorstr_( "Present (nLength: " ) << lpThreadAttributes->nLength << xorstr_( ", lpSecurityDescriptor: " )
 			<< lpThreadAttributes->lpSecurityDescriptor << xorstr_( ", bInheritHandle: " )
-			<< ( lpThreadAttributes->bInheritHandle ? xorstr_( "true") : xorstr_( "false") ) << xorstr_( ")");
+			<< ( lpThreadAttributes->bInheritHandle ? xorstr_( "true" ) : xorstr_( "false" ) ) << xorstr_( ")" );
 	}
 	else {
-		log << xorstr_( "nullptr");
+		log << xorstr_( "nullptr" );
 	}
-	log << xorstr_( "\n");
+	log << xorstr_( "\n" );
 
-	log << xorstr_( "dwStackSize: ") << dwStackSize << xorstr_( " bytes\n");
+	log << xorstr_( "dwStackSize: " ) << dwStackSize << xorstr_( " bytes\n" );
 
-	log << xorstr_( "lpStartAddress: ") << std::hex << std::setw( sizeof( void * ) * 2 ) << std::setfill( '0' )
+	log << xorstr_( "lpStartAddress: " ) << std::hex << std::setw( sizeof( void * ) * 2 ) << std::setfill( '0' )
 		<< reinterpret_cast< void * >( lpStartAddress ) << "\n";
 
-	log << xorstr_( "lpParameter: ") << std::hex << std::setw( sizeof( void * ) * 2 ) << std::setfill( '0' )
+	log << xorstr_( "lpParameter: " ) << std::hex << std::setw( sizeof( void * ) * 2 ) << std::setfill( '0' )
 		<< reinterpret_cast< void * >( lpParameter ) << "\n";
 
-	log << xorstr_( "dwCreationFlags: 0x") << std::hex << dwCreationFlags << "\n";
+	log << xorstr_( "dwCreationFlags: 0x" ) << std::hex << dwCreationFlags << "\n";
 
-	log << xorstr_( "lpThreadId: ");
+	log << xorstr_( "lpThreadId: " );
 	if ( lpThreadId ) {
 		log << *lpThreadId;
 	}
 	else {
 		log << xorstr_( "nullptr" );
 	}
-	log << xorstr_( "\n");
+	log << xorstr_( "\n" );
 
 	return log.str( );
 }
@@ -545,8 +545,8 @@ HANDLE WINAPI MyCreateThread(
 			if ( _globals.DetectionsPointer != nullptr ) {
 				Detections * DetectionPtr = reinterpret_cast< Detections * > ( _globals.DetectionsPointer );
 				DetectionPtr->AddExternalDetection( INVALID_THREAD_CREATION , DetectionStruct( GenerateInvalidThreadLog( lpThreadAttributes ,
-					dwStackSize, lpStartAddress, lpParameter, dwCreationFlags, lpThreadId
-					) , DETECTED ) );
+					dwStackSize , lpStartAddress , lpParameter , dwCreationFlags , lpThreadId
+				) , DETECTED ) );
 			}
 
 			LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Invalid thread creation attempted" ) , RED );
@@ -602,22 +602,24 @@ bool Preventions::EnableApiHooks( ) {
 	return true;
 }
 
-void Preventions::Deploy( ) {
+int Preventions::Deploy( ) {
 
 	if ( !Preventions::Get( ).RestrictProcessAccess( ) )
-		LogSystem::Get( ).Log( xorstr_( "[0] Failed to protect process" ) );
+		return 0;
 
-	if ( !Preventions::Get().EnableApiHooks( ) ) 
-		LogSystem::Get( ).Log( xorstr_( "[1] Failed to protect process" ) );
-	
+	if ( !Preventions::Get( ).EnableApiHooks( ) )
+		return 1;
+
 	if ( !Preventions::Get( ).RandomizeModuleName( ) )
-		LogSystem::Get( ).Log( xorstr_( "[2] Failed to protect process" ) );
+		return 2;
 
 	if ( !Preventions::Get( ).PreventDllInjection( ) )
-		LogSystem::Get( ).Log( xorstr_( "[3] Failed to protect process" ) );
+		return 3;
 
-	if(!Preventions::Get().PreventThreadCreation() )
-		LogSystem::Get( ).Log( xorstr_( "[4] Failed to protect process" ) );
+	if ( !Preventions::Get( ).PreventThreadCreation( ) )
+		return 4;
+
+
 
 
 	/*if ( !Preventions::Get( ).RemapProgramSections( ) ) {
@@ -630,5 +632,6 @@ void Preventions::Deploy( ) {
 
 	LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "deployed sucessfully" ) , GREEN );
 
+	return 903;
 }
 

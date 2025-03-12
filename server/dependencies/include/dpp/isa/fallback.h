@@ -20,6 +20,7 @@
  ************************************************************************************/
 #pragma once
 
+#include <dpp/export.h>
 #include <numeric>
 #include <cstdint>
 #include <limits>
@@ -75,4 +76,4 @@ namespace dpp {
 		}
 	};
 
-} // namespace dpp
+}

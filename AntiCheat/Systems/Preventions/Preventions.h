@@ -13,6 +13,6 @@ class Preventions : public CSingleton<Preventions>
 	bool StopAPCInjection( );
 	bool DeployDllLoadNotifation( );
 public:
-	void Deploy( );
+	int Deploy( );
 };
 

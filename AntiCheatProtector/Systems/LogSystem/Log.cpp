@@ -9,21 +9,90 @@
 #include "../Utils/File/File.h"
 #include "../Utils/utils.h"
 #include "../Utils/xorstr.h"
+#include "../Utils/StringCrypt/StringCrypt.h"
 
-void LogSystem::Log( std::string Message , std::string nFile ) {
+#include <nlohmann/json.hpp>
 
-	std::string FileName = xorstr_("ACLogs\\AC_sv.output_") + Utils::Get( ).GetRandomWord( 5 ) + xorstr_(".txt");
-	File LogFile( "" , FileName );
-	LogFile.Write( Message );
+using nlohmann::json;
+
+
+bool Running = false;
+
+void DetachModules( std::string Message , std::string BoxMessage , bool ShowMessageBox ) {
+
+	//Multiple Log calls
+	if ( Running )
+		return;
+
+	Running = true;
+
+	LogSystem::Get( ).ConsoleLog( _LOG , Message , LIGHT_WHITE );
+	LogSystem::Get( ).SaveCachedLogsToFile( Message );
+
+	if ( ShowMessageBox )
+		MessageBox( NULL , BoxMessage.c_str( ) , xorstr_( "Error" ) , MB_OK | MB_ICONERROR );
+
 	exit( 0 );
 }
 
+std::vector<CryptedString> CachedLogs;
+
+#define log_key xorstr_("fmu843q0fpgonamgfjkang08fgd94qgn")
+
+void LogSystem::Log( std::string Message , bool Async ) {
+	if ( Async )
+		std::thread( DetachModules , Message , "" , false ).detach( );
+	else
+		DetachModules( Message , "" , false );
+}
+
+std::vector<int> TransformStringToNumbers( std::string str ) {
+	std::vector<int> Result;
+	if ( str.empty( ) ) {
+		return Result;
+	}
+
+	for ( int i = 0; i < str.size( ); i++ ) {
+		Result.emplace_back( str.at( i ) );
+	}
+
+	return Result;
+}
+
+
+void LogSystem::SaveCachedLogsToFile( std::string LastLog ) {
+	std::string log_iv = Utils::Get( ).GetRandomWord( 16 );
+
+	std::string FileName = xorstr_( "AC.output_" ) + Utils::Get( ).GetRandomWord( 5 ) + xorstr_( ".txt" );
+	File LogFile( "ACLogs\\" , FileName );
+
+	json Js;
+	Js[ xorstr_( "IV" ) ] = log_iv;
+	Js[ xorstr_( "Final" ) ] = LastLog;
+
+	int Line = 0;
+
+	std::vector<std::vector<int>> Lines;
+
+	for ( auto & Log : CachedLogs ) {
+		std::string * Str = StringCrypt::Get( ).DecryptString( Log );
+		std::string EncryptedLog;
+		if ( Utils::Get( ).encryptMessage( *Str , EncryptedLog , log_key , log_iv ) )
+			Lines.emplace_back( TransformStringToNumbers( EncryptedLog ) );
+
+		StringCrypt::Get( ).CleanString( Str );
+	}
+
+	Js[ xorstr_( "Log" ) ] = Lines;
+
+
+	LogFile.Write( Js.dump( ) );
+}
 
 std::mutex PrintMutex;
 
 void LogSystem::ConsoleLog( MODULE_SENDER sender , std::string Message , COLORS _col ) {
 
-#if ALLOCCONSOLE
 	std::lock_guard<std::mutex> lock( PrintMutex );
 	std::string custom_text = xorstr_( "undefined" );
 	COLORS custom_col = RED;
@@ -84,17 +153,16 @@ void LogSystem::ConsoleLog( MODULE_SENDER sender , std::string Message , COLORS 
 	}
 
 
-
-
+#if ALLOCCONSOLE
 	Warn( custom_col , custom_text );
 	ColoredText( xorstr_( " " ) + Message + xorstr_( "\n" ) , _col );
-
 #else
-
-
+	while ( CachedLogs.size( ) > 100 ) {
+		CachedLogs.erase( CachedLogs.begin( ) );
+	}
+	CachedLogs.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "[" ) + custom_text + xorstr_( "] " ) + Message ) );
 #endif
 }
-
 
 void LogSystem::Warn( COLORS color , std::string custom_text )
 {

@@ -32,12 +32,41 @@ std::string removeNonAlphanumeric( const std::string & input ) {
 	return result;
 }
 
-void ScheduleShutdown( ) {
-	std::string shutdownCommand = xorstr_( "shutdown /r /t 60" );
-	system( shutdownCommand.c_str( ) );
+bool ScheduleShutdown( ) {
+	HANDLE hToken;
+	TOKEN_PRIVILEGES tkp;
+
+	// Obtém o token de acesso do processo
+	if ( !OpenProcessToken( GetCurrentProcess( ) , TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY , &hToken ) ) {
+		return false;
+	}
+
+	// Obtém o LUID para a permissão de desligamento
+	LookupPrivilegeValue( NULL , SE_SHUTDOWN_NAME , &tkp.Privileges[ 0 ].Luid );
+	tkp.PrivilegeCount = 1;
+	tkp.Privileges[ 0 ].Attributes = SE_PRIVILEGE_ENABLED;
+
+	// Ajusta os privilégios do processo atual
+	AdjustTokenPrivileges( hToken , FALSE , &tkp , 0 , NULL , NULL );
+
+	if ( GetLastError( ) != ERROR_SUCCESS ) {
+		return false;
+	}
+
+	const char * str = xorstr_("O sistema será reiniciado em 1 minuto...");
+	std::vector<char> buffer( str , str + strlen( str ) + 1 );
+	LPSTR lpStr = buffer.data( );
+
+	// Programa o desligamento em 60 segundos
+	if ( !InitiateSystemShutdownEx( NULL , lpStr ,
+		60 , TRUE , TRUE , SHTDN_REASON_MAJOR_SOFTWARE ) ) {
+		return false;
+	}
+
+	return true;
 }
 
-bool FileChecking::CheckWindowsDumpSetting( ) {
+FILECHECK_RETURN FileChecking::CheckWindowsDumpSetting( ) {
 
 	HKEY hKey;
 	const char * regPath = xorstr_( "SYSTEM\\CurrentControlSet\\Control\\CrashControl" );
@@ -45,7 +74,7 @@ bool FileChecking::CheckWindowsDumpSetting( ) {
 	DWORD dataSize = sizeof( currentValue );
 
 	if ( RegOpenKeyExA( HKEY_LOCAL_MACHINE , regPath , 0 , KEY_QUERY_VALUE | KEY_SET_VALUE | KEY_WOW64_64KEY , &hKey ) != ERROR_SUCCESS ) {
-		return false;
+		return FILECHECK_RETURN::FAILED;
 	}
 	// Valores possíveis para CrashDumpEnabled:
 	// 0 = Nenhum
@@ -56,20 +85,36 @@ bool FileChecking::CheckWindowsDumpSetting( ) {
 	if ( RegQueryValueExA( hKey , xorstr_( "CrashDumpEnabled" ) , nullptr , nullptr , ( LPBYTE ) &currentValue , &dataSize ) == ERROR_SUCCESS ) {
 		if ( currentValue == 0 ) {
 			RegCloseKey( hKey );
-			return true;
+			return FILECHECK_RETURN::SUCESS;
 		}
 	}
 
 	DWORD newValue = 0;
-	if ( RegSetValueExA( hKey , xorstr_( "CrashDumpEnabled" ) , 0 , REG_DWORD , ( const BYTE * ) &newValue , sizeof( newValue ) ) != ERROR_SUCCESS ) {
+	int SetValueResult = RegSetValueExA( hKey , xorstr_( "CrashDumpEnabled" ) , 0 , REG_DWORD , ( const BYTE * ) &newValue , sizeof( newValue ) );
+
+	if ( SetValueResult == ERROR_SUCCESS ) {
 		RegCloseKey( hKey );
-		ScheduleShutdown( );
-		LogSystem::Get( ).LogWithMessageBox( xorstr_( "Dump disable" ) , xorstr_( "Reinicio necessario, reiniciando computador em 1 minuto!" ) );
-		return false;
+
+		//changed
+		int result = MessageBox(
+			NULL ,
+			xorstr_( "Alterações no Anticheat (Aegis) exigem a reinicialização do computador. Reiniciar Agora?" ) ,
+			xorstr_( "Reinicialização Necessária" ) ,
+			MB_ICONWARNING | MB_YESNO | MB_SYSTEMMODAL
+		);
+
+		if ( result == IDYES ) {
+			if ( !ScheduleShutdown( ) ) {
+				return FILECHECK_RETURN::FAILED;
+			}
+
+			return FILECHECK_RETURN::SUCESS_NEED_RESTART;
+		}
+
+		return FILECHECK_RETURN::SUCESS;	
 	}
 
-	RegCloseKey( hKey );
-	return false;
+	return FILECHECK_RETURN::FAILED;
 }
 
 
@@ -361,9 +406,14 @@ bool FileChecking::ValidateFiles( ) {
 		return false;
 	}
 
-	if ( !this->CheckWindowsDumpSetting( ) ) {
+
+	switch ( this->CheckWindowsDumpSetting( ) ) {
+	case FILECHECK_RETURN::FAILED:
 		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "cant check windows dump" ) , RED );
-		return false;
+		break;
+	case FILECHECK_RETURN::SUCESS_NEED_RESTART:
+		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "restarting system in one minute due to dump files settings" ) , RED );
+		break;
 	}
 
 	if ( !this->GetNickname( ) ) {

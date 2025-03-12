@@ -7,6 +7,12 @@ enum F_CHECKER {
 	CLIENT
 };
 
+enum FILECHECK_RETURN {
+	FAILED,
+	SUCESS,
+	SUCESS_NEED_RESTART
+};
+
 class FileChecking : public CSingleton<FileChecking>
 {
 
@@ -19,7 +25,7 @@ class FileChecking : public CSingleton<FileChecking>
 	bool SearchFiles( );
 	bool GetNickname( );
 	bool GetSteamID( std::string * Buffer = nullptr );
-	bool CheckWindowsDumpSetting( );
+	FILECHECK_RETURN CheckWindowsDumpSetting( );
 public:
 	bool CheckFile( F_CHECKER File );
 	bool ValidateFiles( );
