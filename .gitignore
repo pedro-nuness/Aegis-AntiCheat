@@ -11,3 +11,12 @@
 /server/x64
 /x64
 /ExternalCheatExample/x64
+*.vsidx
+*.db
+*.db-shm
+*.db-wal
+*.ipch
+*.bin
+*.json
+*.opendb
+/.vs
