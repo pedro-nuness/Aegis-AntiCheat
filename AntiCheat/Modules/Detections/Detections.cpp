@@ -768,32 +768,7 @@ void Detections::AddThreadToWhitelist( DWORD threadPID ) {
 
 void Detections::threadFunction( ) {
 
-	{
-		std::lock_guard<std::mutex> lock( _globals.threadReadyMutex );
-		_globals.threadsReady.at( THREADS::DETECTIONS ) = true;
-		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "thread signalled ready!" ) , GREEN );
-	}
-
-	while ( true ) {
-		std::vector<bool> localthreadsReady;
-		{
-			std::lock_guard<std::mutex> lock( _globals.threadReadyMutex );
-			localthreadsReady = _globals.threadsReady;
-		}
-
-		bool found = false;
-
-		for ( int i = 0; i < localthreadsReady.size( ); i++ ) {
-			if ( !localthreadsReady.at( i ) ) {
-				found = true;
-				break;
-			}
-		}
-
-		if ( !found ) {
-			break;
-		}
-	}
+	
 
 
 	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );

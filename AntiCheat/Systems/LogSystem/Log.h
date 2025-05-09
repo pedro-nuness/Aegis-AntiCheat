@@ -24,24 +24,21 @@ enum COLORS
 
 
 enum MODULE_SENDER {
-	_TRIGGERS ,
-	_DETECTION ,
-	_MONITOR ,
-	_COMMUNICATION ,
-	_SERVER_MESSAGE ,
-	_SERVER ,
-	_LISTENER,
-	_ANTIDEBUGGER ,
-	_CHECKER ,
-	_HWID ,
-	_MAIN ,
-	_PUNISH ,
-	_PREVENTIONS ,
-	_LOG
+    _TRIGGERS ,
+    _DETECTION ,
+    _COMMUNICATION ,
+    _ANTIDEBUGGER ,
+    _LISTENER,
+    _MONITOR ,
+    _SERVER_MESSAGE,
+    _SERVER ,
+    _CHECKER ,
+    _HWID ,
+    _MAIN ,
+    _PUNISH ,
+    _PREVENTIONS ,
+    _LOG
 };
-
-
-
 
 class LogSystem : public CSingleton<LogSystem>
 { 

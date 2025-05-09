@@ -30,14 +30,156 @@
 #include "Client/client.h"
 #include "Globals/Globals.h"
 
+#include "../../externals/minhook/MinHook.h"
+
 using nlohmann::json;
 
 namespace fs = std::filesystem;
 
+#include <d3d11.h>
+#include <dxgi.h>
 
 #define IDR_DUMPERDLL 104
 #define IDR_LIBCRYPTO 105
 #define IDR_LIBSSL 106
+
+#pragma comment(lib, "d3d11.lib")
+#pragma comment(lib, "dxgi.lib")
+
+typedef HRESULT( __stdcall * Present_t )( IDXGISwapChain * pSwapChain , UINT SyncInterval , UINT Flags );
+Present_t oPresent = nullptr;
+
+ID3D11Device * pDevice;
+ID3D11DeviceContext * pContext;
+
+bool loadingScreenStarted = false;
+bool loadingScreenEnded = false;
+bool TempConnection = true;
+std::vector<BYTE> lastFrameRegion;
+
+bool FrameCentralMudou( BYTE * atual , BYTE * anterior , int larguraLinha , int larguraRegiao , int alturaRegiao , int tolerancia = 5 ) {
+	int diferentes = 0;
+	int totalPixels = larguraRegiao * alturaRegiao * 4; // 4 bytes por pixel (RGBA)
+
+	for ( int y = 0; y < alturaRegiao; y++ ) {
+		BYTE * linhaAtual = atual + y * larguraLinha;
+		BYTE * linhaAnterior = anterior + y * larguraLinha;
+
+		for ( int x = 0; x < larguraRegiao * 4; x++ ) {
+			if ( abs( linhaAtual[ x ] - linhaAnterior[ x ] ) > tolerancia ) {
+				diferentes++;
+				if ( diferentes > 500 ) return true; // limite mínimo pra considerar que mudou
+			}
+		}
+	}
+
+	return false;
+}
+
+HRESULT __stdcall hkPresent( IDXGISwapChain * pSwapChain , UINT SyncInterval , UINT Flags ) {
+	if ( !loadingScreenStarted ) {
+		loadingScreenStarted = true;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "loading screen started" ) , GREEN );
+	}
+
+	static bool init = false;
+	static int largura = 0 , altura = 0;
+
+	if ( !init ) {
+		pSwapChain->GetDevice( __uuidof( ID3D11Device ) , ( void ** ) &pDevice );
+		pDevice->GetImmediateContext( &pContext );
+		init = true;
+	}
+
+	if ( !loadingScreenEnded ) {
+		ID3D11Texture2D * backBuffer = nullptr;
+		if ( SUCCEEDED( pSwapChain->GetBuffer( 0 , __uuidof( ID3D11Texture2D ) , ( void ** ) &backBuffer ) ) ) {
+			D3D11_TEXTURE2D_DESC desc;
+			backBuffer->GetDesc( &desc );
+
+			largura = desc.Width;
+			altura = desc.Height;
+
+			D3D11_TEXTURE2D_DESC stagingDesc = desc;
+			stagingDesc.Usage = D3D11_USAGE_STAGING;
+			stagingDesc.BindFlags = 0;
+			stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+			stagingDesc.MiscFlags = 0;
+
+			ID3D11Texture2D * stagingTexture = nullptr;
+			if ( SUCCEEDED( pDevice->CreateTexture2D( &stagingDesc , nullptr , &stagingTexture ) ) ) {
+				pContext->CopyResource( stagingTexture , backBuffer );
+
+				D3D11_MAPPED_SUBRESOURCE mapped;
+				if ( SUCCEEDED( pContext->Map( stagingTexture , 0 , D3D11_MAP_READ , 0 , &mapped ) ) ) {
+					// Define região central (ex: 100x100 px)
+					const int regiaoLargura = 100;
+					const int regiaoAltura = 100;
+					const int startX = ( largura / 2 ) - ( regiaoLargura / 2 );
+					const int startY = ( altura / 2 ) - ( regiaoAltura / 2 );
+
+					std::vector<BYTE> currentRegion( regiaoLargura * regiaoAltura * 4 );
+
+					for ( int y = 0; y < regiaoAltura; y++ ) {
+						BYTE * src = reinterpret_cast< BYTE * >( mapped.pData ) + ( startY + y ) * mapped.RowPitch + startX * 4;
+						memcpy( &currentRegion[ y * regiaoLargura * 4 ] , src , regiaoLargura * 4 );
+					}
+
+					if ( !lastFrameRegion.empty( ) ) {
+						if ( FrameCentralMudou( currentRegion.data( ) , lastFrameRegion.data( ) , regiaoLargura * 4 , regiaoLargura , regiaoAltura ) ) {
+							loadingScreenEnded = true;
+							std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
+						}
+					}
+
+					lastFrameRegion = currentRegion;
+					pContext->Unmap( stagingTexture , 0 );
+				}
+
+				stagingTexture->Release( );
+			}
+
+			backBuffer->Release( );
+		}
+	}
+
+	return oPresent( pSwapChain , SyncInterval , Flags );
+}
+
+void HookPresent( ) {
+	DXGI_SWAP_CHAIN_DESC scd = {};
+	scd.BufferCount = 1;
+	scd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+	scd.OutputWindow = GetForegroundWindow( );  // Qualquer janela
+	scd.SampleDesc.Count = 1;
+	scd.Windowed = TRUE;
+	scd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+
+	D3D_FEATURE_LEVEL featureLevel;
+	ID3D11Device * pDevice = nullptr;
+	ID3D11DeviceContext * pContext = nullptr;
+	IDXGISwapChain * pSwapChain = nullptr;
+
+	if ( D3D11CreateDeviceAndSwapChain( nullptr , D3D_DRIVER_TYPE_HARDWARE , nullptr , 0 , nullptr ,
+		0 , D3D11_SDK_VERSION , &scd , &pSwapChain , &pDevice , &featureLevel , &pContext ) != S_OK ) {
+		return;
+	}
+
+	void ** pVTable = *reinterpret_cast< void *** >( pSwapChain ); // VTable do SwapChain
+	void * pPresent = pVTable[ 8 ]; // Index 8 = Present()
+
+	// Inicia o MinHook e aplica o hook
+	MH_Initialize( );
+	MH_CreateHook( pPresent , &hkPresent , reinterpret_cast< void ** >( &oPresent ) );
+	MH_EnableHook( pPresent );
+	LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "pPresent hooked!" ) , GREEN );
+
+	// Cleanup
+	pSwapChain->Release( );
+	pDevice->Release( );
+	pContext->Release( );
+}
 
 void * LoadInternalResource( DWORD * buffer, int resourceID, LPSTR type ) {
 	if ( _globals.dllModule == NULL ) {
@@ -142,11 +284,7 @@ void Startup( ) {
 		std::make_pair( &ListenEvent,  LISTENER )
 	};
 
-
-	//Thread holder state
-	for ( int i = 0; i < threads.size( ); i++ ) {
-		_globals.threadsReady.emplace_back( false );
-	}
+	ThreadHolder::initializeThreadWaiter( );
 
 	CommunicationEvent.start( );
 	detection->start( );
@@ -165,16 +303,34 @@ void Startup( ) {
 
 	std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
 
+	while ( !loadingScreenEnded ) {
+		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
+	}
+
+	if ( !Preventions::Get( ).DeployLastBarrier( ) ) {
+		LogSystem::Get( ).Error( xorstr_( "[401] Failed to deploy last barrier" ) , false );
+		return;
+	}
+
 	while ( true ) {
 		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "ping" ) , GRAY );
 
-		if ( !monitor.isRunning( ) ) {
-			LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "thread monitor is not running" ) , RED );
-		}
-		else if ( monitor.ThreadObject->IsShutdownSignalled( ) ) {
-			LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "thread monitor signalled shutdown, shutting down main module!" ) , YELLOW );
+		switch ( monitor.isRunning() ) {
+		case THREAD_STATUS::INITIALIZATION_FAILED:
+			LogSystem::Get( ).Error( xorstr_( "thread monitor thread initialization failed!" ), false);
 			return;
+			break;
+		case THREAD_STATUS::TERMINATED:
+			_client.SendPunishToServer(xorstr_( "thread monitor thread was found terminated! Abnormal execution" ) , CommunicationType::BAN );
+			return;
+			break;
+
+		case THREAD_STATUS::SUSPENDED:
+			_client.SendPunishToServer( xorstr_( "thread monitor thread was found suspended! Abnormal execution" ) , CommunicationType::BAN );
+			return;
+			break;
 		}
+
 		std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
 	}
 }
@@ -263,6 +419,15 @@ bool OpenConsole( ) {
 	return true;
 }
 
+void TempConnectionThread( ) {
+	while ( TempConnection ) {
+		if ( !_client.SendPingToServer( ) ) {
+			LogSystem::Get( ).ConsoleLog(_MAIN, xorstr_("Can't send ping to server" ) , RED );
+		}
+
+		std::this_thread::sleep_for( std::chrono::seconds( 10 ) );
+	}
+}
 
 DWORD WINAPI main( LPVOID lpParam ) {
 	double StartupTime = GetProcessUptimeSeconds( );
@@ -328,11 +493,10 @@ DWORD WINAPI main( LPVOID lpParam ) {
 		return 1;
 	}
 
-	//Utils::Get( ).waitModule( xorstr_( "BEClient" ) );
+	HookPresent( );
 
-	if ( !Preventions::Get( ).DeployLastBarrier( ) ) {
-		LogSystem::Get( ).Error( xorstr_( "[401] Failed to deploy last barrier" ) , false );
-		return 1;
+	while(!loadingScreenStarted ) {
+		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
 	}
 
 	if ( !_client.SendPingToServer( ) ) {

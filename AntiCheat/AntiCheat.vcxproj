@@ -75,7 +75,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>$(ProjectDir)Dependencies\release\include;$(IncludePath)</IncludePath>
     <TargetName>$(ProjectName)\aegis</TargetName>
-    <LibraryPath>$(ProjectDir)Dependencies\release\lib\openssl;$(ProjectDir)Dependencies\release\lib\windvert;$(ProjectDir)Dependencies\release\lib\minhook;$(UniversalCRT_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(VC_LibraryPath_x64)</LibraryPath>
+    <LibraryPath>D:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Lib\x64;$(ProjectDir)Dependencies\release\lib\minhook;$(ProjectDir)Dependencies\release\lib\openssl;$(ProjectDir)Dependencies\release\lib\windvert;$(UniversalCRT_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(VC_LibraryPath_x64)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>$(ProjectDir)Dependencies\debug\include\dpp-10.0;$(ProjectDir)Dependencies\debug\include\kernelbridge;$(ProjectDir)Dependencies\release\include\minhook;$(IncludePath)</IncludePath>
@@ -133,7 +133,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;OPENSSL_USE_STATIC_LIBS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)Dependencies\include;D:\Code\includes\OPENSSL\Lib\x64\Release\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)Dependencies\include;D:\Code\includes\OPENSSL\Lib\x64\Release\include;D:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

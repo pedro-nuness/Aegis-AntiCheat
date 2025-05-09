@@ -12,10 +12,11 @@ enum THREAD_STATUS {
     TERMINATED
 };
 
+
 enum THREADS {
-    COMMUNICATION ,
-    DETECTIONS ,
     TRIGGERS ,
+    DETECTIONS ,
+    COMMUNICATION ,
     ANTIDEBUGGER ,
     LISTENER,
     THREADGUARD,
@@ -38,6 +39,9 @@ private:
 public:
     static std::string GetThreadName( THREADS thread );
     static std::string StatusToString( THREAD_STATUS status );
+    static void initializeThreadWaiter( );
+
+    void waitOtherThreads( );
 
     std::unique_ptr<Thread> ThreadObject;
     

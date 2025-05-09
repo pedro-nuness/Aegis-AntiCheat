@@ -21,10 +21,12 @@
 
 #pragma comment(lib, "ws2_32.lib")
 
+std::string portPath = xorstr_( "Software\\AegisPort" );
+
 Listener::Listener( ) 
 	: ThreadHolder( THREADS::LISTENER )
 {
-
+	GenerateRandomPort( );
 }
 
 Listener::~Listener( ) {
@@ -103,36 +105,46 @@ void Listener::ProcessMessages( ) {
 	//}
 }
 
+void Listener::GenerateRandomPort( ) {
+	this->port = Utils::Get( ).RandomNumber( 1024 , 65535 );
+}
+
+bool Listener::savePort( std::string porta ) {
+	HKEY hKey;
+	
+	// Cria ou abre a chave no registro
+	if ( RegCreateKeyExA( HKEY_CURRENT_USER , portPath.c_str() , 0 , nullptr , 0 , KEY_WRITE , nullptr , &hKey , nullptr ) == ERROR_SUCCESS ) {
+		// Escreve o valor da porta como string
+		RegSetValueExA( hKey , xorstr_( "Porta") , 0 , REG_SZ , reinterpret_cast< const BYTE * >( porta.c_str( ) ) , porta.size( ) + 1 );
+		RegCloseKey( hKey );
+		return true;
+	}
+	
+	return false;
+}
+
+std::string Listener::readPort( ) {
+	HKEY hKey;
+	char buffer[ 256 ];
+	DWORD bufferSize = sizeof( buffer );
+	DWORD tipo = 0;
+
+	if ( RegOpenKeyExA( HKEY_CURRENT_USER , portPath.c_str() , 0 , KEY_READ , &hKey ) == ERROR_SUCCESS ) {
+		if ( RegQueryValueExA( hKey , xorstr_("Porta") , nullptr , &tipo , reinterpret_cast< LPBYTE >( buffer ) , &bufferSize ) == ERROR_SUCCESS ) {
+			if ( tipo == REG_SZ ) {
+				RegCloseKey( hKey );
+				return std::string( buffer );
+			}
+		}
+		RegCloseKey( hKey );
+	}
+
+	return xorstr_("");
+}
+
 
 void Listener::threadFunction( ) {
 	// Inicializa Winsock
-
-	{
-		std::lock_guard<std::mutex> lock( _globals.threadReadyMutex );
-		_globals.threadsReady.at( THREADS::LISTENER ) = true;
-		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "thread signalled ready!" ) , GREEN );
-	}
-
-	while ( true ) {
-		std::vector<bool> localthreadsReady;
-		{
-			std::lock_guard<std::mutex> lock( _globals.threadReadyMutex );
-			localthreadsReady = _globals.threadsReady;
-		}
-
-		bool found = false;
-
-		for ( int i = 0; i < localthreadsReady.size( ); i++ ) {
-			if ( !localthreadsReady.at( i ) ) {
-				found = true;
-				break;
-			}
-		}
-
-		if ( !found ) {
-			break;
-		}
-	}
 
 	WSADATA wsaData;
 	if ( WSAStartup( MAKEWORD( 2 , 2 ) , &wsaData ) != 0 ) {
@@ -140,13 +152,6 @@ void Listener::threadFunction( ) {
 		this->setThreadStatus( THREAD_STATUS::INITIALIZATION_FAILED );
 		return;
 	}
-
-	sockaddr_in serverAddr;
-	const int serverPort = 50505;
-	serverAddr.sin_family = AF_INET;
-	serverAddr.sin_port = htons( serverPort );
-	// Configurar para escutar todos os endereços de IP disponíveis (INADDR_ANY)
-	serverAddr.sin_addr.s_addr = INADDR_ANY;  // Escuta em todos os endereços de rede da máquina
 
 	// Obter o nome do host
 	char hostName[ 256 ];
@@ -164,14 +169,12 @@ void Listener::threadFunction( ) {
 	hints.ai_protocol = IPPROTO_TCP;
 	hints.ai_flags = AI_PASSIVE;      // Configura o socket para escutar
 
-
 	if ( getaddrinfo( hostName , nullptr , &hints , &res ) != 0 ) {
 		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Failed to get address info." ) , COLORS::RED );
 		this->setThreadStatus( THREAD_STATUS::INITIALIZATION_FAILED );
 		WSACleanup( );
 		return;
 	}
-
 
 	// Criar socket para escutar conexões
 	SOCKET listenSock = socket( res->ai_family , res->ai_socktype , res->ai_protocol );
@@ -182,15 +185,49 @@ void Listener::threadFunction( ) {
 		return;
 	}
 
-	// Associar o socket ao ender
-	// eço IP encontrado e porta
-	if ( bind( listenSock , ( sockaddr * ) &serverAddr , sizeof( serverAddr ) ) == SOCKET_ERROR ) {
-		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Bind failed. Error code: " ) + std::to_string( WSAGetLastError( ) ) , COLORS::RED );
+	sockaddr_in serverAddr;
+	serverAddr.sin_family = AF_INET;
+	serverAddr.sin_addr.s_addr = INADDR_ANY;  // Escuta em todos os endereços de rede da máquina
+
+	bool initializedPort = false;
+	for ( int i = 0; i < 10; i++ ) {
+		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "trying to bind listener on port " ) + std::to_string( this->port ) , GRAY );
+	
+		serverAddr.sin_port = htons( this->port );
+		// Configurar para escutar todos os endereços de IP disponíveis (INADDR_ANY)
+		// Associar o socket ao endereço IP encontrado e porta
+		if ( bind( listenSock , ( sockaddr * ) &serverAddr , sizeof( serverAddr ) ) == SOCKET_ERROR ) {
+			LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Bind failed. Error code: " ) + std::to_string( WSAGetLastError( ) ) , GRAY );
+			GenerateRandomPort( );
+			continue;		
+		}
+		else {
+			initializedPort = true;
+
+			if ( !savePort( std::to_string( this->port ) ) ) {
+				LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Can't save port" ) , RED );
+				this->setThreadStatus( THREAD_STATUS::INITIALIZATION_FAILED );
+				closesocket( listenSock );
+				WSACleanup( );
+				return;
+			}
+			LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Saved port" ), GRAY );
+
+			break;
+		}
+	}
+
+
+	if ( !initializedPort ) {
+		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Can't initialize listener server" )  , RED );
 		this->setThreadStatus( THREAD_STATUS::INITIALIZATION_FAILED );
 		closesocket( listenSock );
 		WSACleanup( );
 		return;
 	}
+
+
+
 
 	if ( listen( listenSock , SOMAXCONN ) == SOCKET_ERROR ) {
 		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Listen failed. Error code: " ) + std::to_string( WSAGetLastError( ) ) , COLORS::RED );
@@ -203,7 +240,7 @@ void Listener::threadFunction( ) {
 	// Converter o endereço IP para string e imprimir
 	char ipStr[ INET_ADDRSTRLEN ];
 	inet_ntop( AF_INET , &serverAddr.sin_addr , ipStr , sizeof( ipStr ) );
-	LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Server listening on port " ) + std::to_string( serverPort ) , COLORS::GREEN );
+	LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Server listening on port " ) + std::to_string( this->port ) , COLORS::GREEN );
 
 	while ( true ) {
 		if ( this->ThreadObject->IsShutdownSignalled( ) ) {

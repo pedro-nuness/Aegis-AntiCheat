@@ -21,12 +21,34 @@
 
 using json = nlohmann::json;
 
-client::client( ) {}
+client::client( ) {
+	this->Port = readPort( );
+}
 client::~client( ) {}
 
-
+std::string portPath = xorstr_( "Software\\AegisPort" );
 #define key xorstr_("W86ztLe5cLYZUDRBK61cVTJONv4IlivA")
 #define salt xorstr_("pJWjN6fCSfJmfL92vRnkdHUgzVSSYSks")
+
+
+int client::readPort( ) {
+	HKEY hKey;
+	char buffer[ 256 ];
+	DWORD bufferSize = sizeof( buffer );
+	DWORD tipo = 0;
+
+	if ( RegOpenKeyExA( HKEY_CURRENT_USER , portPath.c_str( ) , 0 , KEY_READ , &hKey ) == ERROR_SUCCESS ) {
+		if ( RegQueryValueExA( hKey , "Porta" , nullptr , &tipo , reinterpret_cast< LPBYTE >( buffer ) , &bufferSize ) == ERROR_SUCCESS ) {
+			if ( tipo == REG_SZ ) {
+				RegCloseKey( hKey );
+				return std::stoi( buffer );
+			}
+		}
+		RegCloseKey( hKey );
+	}
+
+	return 0;
+}
 
 bool client::InitializeConnection( ) {
 	WSADATA wsaData;
@@ -43,6 +65,10 @@ bool client::InitializeConnection( ) {
 
 	sockaddr_in serverAddr;
 	const int serverPort = this->Port;
+	if ( !serverPort ) {
+		WSACleanup( );
+		return false;
+	}
 
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_port = htons( serverPort );

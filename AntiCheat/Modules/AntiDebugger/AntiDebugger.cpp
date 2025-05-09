@@ -465,35 +465,6 @@ bool AntiDebugger::_IsDebuggerPresent_ProcessDebugFlags( )
 
 void AntiDebugger::threadFunction( ) {
 
-	{
-		std::lock_guard<std::mutex> lock( _globals.threadReadyMutex );
-		_globals.threadsReady.at( THREADS::ANTIDEBUGGER ) = true;
-		LogSystem::Get( ).ConsoleLog( _ANTIDEBUGGER , xorstr_( "thread signalled ready!" ) , GREEN );
-	}
-
-	while ( true ) {
-		std::vector<bool> localthreadsReady;
-		{
-			std::lock_guard<std::mutex> lock( _globals.threadReadyMutex );
-			localthreadsReady = _globals.threadsReady;
-		}
-
-		bool found = false;
-
-		for ( int i = 0; i < localthreadsReady.size( ); i++ ) {
-			if ( !localthreadsReady.at( i ) ) {
-				found = true;
-				break;
-			}
-		}
-
-		if ( !found ) {
-			break;
-		}
-	}
-
-
-
 	LogSystem::Get( ).ConsoleLog( _ANTIDEBUGGER , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );
 
 	bool running_thread = true;

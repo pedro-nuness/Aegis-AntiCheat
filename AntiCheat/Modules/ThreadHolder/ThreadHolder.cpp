@@ -4,6 +4,12 @@
 
 #include "../../Systems/Utils/xorstr.h"
 
+#include <mutex>
+#include <vector>
+
+std::vector<bool> threadsReady;
+std::mutex threadReadyMutex;
+
 void ThreadHolder::start( ) {
 	ThreadObject = std::make_unique<Thread>( ( LPTHREAD_START_ROUTINE ) threadFunctionWrapper , this , true );
 	if ( !ThreadObject->GetHandle( ) || ThreadObject->GetHandle( ) == INVALID_HANDLE_VALUE ) {
@@ -17,6 +23,7 @@ void ThreadHolder::reset( ) {
 }
 
 void ThreadHolder::threadFunctionWrapper( LPVOID instance ) {
+	// static_cast< ThreadHolder * >( instance )->waitOtherThreads( );
 	static_cast< ThreadHolder * >( instance )->threadFunction( );
 }
 
@@ -26,7 +33,7 @@ void ThreadHolder::stop( ) {
 	}
 }
 
-std::string ThreadHolder::StatusToString(THREAD_STATUS status ) {
+std::string ThreadHolder::StatusToString( THREAD_STATUS status ) {
 
 	switch ( status ) {
 	case THREAD_STATUS::INITIALIZATION_FAILED:
@@ -61,7 +68,41 @@ std::string ThreadHolder::GetThreadName( THREADS thread ) {
 	return  xorstr_( "undefined" );
 }
 
+void ThreadHolder::initializeThreadWaiter( ) {
+	while ( threadsReady.size( ) < NO_THREAD - 1 ) {
+		threadsReady.emplace_back( false );
+	}
+}
 
+void ThreadHolder::waitOtherThreads( ) {
+	{
+		std::lock_guard<std::mutex> lock( threadReadyMutex );
+		threadsReady.at( this->getThreaID( ) ) = true;
+		LogSystem::Get( ).ConsoleLog( ( MODULE_SENDER ) this->getThreaID( ) , xorstr_( "ready!" ) , WHITE );
+	}
+
+	while ( true ) {
+		std::vector<bool> localthreadsReady;
+		{
+			std::lock_guard<std::mutex> lock( threadReadyMutex );
+			localthreadsReady = threadsReady;
+		}
+
+		bool found = false;
+
+		for ( int i = 0; i < localthreadsReady.size( ); i++ ) {
+			if ( !localthreadsReady.at( i ) ) {
+				LogSystem::Get( ).ConsoleLog( (MODULE_SENDER)this->getThreaID( ) , xorstr_( "Waiting for " ) + GetThreadName( ( THREADS ) i ) + xorstr_( " thread!" ) , GRAY );
+				found = true;
+				break;
+			}
+		}
+
+		if ( !found ) {
+			break;
+		}
+	}
+}
 
 THREAD_STATUS ThreadHolder::isRunning( ) {
 

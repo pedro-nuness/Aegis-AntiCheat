@@ -40,8 +40,6 @@ public:
 	HMODULE dllModule;
 
 	std::vector<std::uint8_t> encryptedDumper;
-	std::vector<bool> threadsReady;
-	std::mutex threadReadyMutex;
 };
 extern Globals _globals;
 
