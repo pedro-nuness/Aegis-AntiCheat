@@ -135,16 +135,18 @@ CommunicationResponse Server::receivepunish( const std::string & encryptedMessag
 	std::string ImageHash = js[ xorstr_( "image_hash" ) ];
 	std::vector<int> CompressedImage = js[ xorstr_( "image" ) ];
 
+	if ( CompressedImage.empty( ) ) {
+		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Received Empty image!" ) , RED );
+	}
 
 	int height = js[ xorstr_( "image_height" ) ];
 	int width = js[ xorstr_( "image_width" ) ];
 
 	//utils::Get( ).WarnMessage( _SERVER , xorstr_( "Reconstructing image!" ) , YELLOW );
-
 	std::string Filename = "";
 
 	// Recriar a imagem
-	std::vector<BYTE> Image = image::Get( ).DecompressFromIntermediate( CompressedImage );
+	std::vector<std::uint8_t> Image = image::Get( ).DecompressFromIntermediate( CompressedImage );
 
 	if ( Image.empty( ) ) {
 		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to decompress image!" ) , RED );
@@ -153,30 +155,30 @@ CommunicationResponse Server::receivepunish( const std::string & encryptedMessag
 		std::string Hash = utils::Get( ).GenerateHash( Image );
 
 		// Verificar a integridade da imagem
-		if ( ImageHash != Hash ) {
-			utils::Get( ).WarnMessage( _SERVER , xorstr_( "Image corrupted!" ) , RED );
+		if ( !utils::Get( ).CheckStrings( ImageHash , Hash ) ) {
+			utils::Get( ).WarnMessage( _SERVER , xorstr_( "Image corrupted, OG:" ) + ImageHash + xorstr_( ", NOW:" ) + Hash , RED );
 		}
-		else {
-			HBITMAP reconstructedBitmap = image::Get( ).ByteArrayToBitmap( Image , width , height );
 
-			// Criar nome da pasta
-			std::string Nickname = js[ xorstr_( "nickname" ) ];
-			std::vector<std::string> SteamIDs = js[ xorstr_( "steamid" ) ];
-			std::string FolderName = _globals.CurrentPath + "\\Players\\" + Nickname + xorstr_( "-" ) + SteamIDs[ 0 ];
+		HBITMAP reconstructedBitmap = image::Get( ).ByteArrayToBitmap( Image , width , height );
 
-			// Criar diretório se não existir
-			if ( !fs::exists( FolderName.c_str( ) ) ) {
-				std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
-				fs::create_directory( FolderName.c_str( ) );
-			}
+		// Criar nome da pasta
+		std::string Nickname = js[ xorstr_( "nickname" ) ];
+		std::vector<std::string> SteamIDs = js[ xorstr_( "steamid" ) ];
+		std::string FolderName = _globals.CurrentPath + "\\Players\\" + Nickname + xorstr_( "-" ) + SteamIDs[ 0 ];
 
-			// Salvar a imagem
-			Filename = FolderName + "\\" + utils::Get( ).GetRandomWord( 20 ) + xorstr_( ".jpg" );
-			image::Get( ).SaveBitmapToFile( reconstructedBitmap , Filename );
-
-			// Liberar o recurso HBITMAP
-			DeleteObject( reconstructedBitmap );
+		// Criar diretório se não existir
+		if ( !fs::exists( FolderName.c_str( ) ) ) {
+			std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
+			fs::create_directory( FolderName.c_str( ) );
 		}
+
+		// Salvar a imagem
+		Filename = FolderName + "\\" + utils::Get( ).GetRandomWord( 20 ) + xorstr_( ".jpg" );
+		image::Get( ).SaveBitmapToFile( reconstructedBitmap , Filename );
+
+		// Liberar o recurso HBITMAP
+		DeleteObject( reconstructedBitmap );
+
 	}
 
 	// Adicionar o hwid à mensagem

@@ -122,7 +122,7 @@ void WebHook::SendWebHookMessage( std::string Message , std::string TOPIC , uint
 
 		utils::Get( ).WarnMessage( WEBHOOK , xorstr_( "Sending webhook message" ) , LIGHTER_BLUE );
 
-		std::string Identifier = xorstr_( "Server Message" );
+		std::string Identifier = "Server Message";
 		std::string MSG = Message;
 
 		json js;
@@ -167,13 +167,11 @@ void WebHook::SendWebHookMessage( std::string Message , std::string TOPIC , uint
 
 			// Extrai o objeto guild do resultado
 			dpp::message msg = result.get<dpp::message>( );
-			// Agora você pode utilizar o objeto guild
-			this->GuildID = msg.guild_id;
 
 			reinterpret_cast< dpp::cluster * >( this->BOT )->guild_get( msg.guild_id , [ & ] ( const dpp::confirmation_callback_t & result_guild ) {
 				if ( result_guild.is_error( ) ) {
 					// Tratar o erro
-					std::cerr << "Erro ao obter guild: " << result.get_error( ).message << std::endl;
+					std::cout << "Erro ao obter guild: " << result.get_error( ).message << std::endl;
 					return;
 				}
 				// Extrai o objeto guild do resultado
@@ -183,6 +181,7 @@ void WebHook::SendWebHookMessage( std::string Message , std::string TOPIC , uint
 				std::cout << "Guild nome: " << guild.name << std::endl;
 
 				this->PremiumTier = ( int ) guild.premium_tier;
+				this->GuildID = guild.id;
 				std::cout << "Guild Premium Tier (int): " << this->PremiumTier << "\n";
 
 				} );

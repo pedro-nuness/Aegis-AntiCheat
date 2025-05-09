@@ -1,9 +1,15 @@
 #pragma once
 #include "../Utils/singleton.h"
 
+
 class Preventions : public CSingleton<Preventions>
 {
-	bool EnableApiHooks( );
+
+
+
+public:
+
+	bool EnableApiHooks( bool Log = false);
 	bool RestrictProcessAccess( );
 	bool RandomizeModuleName( );
 	bool RemapProgramSections( );
@@ -12,7 +18,8 @@ class Preventions : public CSingleton<Preventions>
 	bool PreventThreadCreation( );
 	bool StopAPCInjection( );
 	bool DeployDllLoadNotifation( );
-public:
-	int Deploy( );
+
+	bool DeployFirstBarrier( );
+	bool DeployLastBarrier( );
 };
 

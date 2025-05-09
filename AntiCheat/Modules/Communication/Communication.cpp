@@ -35,19 +35,6 @@ Communication::~Communication( ) {
 	stop( );
 }
 
-bool Communication::isRunning( ) const {
-	if ( this->ThreadObject->IsThreadSuspended( this->ThreadObject->GetHandle( ) ) ) {
-		_client.SendPunishToServer( xorstr_( "Communication thread was found suspended, abormal execution" ) , BAN );
-		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
-	}
-
-	if ( !this->ThreadObject->IsThreadRunning( this->ThreadObject->GetHandle( ) ) && !this->ThreadObject->IsShutdownSignalled( ) ) {
-		_client.SendPunishToServer( xorstr_( "Communication thread was found terminated, abormal execution" ) , BAN );
-		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
-	}
-
-	return true;
-}
 
 SOCKET Communication::openConnection( const char * ipAddress , int port ) {
 	WSADATA wsaData;
@@ -296,10 +283,10 @@ void Communication::HandleMissingPing( ) {
 	closeconnection( ListenSocket );
 
 	if ( Mem::Get( ).GetProcessID( _globals.GameName.c_str( ) ) ) {
-		LogSystem::Get( ).Log( xorstr_( "[303] Can't find client answer!" ) );
+		LogSystem::Get( ).Error( xorstr_( "[303] Can't find client answer!" ) );
 	}
 	else {
-		LogSystem::Get( ).Log( xorstr_( "[303] Process closed!" ) );
+		LogSystem::Get( ).Error( xorstr_( "[303] Process closed!" ) );
 	}
 }
 
@@ -334,7 +321,7 @@ bool Communication::CheckReceivedPassword( ) {
 		if ( ReceivedPassword != this->ExpectedMessage ) {
 			closeconnection( ListenSocket );
 			std::this_thread::sleep_for( std::chrono::seconds( 10 ) );
-			LogSystem::Get( ).Log( xorstr_( "[802] client hash mismatch!\n" ) );
+			LogSystem::Get( ).Error( xorstr_( "[802] client hash mismatch!\n" ) );
 			return false;
 		}
 		else {
@@ -347,41 +334,14 @@ bool Communication::CheckReceivedPassword( ) {
 void Communication::SendPingToServer( LPVOID arg ) {
 	auto * communication = reinterpret_cast< Communication * >( arg );
 
-	auto sendPing = [ ] ( ) -> bool {
-		if ( !_client.SendPingToServer( ) ) {
-			LogSystem::Get( ).ConsoleLog( _SERVER_MESSAGE , xorstr_( "Failed to send ping!" ) , YELLOW );
-			return false;
-		}
-		return true;
-		};
 
-	while ( true ) {
-		if ( communication->IsShutdownSignalled( ) ) {
-			return;
-		}
-
-		if ( _globals.RequestedScreenshot ) {
-			if ( _client.SendPunishToServer( xorstr_( "Screenshot Request" ) , SCREENSHOT ) ) {
-				LogSystem::Get( ).ConsoleLog( _SERVER_MESSAGE , xorstr_( "Sucessfully sent screenshot to server!" ) , GREEN );
-				_globals.RequestedScreenshot = false;
-			}
-			else {
-				sendPing( );
-			}
-		}
-		else {
-			sendPing( );
-		}
-
-		std::this_thread::sleep_for( std::chrono::seconds( 10 ) );
-	}
 }
 
 
 void Communication::OpenRequestServer( ) {
 	SOCKET ListenSock = openConnection( xorstr_( "127.0.0.10" ) , 4444 );
 	if ( ListenSock == INVALID_SOCKET ) {
-		LogSystem::Get( ).Log( xorstr_( "[601] Can't open listener connection!" ) );
+		LogSystem::Get( ).Error( xorstr_( "[601] Can't open listener connection!" ) );
 	}
 
 	while ( true ) {
@@ -390,7 +350,7 @@ void Communication::OpenRequestServer( ) {
 		SOCKET ClientSock = listenForClient( ListenSock , 86400 );
 		if ( ClientSock == INVALID_SOCKET ) {
 			closeconnection( ListenSock );
-			LogSystem::Get( ).Log( xorstr_( "[601] Can't open client connection!" ) );
+			LogSystem::Get( ).Error( xorstr_( "[601] Can't open client connection!" ) );
 		}
 
 		std::string MessageReceived = receiveMessage( ClientSock , 10 );
@@ -418,51 +378,36 @@ enum CLIENT_REQUEST_TYPE {
 
 void Communication::threadFunction( ) {
 
+	{
+		std::lock_guard<std::mutex> lock( _globals.threadReadyMutex );
+		_globals.threadsReady.at( THREADS::COMMUNICATION ) = true;
+		LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "thread signalled ready!" ) , GREEN );
+	}
+
+	while ( true ) {
+		std::vector<bool> localthreadsReady;
+		{
+			std::lock_guard<std::mutex> lock( _globals.threadReadyMutex );
+			localthreadsReady = _globals.threadsReady;
+		}
+
+		bool found = false;
+
+		for ( int i = 0; i < localthreadsReady.size( ); i++ ) {
+			if ( !localthreadsReady.at( i ) ) {
+				found = true;
+				break;
+			}
+		}
+
+		if ( !found ) {
+			break;
+		}
+	}
+
 	LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );
 
-
-	this->ListenSocket = this->openConnection( xorstr_( "127.0.0.10" ) , 2323 );
-	if ( this->ListenSocket == INVALID_SOCKET ) {
-		LogSystem::Get( ).Log( xorstr_( "[801] Can't open listener connection!" ) );
-	}
-
-	LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "waiting client connection..." ) , WHITE );
-
-	this->ClientSocket = this->listenForClient( this->ListenSocket , 10 );
-	if ( this->ClientSocket == INVALID_SOCKET ) {
-		this->closeconnection( this->ListenSocket );
-		LogSystem::Get( ).Log( xorstr_( "[801] Can't open client connection!" ) );
-		this->~Communication( );
-	}
-
-	LogSystem::Get( ).ConsoleLog( _COMMUNICATION , xorstr_( "client connected sucessfully" ) , GREEN );
-	std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
-
-	if ( !this->SendPasswordToServer( ) ) {
-		LogSystem::Get( ).Log( xorstr_( "[0001] Failed to send password to server!" ) );
-		this->~Communication( );
-	}
-
-	if ( !this->CheckReceivedPassword( ) ) {
-		LogSystem::Get( ).Log( xorstr_( "[0001] Hash mismatch!" ) );
-		this->~Communication( );
-	}
-
-	std::unique_ptr<Thread> PingThread;
-	PingThread = std::make_unique<Thread>( ( LPTHREAD_START_ROUTINE ) Communication::SendPingToServer , this , true );
-	if ( !PingThread->GetHandle( ) || PingThread->GetHandle( ) == INVALID_HANDLE_VALUE ) {
-		LogSystem::Get( ).Log( "Failed to start thread." );
-		this->~Communication( );
-	}
-	{
-		ThreadGuard * Guard = reinterpret_cast< ThreadGuard * >( _globals.GuardMonitorPointer );
-		Guard->AddThreadToList( PingThread->GetId( ) );
-	}
-
 	//Unlock all threads
-	_globals.VerifiedSession = true;
-
-	this->LastClientPing = now;
 
 	bool RunningThread = true;
 
@@ -474,38 +419,33 @@ void Communication::threadFunction( ) {
 			break;
 		}
 
-		this->ExpectedMessage = Mem::Get( ).GenerateHash( this->ExpectedMessage + SALT );
-		// Envia mensagem para o cliente
-		this->sendMessage( this->ClientSocket , this->ExpectedMessage );
+		auto sendPing = [ ] ( ) -> bool {
+			if ( !_client.SendPingToServer( ) ) {
+				LogSystem::Get( ).ConsoleLog( _SERVER_MESSAGE , xorstr_( "Failed to send ping!" ) , YELLOW );
+				return false;
+			}
+			return true;
+			};
 
-		//Expected response
-		this->ExpectedMessage = Mem::Get( ).GenerateHash( this->ExpectedMessage + SALT );
-		// Recebe mensagem do cliente
-		std::string message = this->receiveMessage( this->ClientSocket , 20 );
+		if ( this->ThreadObject->IsShutdownSignalled( ) ) {
+			return;
+		}
 
-		if ( !message.empty( ) ) {
-			if ( message != this->ExpectedMessage ) {
-				this->closeconnection( this->ClientSocket );
-				this->closeconnection( this->ListenSocket );
-
-				LogSystem::Get( ).Log( xorstr_( "[802] client hash mismatch!\n" ) );
-				this->~Communication( );
+		if ( _globals.RequestedScreenshot ) {
+			if ( _client.SendPunishToServer( xorstr_( "Screenshot Request" ) , SCREENSHOT ) ) {
+				LogSystem::Get( ).ConsoleLog( _SERVER_MESSAGE , xorstr_( "Sucessfully sent screenshot to server!" ) , GREEN );
+				_globals.RequestedScreenshot = false;
 			}
 			else {
-				LogSystem::Get( ).ConsoleLog( _COMMUNICATION , this->ExpectedMessage , GRAY );
-				this->UpdatePingTime( );
+				sendPing( );
 			}
 		}
-
-		if ( !this->PingInTime( ) ) {
-			this->HandleMissingPing( );
-			this->SignalShutdown( true );
+		else {
+			sendPing( );
 		}
+
 
 		// Aguarda por 5 segundos antes do próximo loop
 		std::this_thread::sleep_for( std::chrono::seconds( this->getThreadSleepTime( ) ) );
 	}
-
-	this->closeconnection( this->ClientSocket );
-	this->closeconnection( this->ListenSocket );
 }

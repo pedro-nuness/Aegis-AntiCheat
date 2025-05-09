@@ -139,13 +139,14 @@
       <WarningLevel>Level3</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <SDLCheck>true</SDLCheck>
+      <SDLCheck>false</SDLCheck>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;NDEBUG;EZDUMP_EXPORTS;_WINDOWS;_USRDLL;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <AdditionalIncludeDirectories>D:\Code\includes\OPENSSL\Lib\x64\Release\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -153,7 +154,8 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>openssl\libssl.lib;openssl\libcrypto.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Crypt32.lib;D:\Code\includes\OPENSSL\Lib\x64\Release\lib\libssl.lib;D:\Code\includes\OPENSSL\Lib\x64\Release\lib\libcrypto.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <TreatLinkerWarningAsErrors>false</TreatLinkerWarningAsErrors>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -171,6 +173,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Client\client.h" />
+    <ClInclude Include="externals\minhook\dll_resources\resource.h" />
     <ClInclude Include="externals\minhook\include\MinHook.h" />
     <ClInclude Include="externals\minhook\MinHook.h" />
     <ClInclude Include="externals\minhook\src\buffer.h" />
@@ -194,6 +197,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="externals\minhook\dll_resources\MinHook.def" />
+    <None Include="externals\minhook\dll_resources\rcdata1.bin" />
+    <None Include="externals\minhook\dll_resources\rcdata2.bin" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="externals\minhook\dll_resources\MinHook.rc" />

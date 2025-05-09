@@ -1,0 +1,11 @@
+﻿D:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppBuild.targets(1119,5): warning MSB8027: Dois ou mais arquivos com o nome File.cpp produzirão saídas para o mesmo local. Isso pode levar a um resultado de compilação incorreto. Os arquivos envolvidos são Systems\LogSystem\File\File.cpp, Utils\File\File.cpp.
+  main.cpp
+x64\Release\File.obj : warning LNK4042: objeto especificado mais de uma vez; extras ignorados
+  Gerando código
+  57 of 469 functions (12.2%) were compiled, the rest were copied from previous compilation.
+    14 functions were new in current compilation
+    25 functions had inline decision re-evaluated but remain unchanged
+  Finalizada a geração de código
+libcrypto.lib(libcrypto-lib-aes-gcm-avx512.obj) : warning LNK4209: informação de depuração corrompida; recompile módulo; vinculação de objeto quando sem informação de depuração
+libcrypto.lib(libcrypto-lib-aes-gcm-avx512.obj) : warning LNK4209: informação de depuração corrompida; recompile módulo; vinculação de objeto quando sem informação de depuração
+  AegisStarter.vcxproj -> D:\Code\Projects\Software\Aegis-AntiCheat\x64\Release\AegisStarter.exe

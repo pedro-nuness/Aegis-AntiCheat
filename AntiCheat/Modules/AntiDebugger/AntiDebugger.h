@@ -21,7 +21,5 @@ public:
 	AntiDebugger( );
 	~AntiDebugger( );
 
-
-	bool isRunning( ) const override;
 };
 

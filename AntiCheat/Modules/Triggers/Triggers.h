@@ -40,14 +40,14 @@ class Triggers : public ThreadHolder {
 	void threadFunction( ) override;
 
 public:
-	Triggers ( DWORD _MomProcess , DWORD _ProtectProcess ) {
+	Triggers ( DWORD _MomProcess , DWORD _ProtectProcess ) 
+		: ThreadHolder( THREADS::TRIGGERS )
+	{
 		SetupFiles( );
 		this->MomProcess = _MomProcess;
 		this->ProtectProcess = _ProtectProcess;
 	}
 
 	~Triggers( );
-
-	bool isRunning( ) const override;
 };
 

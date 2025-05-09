@@ -19,6 +19,8 @@ public:
 	
 	char * GenerateRandomString( int length ); //make sure to delete[] memory after
 	wchar_t * GenerateRandomWString( int length ); //make sure to delete[] memory after
+
+	void waitModule( std::string ModuleName );
 	
 
 	bool encryptMessage( const std::string & plaintext , std::string & ciphertext , const std::string & key , const std::string & iv );

@@ -59,12 +59,15 @@ CryptedString CachedVersionID;
 bool hardware::GenerateInitialCache( ) {
 	//before preventions deployment
 	if ( !GetMotherboardSerialNumber( nullptr ) ) {
+		LogSystem::Get( ).ConsoleLog( _HWID, xorstr_( "Failed to get motherboard serial" ), RED);
 		return false;
 	}
 	if ( !GetDiskSerialNumber( nullptr ) ) {
+		LogSystem::Get( ).ConsoleLog( _HWID,  xorstr_( "Failed to get disk serial" ), RED );
 		return false;
 	}
 	if ( !GetIp( nullptr ) ) {
+		LogSystem::Get( ).ConsoleLog( _HWID, xorstr_( "Failed to get ip" ), RED );
 		return false;
 	}
 
@@ -184,12 +187,12 @@ bool hardware::GetVersionUID( std::string * buffer ) {
 		if ( ParentVersionID.empty( ) )
 			return false;
 
-		std::string GameVersionID = Mem::Get( ).GetFileHash( Mem::Get( ).GetProcessExecutablePath( _globals.ProtectProcess ) );
+		//std::string GameVersionID = Mem::Get( ).GetFileHash( Mem::Get( ).GetProcessExecutablePath( _globals.ProtectProcess ) );
 
-		if ( GameVersionID.empty( ) )
-			return false;
+		//if ( GameVersionID.empty( ) )
+		//	return false;
 
-		std::string FinalVersionID = Mem::Get( ).GenerateHash( AntiCheatVersionID + ParentVersionID + GameVersionID );
+		std::string FinalVersionID = Mem::Get( ).GenerateHash( ParentVersionID + AntiCheatVersionID  );
 
 		if ( FinalVersionID.empty( ) )
 			return false;
@@ -360,11 +363,13 @@ std::vector<std::string> hardware::getMacAddress( ) {
 bool hardware::GetIp( std::string * Buffer ) {
 	if ( CachedIp.EncryptedString.empty( ) ) {
 
-		std::string Ip = Utils::Get( ).DownloadString( xorstr_( "https://httpbin.org/ip" ) );
+		std::string Ip = Utils::Get( ).DownloadString( xorstr_( "http://ip-api.com/json/" ) );
 		if ( Ip.empty( ) ) {
 			LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to request ip address from url!" ) , RED );
 			return false;
 		}
+
+		LogSystem::Get( ).ConsoleLog( _HWID, Ip, WHITE );
 
 		json js;
 		try {
@@ -375,15 +380,15 @@ bool hardware::GetIp( std::string * Buffer ) {
 			return false;
 		}
 
-		if ( !js.contains( xorstr_( "origin" ) ) ) {
+		if ( !js.contains( xorstr_( "query" ) ) ) {
 			LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Failed to get ip json value!" ) , RED );
 			return false;
 		}
 
-		CachedIp = StringCrypt::Get( ).EncryptString( js[ xorstr_( "origin" ) ] );
+		CachedIp = StringCrypt::Get( ).EncryptString( js[ xorstr_( "query" ) ] );
 
 		if ( Buffer != nullptr ) {
-			*Buffer = js[ xorstr_( "origin" ) ];
+			*Buffer = js[ xorstr_( "query" ) ];
 		}
 
 		return true;

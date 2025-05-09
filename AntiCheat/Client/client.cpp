@@ -502,7 +502,7 @@ bool client::SendPingToServer( ) {
 		if ( GetIV( ).empty( ) ) {
 
 			if ( GetSessionID( ).empty( ) ) {
-				LogSystem::Get( ).Log( xorstr_( "[03] Session ID is empty" ) );
+				LogSystem::Get( ).Error( xorstr_( "[03] Session ID is empty" ) );
 				return false;
 			}
 
@@ -537,7 +537,7 @@ bool client::SendPingToServer( ) {
 			break;
 		case RECEIVE_BANNED:
 			LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "You have been banned!" ) , RED );
-			LogSystem::Get( ).LogWithMessageBox( xorstr_( "Server denied ping" ) , xorstr_( "You have been banned!" ) );
+			LogSystem::Get( ).MessageBoxError( xorstr_( "Server denied ping" ) , xorstr_( "You have been banned!" ) );
 			return false;
 			break;
 
@@ -563,7 +563,7 @@ bool client::SendPingToServer( ) {
 			break;
 
 		case RECEIVE_INVALIDSESSION:
-			LogSystem::Get( ).LogWithMessageBox( xorstr_( "Unverified Session" ) , xorstr_( "Can't verify session integrity" ) );
+			LogSystem::Get( ).MessageBoxError( xorstr_( "Unverified Session" ) , xorstr_( "Can't verify session integrity" ) );
 			return false;
 			break;
 

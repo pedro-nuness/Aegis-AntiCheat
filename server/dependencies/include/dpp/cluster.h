@@ -25,6 +25,7 @@
 #include <string>
 #include <map>
 #include <variant>
+#include <thread>
 #include <dpp/snowflake.h>
 #include <dpp/dispatcher.h>
 #include <dpp/misc-enum.h>
@@ -40,7 +41,6 @@
 #include <dpp/cache.h>
 #include <dpp/intents.h>
 #include <dpp/discordevents.h>
-#include <dpp/sync.h>
 #include <algorithm>
 #include <iostream>
 #include <shared_mutex>
@@ -48,8 +48,17 @@
 #include <dpp/restresults.h>
 #include <dpp/event_router.h>
 #include <dpp/coro/async.h>
+#include <dpp/socketengine.h>
 
 namespace dpp {
+
+/**
+ * @brief Pass this value into the constructor of dpp::cluster for the shard count to create a cluster with no shards.
+ * A cluster with no shards does not connect to a websocket, but can still use the event loop to dispatch HTTPS API
+ * requests to Discord. This is useful for bots that do not need to receive websocket events as it will save a lot of
+ * resources.
+ */
+constexpr uint32_t NO_SHARDS = ~0U;
 
 /**
  * @brief Types of startup for cluster::start()
@@ -124,12 +133,17 @@ class DPP_EXPORT cluster {
 	shard_list shards;
 
 	/**
-	 * @brief List of all active registered timers
+	 * @brief List of shards waiting for reconnection
 	 */
-	timer_reg_t timer_list;
+	reconnect_list reconnections;
 
 	/**
-	 * @brief List of timers by time
+	 * @brief Ephemeral list of deleted timer ids
+	 */
+	timers_deleted_t deleted_timers;
+
+	/**
+	 * @brief Priority queue of of timers by time
 	 */
 	timer_next_t next_timer;
 
@@ -143,7 +157,7 @@ class DPP_EXPORT cluster {
 	 */
 	using slashcommand_handler_t = std::function<void(const slashcommand_t &)>;
 
-#ifdef DPP_CORO
+#ifndef DPP_NO_CORO
 	/**
 	 * @brief Typedef for coroutines based slashcommand handler type
 	 */
@@ -164,18 +178,35 @@ class DPP_EXPORT cluster {
 	 */
 	std::map<std::string,slashcommand_handler_t> named_commands;
 #endif
+	/**
+	 * @brief Thread pool
+	 */
+	std::unique_ptr<thread_pool> pool{nullptr};
 
 	/**
-	 * @brief Tick active timers
+	 * @brief Used to spawn the socket engine into its own thread if
+	 * the cluster is started with dpp::st_return. It is unused otherwise.
 	 */
-	void tick_timers();
+	std::thread engine_thread;
 
 	/**
-	 * @brief Reschedule a timer for its next tick
-	 * 
-	 * @param t Timer to reschedule
+	 * @brief Protection mutex for timers
 	 */
-	void timer_reschedule(timer_t* t);
+	std::mutex timer_guard;
+
+	/**
+	 * @brief Webhook server if enabled
+	 */
+	struct discord_webhook_server* webhook_server{nullptr};
+
+	/**
+	 * @brief Mark a shard as requiring reconnection.
+	 * Destructs the old shard in 5 seconds and creates a new one attempting to resume.
+	 *
+	 * @param shard_id Shard ID
+	 */
+	void add_reconnect(uint32_t shard_id);
+
 public:
 	/**
 	 * @brief Current bot token for all shards on this cluster and all commands sent via HTTP
@@ -230,14 +261,33 @@ public:
 	websocket_protocol_t ws_mode;
 
 	/**
-	 * @brief Condition variable notified when the cluster is terminating.
+	 * @brief Atomic bool to set to true when the cluster is terminating.
+	 *
+	 * D++ itself does not set this value, it is for library users to set if they want
+	 * the cluster to terminate outside of a flow where they may have simple access to
+	 * destruct the cluster object.
 	 */
-	std::condition_variable terminating;
+	std::atomic_bool terminating{false};
 
 	/**
 	 * @brief The time (in seconds) that a request is allowed to take.
 	 */
-	uint16_t request_timeout = 20;
+	uint16_t request_timeout = 60;
+
+	/**
+	 * @brief Socket engine instance
+	 */
+	std::unique_ptr<socket_engine_base> socketengine;
+
+	/**
+	 * @brief Constructor for creating a cluster without a token.
+	 * A cluster created without a token has no shards, and just runs the event loop. You can use this to make asynchronous
+	 * HTTP requests via e.g. dpp::cluster::request without having to connect to a websocket to receive shard events.
+	 * @param pool_threads The number of threads to allocate for the thread pool. This defaults to half your system concurrency and if set to a number less than 4, will default to 4.
+	 * All callbacks and events are placed into the thread pool. The bigger you make this pool (but generally no bigger than your number of cores), the more your bot will scale.
+	 * @throw dpp::exception Thrown on windows, if WinSock fails to initialise, or on any other system if a dpp::request_queue fails to construct
+	 */
+	explicit cluster(uint32_t pool_threads = std::thread::hardware_concurrency() / 2);
 
 	/**
 	 * @brief Constructor for creating a cluster. All but the token are optional.
@@ -249,11 +299,34 @@ public:
 	 * @param maxclusters The total number of clusters that are active, which may be on separate processes or even separate machines.
 	 * @param compressed Whether or not to use compression for shards on this cluster. Saves a ton of bandwidth at the cost of some CPU
 	 * @param policy Set the caching policy for the cluster, either lazy (only cache users/members when they message the bot) or aggressive (request whole member lists on seeing new guilds too)
-	 * @param request_threads The number of threads to allocate for making HTTP requests to Discord. This defaults to 12. You can increase this at runtime via the object returned from get_rest().
-	 * @param request_threads_raw The number of threads to allocate for making HTTP requests to sites outside of Discord. This defaults to 1. You can increase this at runtime via the object returned from get_raw_rest().
+	 * @param pool_threads The number of threads to allocate for the thread pool. This defaults to half your system concurrency and if set to a number less than 4, will default to 4.
+	 * All callbacks and events are placed into the thread pool. The bigger you make this pool (but generally no bigger than your number of cores), the more your bot will scale.
 	 * @throw dpp::exception Thrown on windows, if WinSock fails to initialise, or on any other system if a dpp::request_queue fails to construct
 	 */
-	cluster(const std::string& token, uint32_t intents = i_default_intents, uint32_t shards = 0, uint32_t cluster_id = 0, uint32_t maxclusters = 1, bool compressed = true, cache_policy_t policy = cache_policy::cpol_default, uint32_t request_threads = 12, uint32_t request_threads_raw = 1);
+	cluster(const std::string& token, uint32_t intents = i_default_intents, uint32_t shards = 0, uint32_t cluster_id = 0, uint32_t maxclusters = 1, bool compressed = true, cache_policy_t policy = cache_policy::cpol_default, uint32_t pool_threads = std::thread::hardware_concurrency() / 2);
+
+	/**
+	 * @brief Create a webhook server for receiving interactions
+	 * @note This should be considered mutually exclusive with delivery of interaction events via shards.
+	 * @param discord_public_key Public key for the application from the application dashboard page
+	 * @param address address to bind to, use "0.0.0.0" to bind to all local addresses
+	 * @param port port to bind to. You should generally use a port > 1024.
+	 * @param ssl_private_key Private key PEM file for HTTPS/SSL. If empty, a plaintext server is created
+	 * @param ssl_public_key Public key PEM file for HTTPS/SSL. If empty, a plaintext server is created
+	 */
+	cluster& enable_webhook_server(const std::string& discord_public_key, const std::string_view address, uint16_t port,  const std::string& ssl_private_key = "", const std::string& ssl_public_key = "");
+
+	/**
+	 * @brief Place some arbitrary work into the thread pool for execution when time permits.
+	 *
+	 * Work units are fetched into threads on the thread pool from the queue in order of priority,
+	 * lowest numeric values first. Low numeric values should be reserved for API replies from Discord,
+	 * guild creation events, etc.
+	 *
+	 * @param priority Priority of the work unit
+	 * @param task Task to queue
+	 */
+	void queue_work(int priority, work_unit task);
 
 	/**
 	 * @brief dpp::cluster is non-copyable
@@ -309,6 +382,11 @@ public:
 	 * @throw dpp::logic_exception If called after the cluster is started (this is not supported)
 	 */
 	cluster& set_websocket_protocol(websocket_protocol_t mode);
+
+	/**
+	 * @brief Tick active timers
+	 */
+	void tick_timers();
 
 	/**
 	 * @brief Set the audit log reason for the next REST call to be made.
@@ -383,6 +461,33 @@ public:
 	 */
 	timer start_timer(timer_callback_t on_tick, uint64_t frequency, timer_callback_t on_stop = {});
 
+#ifndef DPP_NO_CORO
+	/**
+	 * @brief Start a coroutine timer. Every `frequency` seconds, the callback is called.
+	 * 
+	 * @param on_tick The callback lambda to call for this timer when ticked
+	 * @param on_stop The callback lambda to call for this timer when it is stopped
+	 * @param frequency How often to tick the timer in seconds
+	 * @return timer A handle to the timer, used to remove that timer later
+	 */
+	template <std::invocable<timer> T, std::invocable<timer> U = std::function<void(timer)>>
+	requires (dpp::awaitable_type<typename std::invoke_result<T, timer>::type>)
+	timer start_timer(T&& on_tick, uint64_t frequency, U&& on_stop = {}) {
+		std::function<void(timer)> ticker = [fun = std::forward<T>(on_tick)](timer t) mutable -> dpp::job {
+			co_await std::invoke(fun, t);
+		};
+		std::function<void(timer)> stopper;
+		if constexpr (dpp::awaitable_type<typename std::invoke_result<U, timer>::type>) {
+			stopper = [fun = std::forward<U>(on_stop)](timer t) mutable -> dpp::job {
+				co_await std::invoke(fun, t);
+			};
+		} else {
+			stopper = std::forward<U>(on_stop);
+		}
+		return start_timer(std::move(ticker), frequency, std::move(stopper));
+	}
+#endif
+
 	/**
 	 * @brief Stop a ticking timer
 	 * 
@@ -392,7 +497,7 @@ public:
 	 */
 	bool stop_timer(timer t);
 
-#ifdef DPP_CORO
+#ifndef DPP_NO_CORO
 	/**
 	 * @brief Get an awaitable to wait a certain amount of seconds. Use the co_await keyword on its return value to suspend the coroutine until the timer ends
 	 *
@@ -433,7 +538,7 @@ public:
 	 *
 	 * @param return_after If true the bot will return to your program after starting shards, if false this function will never return.
 	 */
-	void start(bool return_after = true);
+	void start(start_type return_after = st_wait);
 
 	/**
 	 * @brief Set the presence for all shards on the cluster
@@ -479,7 +584,15 @@ public:
 	 */
 	bool register_command(const std::string& name, const slashcommand_handler_t handler);
 
-#ifdef DPP_CORO
+	/**
+	 * @brief Get the number of currently active HTTP(S) requests active in the cluster.
+	 * This total includes all in-flight API requests and calls to dpp::cluster::request().
+	 * Note that once a request is passed to the thread pool it is no longer counted here.
+	 * @return Total active request count
+	 */
+	size_t active_requests();
+
+#ifndef DPP_NO_CORO
 	/**
 	 * @brief Register a coroutine-based slash command handler.
 	 *
@@ -558,6 +671,14 @@ public:
 	 * The function signature for this event takes a single `const` reference of type log_t&, and returns void.
 	 */
 	event_router_t<log_t> on_log;
+
+	/**
+	 * @brief Called when a file descriptor is removed from the socket engine
+	 *
+	 * @note Use operator() to attach a lambda to this event, and the detach method to detach the listener using the returned ID.
+	 * The function signature for this event takes a single `const` reference of type socket_close_t&, and returns void.
+	 */
+	event_router_t<socket_close_t> on_socket_close;
 
 	/**
 	 * @brief on guild join request delete.
@@ -1487,9 +1608,8 @@ public:
 	 * @param mimetype MIME type of POST data
 	 * @param headers Headers to send with the request
 	 * @param protocol HTTP protocol to use (1.1 and 1.0 are supported)
-	 * @param request_timeout How many seconds before the connection is considered failed if not finished
 	 */
-	void request(const std::string &url, http_method method, http_completion_event callback, const std::string &postdata = "", const std::string &mimetype = "text/plain", const std::multimap<std::string, std::string> &headers = {}, const std::string &protocol = "1.1", time_t request_timeout = 5);
+	void request(const std::string &url, http_method method, http_completion_event callback, const std::string &postdata = "", const std::string &mimetype = "text/plain", const std::multimap<std::string, std::string> &headers = {}, const std::string &protocol = "1.1");
 
 	/**
 	 * @brief Respond to a slash command
@@ -2170,8 +2290,8 @@ public:
 	 * @note This method supports audit log reasons set by the cluster::set_audit_reason() method.
 	 * @param c Channel to set permissions for
 	 * @param overwrite_id Overwrite to change (a user or role ID)
-	 * @param allow allow permissions bitmask
-	 * @param deny deny permissions bitmask
+	 * @param allow Bitmask of allowed permissions (refer to enum dpp::permissions)
+	 * @param deny Bitmask of denied permissions (refer to enum dpp::permissions)
 	 * @param member true if the overwrite_id is a user id, false if it is a channel id
 	 * @param callback Function to call when the API call completes.
 	 * On success the callback will contain a dpp::confirmation object in confirmation_callback_t::value. On failure, the value is undefined and confirmation_callback_t::is_error() method will return true. You can obtain full error details with confirmation_callback_t::get_error().
@@ -2185,8 +2305,8 @@ public:
 	 * @note This method supports audit log reasons set by the cluster::set_audit_reason() method.
 	 * @param channel_id ID of the channel to set permissions for
 	 * @param overwrite_id Overwrite to change (a user or role ID)
-	 * @param allow allow permissions bitmask
-	 * @param deny deny permissions bitmask
+	 * @param allow Bitmask of allowed permissions (refer to enum dpp::permissions)
+	 * @param deny Bitmask of denied permissions (refer to enum dpp::permissions)
 	 * @param member true if the overwrite_id is a user id, false if it is a channel id
 	 * @param callback Function to call when the API call completes.
 	 * On success the callback will contain a dpp::confirmation object in confirmation_callback_t::value. On failure, the value is undefined and confirmation_callback_t::is_error() method will return true. You can obtain full error details with confirmation_callback_t::get_error().
@@ -3975,9 +4095,8 @@ public:
 	 */
 	void channel_set_voice_status(snowflake channel_id, const std::string& status, command_completion_event_t callback = utility::log_error());
 
-#include <dpp/cluster_sync_calls.h>
-#ifdef DPP_CORO
-#include <dpp/cluster_coro_calls.h>
+#ifndef DPP_NO_CORO
+	#include <dpp/cluster_coro_calls.h>
 #endif
 
 };

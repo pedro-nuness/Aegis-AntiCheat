@@ -8,8 +8,11 @@
 
 #include <openssl/sha.h>
 #include <openssl/evp.h>
-
+#include <iomanip>     // std::setw, std::setfill
 #include <sstream>
+
+#include "../Memory/memory.h"
+#include "../LogSystem/Log.h"
 
 #include "../../Globals/Globals.h"
 
@@ -20,18 +23,23 @@
 #pragma comment(lib, "wininet.lib")
 
 
+#include <openssl/evp.h>
+
 std::string Utils::GenerateHash( const std::vector<BYTE> & input )
 {
 	unsigned char hash[ SHA256_DIGEST_LENGTH ];
-	SHA256_CTX sha256;
-	SHA256_Init( &sha256 );
-	SHA256_Update( &sha256 , input.data( ) , input.size( ) );
-	SHA256_Final( hash , &sha256 );
+	EVP_MD_CTX * ctx = EVP_MD_CTX_new( );
+
+	EVP_DigestInit_ex( ctx , EVP_sha256( ) , nullptr );
+	EVP_DigestUpdate( ctx , input.data( ) , input.size( ) );
+	EVP_DigestFinal_ex( ctx , hash , nullptr );
+
+	EVP_MD_CTX_free( ctx );
 
 	std::ostringstream oss;
 	for ( int i = 0; i < SHA256_DIGEST_LENGTH; ++i )
 	{
-		oss << std::hex << ( int ) hash[ i ];
+		oss << std::hex << std::setw( 2 ) << std::setfill( '0' ) << static_cast< int >( hash[ i ] );
 	}
 
 	return oss.str( );
@@ -40,15 +48,18 @@ std::string Utils::GenerateHash( const std::vector<BYTE> & input )
 std::string Utils::GenerateStringHash( const std::string & input )
 {
 	unsigned char hash[ SHA256_DIGEST_LENGTH ];
-	SHA256_CTX sha256;
-	SHA256_Init( &sha256 );
-	SHA256_Update( &sha256 , input.data( ) , input.size( ) );
-	SHA256_Final( hash , &sha256 );
+	EVP_MD_CTX * ctx = EVP_MD_CTX_new( );
+
+	EVP_DigestInit_ex( ctx , EVP_sha256( ) , nullptr );
+	EVP_DigestUpdate( ctx , input.data( ) , input.size( ) );
+	EVP_DigestFinal_ex( ctx , hash , nullptr );
+
+	EVP_MD_CTX_free( ctx );
 
 	std::ostringstream oss;
 	for ( int i = 0; i < SHA256_DIGEST_LENGTH; ++i )
 	{
-		oss << std::hex << ( int ) hash[ i ];
+		oss << std::hex << std::setw( 2 ) << std::setfill( '0' ) << static_cast< int >( hash[ i ] );
 	}
 
 	return oss.str( );
@@ -363,6 +374,26 @@ bool Utils::DownloadToBuffer( const std::string & URL , std::vector<char> & buff
 	InternetCloseHandle( urlFile );
 	InternetCloseHandle( interwebs );
 	return true;
+}
+
+
+void Utils::waitModule( std::string moduleName ) {
+	while ( true ) {
+		auto Modules = Mem::Module::Get( ).EnumerateModules( ::getpid( ) );
+		bool FoundBE = false;
+		for ( auto Module : Modules ) {
+			if ( CheckStrings( Module.moduleName , moduleName ) ) {
+				FoundBE = true;
+				break;
+			}
+		}
+
+		if ( FoundBE ) {
+			LogSystem::Get( ).ConsoleLog( _MAIN , moduleName + xorstr_(" loaded!" ) , GREEN );
+			return;
+		}
+		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
+	}
 }
 
 std::string Utils::DownloadString( std::string URL ) {

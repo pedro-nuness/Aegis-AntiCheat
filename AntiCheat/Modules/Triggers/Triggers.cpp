@@ -22,6 +22,7 @@
 
 
 #include "../../Systems/Utils/StringCrypt/StringCrypt.h"
+#include "../ThreadGuard/ThreadGuard.h"
 
 
 std::vector<CryptedString> BlackListedProcesses;
@@ -151,19 +152,7 @@ Triggers::~Triggers( ) {
 }
 
 
-bool Triggers::isRunning( ) const {
-	if ( this->ThreadObject->IsThreadSuspended( this->ThreadObject->GetHandle( ) ) ) {
-		_client.SendPunishToServer( xorstr_( "Triggers thread was found suspended, abormal execution" ) , BAN );
-		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
-	}
 
-	if ( !this->ThreadObject->IsThreadRunning( this->ThreadObject->GetHandle( ) ) && !this->ThreadObject->IsShutdownSignalled( ) ) {
-		_client.SendPunishToServer( xorstr_( "Triggers thread was found terminated, abormal execution" ) , BAN );
-		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
-	}
-
-	return true;
-}
 
 bool Triggers::AreTriggersEqual( const Trigger & t1 , const Trigger & t2 ) {
 	return t1.Area == t2.Area &&
@@ -299,17 +288,35 @@ std::string Triggers::GenerateWarningStatus( std::vector<Trigger> Triggers ) {
 
 void Triggers::threadFunction( ) {
 
+	{
+		std::lock_guard<std::mutex> lock( _globals.threadReadyMutex );
+		_globals.threadsReady.at( THREADS::TRIGGERS ) = true;
+		LogSystem::Get( ).ConsoleLog( _TRIGGERS , xorstr_( "thread signalled ready!" ) , GREEN );
+	}
+
+	while ( true ) {
+		std::vector<bool> localthreadsReady;
+		{
+			std::lock_guard<std::mutex> lock( _globals.threadReadyMutex );
+			localthreadsReady = _globals.threadsReady;
+		}
+
+		bool found = false;
+
+		for ( int i = 0; i < localthreadsReady.size( ); i++ ) {
+			if ( !localthreadsReady.at( i ) ) {
+				found = true;
+				break;
+			}
+		}
+
+		if ( !found ) {
+			break;
+		}
+	}
+
 	bool Run = true;
 	LogSystem::Get( ).ConsoleLog( _TRIGGERS , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );
-
-	while ( !_globals.VerifiedSession ) {
-		if ( this->ThreadObject->IsShutdownSignalled( ) ) {
-			LogSystem::Get( ).ConsoleLog( _TRIGGERS , xorstr_( "shutting down thread" ) , RED );
-			return;
-		}
-		//as fast as possible cuh
-		std::this_thread::sleep_for( std::chrono::nanoseconds( 1 ) ); // Check every 30 seconds
-	}
 
 	while ( Run ) {
 

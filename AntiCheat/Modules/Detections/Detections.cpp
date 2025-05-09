@@ -20,25 +20,39 @@
 #include "../../Systems/Services/Services.h"	
 #include "../../Client/client.h"
 
+
 #include <TlHelp32.h>
 #include <set>
 #include <winternl.h>
 
+#include <nlohmann/json.hpp>
+
+using nlohmann::json;
+
+
 void Detections::InitializeThreads( ) {
 	for ( ThreadInfo Thread : Mem::Thread::Get( ).EnumerateThreads( GetCurrentProcessId( ) ) ) {
 		AllowedThreads.emplace_back( Thread.threadID );
-		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Allowed thread ID: " ) + std::to_string( Thread.threadID ) , GREEN );
+	
 	}
+
+	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Allowed " ) + std::to_string(AllowedThreads.size() ) + xorstr_(" threads!" ) , GREEN );
 }
 
-Detections::Detections( ) {
-
+Detections::Detections( ) 
+	: ThreadHolder( THREADS::DETECTIONS )
+{
 	HMODULE hNtdll = GetModuleHandleA( xorstr_( "ntdll.dll" ) );
 	if ( hNtdll != 0 ) //register DLL notifications callback 
 	{
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "DLL Notification callback loaded" ), GREEN );
+
 		_LdrRegisterDllNotification pLdrRegisterDllNotification = ( _LdrRegisterDllNotification ) GetProcAddress( hNtdll , xorstr_( "LdrRegisterDllNotification" ) );
 		PVOID cookie;
 		NTSTATUS status = pLdrRegisterDllNotification( 0 , ( PLDR_DLL_NOTIFICATION_FUNCTION ) OnDllNotification , this , &cookie );
+	}
+	else {
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "DLL Notification callback failed" ) , RED );
 	}
 }
 
@@ -68,24 +82,8 @@ Detections::~Detections( ) {
 	stop( );
 }
 
-bool Detections::isRunning( ) const {
-	if ( this->ThreadObject->IsThreadSuspended( this->ThreadObject->GetHandle( ) ) ) {
-		_client.SendPunishToServer( xorstr_( "Detections thread was found suspended, abormal execution" ) , BAN );
-		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
-	}
-
-	if ( !this->ThreadObject->IsThreadRunning( this->ThreadObject->GetHandle( ) ) && !this->ThreadObject->IsShutdownSignalled( ) ) {
-		_client.SendPunishToServer( xorstr_( "Detections thread was found terminated, abormal execution" ) , BAN );
-		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
-	}
-
-	return true;
-}
 
 
-#include <nlohmann/json.hpp>
-
-using nlohmann::json;
 
 bool DumpedDrivers = false;
 
@@ -110,7 +108,7 @@ void Detections::CheckLoadedDrivers( ) {
 			if ( Utils::Get( ).CheckStrings( Driver , xorstr_( "dump_diskdump.sys" ) )
 				|| Utils::Get( ).CheckStrings( Driver , xorstr_( "dump_dumpfve.sys" ) )
 				|| Utils::Get( ).CheckStrings( Driver , xorstr_( "dump_storahci.sys" ) ) ) {
-				LogSystem::Get( ).Log( xorstr_( "[203] Windows dump files found" ) );
+				LogSystem::Get( ).Error( xorstr_( "[203] Windows dump files found" ) );
 				continue;
 			}
 
@@ -152,6 +150,26 @@ bool DoesProcessHaveOpenHandleTous( DWORD pid , std::vector <_SYSTEM_HANDLE> han
 	return false;
 }
 
+// Método de injeção
+bool Detections::InjectProcess( DWORD processId ) {
+	char exePath[ MAX_PATH ];
+	GetModuleFileNameA( NULL , exePath , MAX_PATH );
+	std::string exePathStr( exePath );
+
+	auto find = this->InjectedProcesses.find( processId );
+	if ( find != this->InjectedProcesses.end( ) ) {
+		return false;
+	}
+
+	if ( Injector::Get( ).InjectBytes( _globals.encryptedDumper , processId ) ) {
+		this->InjectedProcesses[ processId ] = true;
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Dumped " ) + Mem::Get( ).GetProcessName( processId ), GREEN);
+		return true;
+	}
+
+	return false;
+}
+
 void Detections::CheckOpenHandles( ) {
 	std::vector<_SYSTEM_HANDLE> handles = Mem::Handle::Get( ).DetectOpenHandlesToProcess( );
 
@@ -169,7 +187,29 @@ void Detections::CheckOpenHandles( ) {
 			C:\Windows\System32\lsass.exe
 			*/
 
+
+
 			std::string ProcessPath = Mem::Get( ).GetProcessExecutablePath( handle.ProcessId );
+
+
+			if ( !strcmp( ProcessPath.c_str( ) , xorstr_( "C:\\Program Files\\AMD\\CNext\\CNext\\RadeonSoftware.exe" ) ) ) {
+				HANDLE ProcessHandle = Mem::Get( ).GetProcessHandle( handle.ProcessId );
+				if ( ProcessHandle != NULL ) {
+					TerminateProcess( ProcessHandle , 1 );
+					CloseHandle( ProcessHandle );
+				}
+				continue;
+			}
+
+			if ( !strcmp( ProcessPath.c_str( ) , xorstr_( "C:\\Windows\\System32\\audiodg.exe" ) ) ) 
+				continue;
+			
+			if ( !strcmp( ProcessPath.c_str( ) , xorstr_( "C:\\Windows\\System32\\lsass.exe" ) ) ) 
+				continue;
+			
+			if ( !strcmp( ProcessPath.c_str( ) , xorstr_( "C:\\Windows\\System32\\conhost.exe" ) ) )
+				continue;
+
 			if ( !strcmp( ProcessPath.c_str( ) , xorstr_( "C:\\Windows\\System32\\svchost.exe" ) ) )
 				continue;
 
@@ -179,7 +219,35 @@ void Detections::CheckOpenHandles( ) {
 			if ( !strcmp( ProcessPath.c_str( ) , xorstr_( "C:\\Windows\\System32\\conhost.exe" ) ) )
 				continue;
 
-			AddDetection( OPENHANDLE_TO_US , DetectionStruct( ProcessPath , SUSPECT ) );
+		
+			HANDLE processHandle = OpenProcess( PROCESS_DUP_HANDLE , FALSE , handle.ProcessId );
+
+			if ( processHandle )
+			{
+				HANDLE duplicatedHandle = INVALID_HANDLE_VALUE;
+
+				if ( DuplicateHandle( processHandle , ( HANDLE ) handle.Handle , GetCurrentProcess( ) , &duplicatedHandle , 0 , FALSE , DUPLICATE_SAME_ACCESS ) )
+				{
+					if ( Mem::Handle::Get( ).CheckDangerousPermissions( duplicatedHandle , nullptr ) ) {
+						LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Process " ) + Mem::Get( ).GetProcessExecutablePath( handle.ProcessId ) + xorstr_( " has open handle to us!" ) , RED );
+
+						AddDetection( OPENHANDLE_TO_US , DetectionStruct( ProcessPath , SUSPECT ) );
+
+						if ( !InjectProcess( handle.ProcessId ) ) {
+							LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Can't dump process" ) , RED );
+						}
+
+					}
+					else
+						LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Process " ) + Mem::Get( ).GetProcessExecutablePath( handle.ProcessId ) + xorstr_( " has open handle to us!" ) , YELLOW );
+
+
+					if ( duplicatedHandle != INVALID_HANDLE_VALUE )
+						CloseHandle( duplicatedHandle );
+				}
+
+				CloseHandle( processHandle );
+			}
 
 			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Process " ) + Mem::Get( ).GetProcessExecutablePath( handle.ProcessId ) + xorstr_( " has open handle to us!" ) , RED );
 			//Logger::logfw( "UltimateAnticheat.log" , Detection , L"Process %s has open process handle to our process." , procName.c_str( ) );
@@ -218,9 +286,6 @@ void Detections::CheckLoadedDlls( ) {
 
 	LoadedDlls.clear( );
 }
-
-
-
 
 std::string Detections::GenerateDetectionStatus( FLAG_DETECTION flag , DetectionStruct _detection ) {
 
@@ -324,7 +389,7 @@ void Detections::DigestDetections( ) {
 		this->DetectedFlags.clear( );
 
 		if ( Ban )
-			LogSystem::Get( ).Log( xorstr_( "AC Flagged unsafe!" ) );
+			LogSystem::Get( ).Error( xorstr_( "AC Flagged unsafe!" ) );
 	}
 	else {
 		// Don`t erase the detection vector, we will try again later!
@@ -334,21 +399,18 @@ void Detections::DigestDetections( ) {
 
 
 bool SaveFirstFunctionBytes( const std::string & moduleName , const std::string & functionName , const std::string & outputFileName , size_t byteCount ) {
-	// Obter o handle do módulo
 	HMODULE hModule = GetModuleHandleA( moduleName.c_str( ) );
 	if ( !hModule ) {
 		std::cerr << "Erro: Não foi possível encontrar o módulo: " << moduleName << std::endl;
 		return false;
 	}
 
-	// Obter o endereço da função
 	FARPROC funcAddress = GetProcAddress( hModule , functionName.c_str( ) );
 	if ( !funcAddress ) {
 		std::cerr << "Erro: Não foi possível encontrar a função: " << functionName << std::endl;
 		return false;
 	}
 
-	// Salvar os primeiros X bytes da função
 	BYTE * start = reinterpret_cast< BYTE * >( funcAddress );
 
 	std::ofstream outFile( outputFileName );
@@ -433,7 +495,6 @@ void Detections::ScanWindows( ) {
 
 	std::unordered_map<DWORD , bool> processedProcesses;
 
-
 	// Enumerate all top-level windows
 	std::vector<WindowInfo> windows;
 	EnumWindows( Mem::EnumWindowsProc , reinterpret_cast< LPARAM >( &windows ) );
@@ -448,12 +509,12 @@ void Detections::ScanWindows( ) {
 			if ( !GetWindowRect( window.hwnd , &overlayRect ) &&
 				( overlayRect.left || overlayRect.right || overlayRect.bottom || overlayRect.top ) )
 				continue;
-			// Mark process as processed
+			// Mark process as processed 
 
 			DWORD windowAffinity;
 			if ( GetWindowDisplayAffinity( window.hwnd , &windowAffinity ) && windowAffinity != WDA_NONE ) {
 				std::string logMessage = Mem::Get( ).GetProcessExecutablePath( window.processId ) + xorstr_( "\n" );
-				Injector::Get( ).Inject( xorstr_( "windows.dll" ) , window.processId );
+				InjectProcess( window.processId );
 				AddDetection( HIDE_FROM_CAPTURE_WINDOW , DetectionStruct( logMessage , DETECTED ) );
 			}
 
@@ -493,7 +554,6 @@ void Detections::ScanWindows( ) {
 				}
 
 				{
-					// Lista de processos do sistema que não possuem janelas transparentes, com xorstr_ aplicado
 					static const std::set<std::string> systemProcesses = {
 						xorstr_( "taskmgr.exe" ),
 						xorstr_( "msconfig.exe" ),
@@ -505,7 +565,7 @@ void Detections::ScanWindows( ) {
 						xorstr_( "notepad.exe" ),
 						xorstr_( "rundll32.exe" ),
 						xorstr_( "mspmsnsv.exe" ),
-						xorstr_( "shell32.dll" ) // Não é um executável, mas importante notar
+						xorstr_( "shell32.dll" )
 					};
 
 					// Comparar o nome do processo criptografado com a lista
@@ -652,7 +712,7 @@ void Detections::CheckFunctions( ) {
 		break;
 
 	default:
-		LogSystem::Get( ).Log( xorstr_( "Incompatible OS Version!" ) );
+		LogSystem::Get( ).Error( xorstr_( "Incompatible OS Version!" ) );
 		goto out;
 	}
 
@@ -708,19 +768,35 @@ void Detections::AddThreadToWhitelist( DWORD threadPID ) {
 
 void Detections::threadFunction( ) {
 
+	{
+		std::lock_guard<std::mutex> lock( _globals.threadReadyMutex );
+		_globals.threadsReady.at( THREADS::DETECTIONS ) = true;
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "thread signalled ready!" ) , GREEN );
+	}
 
-	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );
-
-
-	while ( !_globals.VerifiedSession ) {
-		if ( this->ThreadObject->IsShutdownSignalled( ) ) {
-			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "shutting down thread" ) , RED );
-			return;
+	while ( true ) {
+		std::vector<bool> localthreadsReady;
+		{
+			std::lock_guard<std::mutex> lock( _globals.threadReadyMutex );
+			localthreadsReady = _globals.threadsReady;
 		}
 
-		//as fast as possible cuh
-		std::this_thread::sleep_for( std::chrono::nanoseconds( 1 ) ); // Check every 30 seconds
+		bool found = false;
+
+		for ( int i = 0; i < localthreadsReady.size( ); i++ ) {
+			if ( !localthreadsReady.at( i ) ) {
+				found = true;
+				break;
+			}
+		}
+
+		if ( !found ) {
+			break;
+		}
 	}
+
+
+	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );
 
 	bool Running = true;
 
@@ -734,7 +810,7 @@ void Detections::threadFunction( ) {
 		}
 
 		if ( Services::Get( ).IsTestsigningEnabled( ) || Services::Get( ).IsDebugModeEnabled( ) ) {
-			LogSystem::Get( ).Log( xorstr_( "Test signing or debug mode is enabled" ) );
+			LogSystem::Get( ).Error( xorstr_( "Test signing or debug mode is enabled" ) );
 		}
 
 

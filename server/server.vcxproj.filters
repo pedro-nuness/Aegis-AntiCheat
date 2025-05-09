@@ -24,9 +24,6 @@
     <ClCompile Include="config\config.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="dependencies\include\openssl\applink.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="globals\globals.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

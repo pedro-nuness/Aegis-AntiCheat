@@ -1,5 +1,7 @@
 #pragma once
 #include <string>
+#include <vector>
+#include <mutex>
 #include "../Systems/Utils/singleton.h"
 #include <windows.h>
 
@@ -24,7 +26,6 @@ public:
 
 	std::string GeneralUID;
 
-	bool VerifiedSession = false;
 	bool RequestedScreenshot = false;
 	bool LoggedIn = false;
 
@@ -35,6 +36,12 @@ public:
 
 	std::string CLIENT_NAME;
 	std::string DUMPER_NAME;
+
+	HMODULE dllModule;
+
+	std::vector<std::uint8_t> encryptedDumper;
+	std::vector<bool> threadsReady;
+	std::mutex threadReadyMutex;
 };
 extern Globals _globals;
 

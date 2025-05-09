@@ -1,4 +1,4 @@
-#pragma once
+
 #include "utils.h"
 #include <iostream>
 #include <Windows.h>
@@ -13,13 +13,8 @@
 
 #include <sstream>
 
-
-#pragma comment(lib, "libssl.lib")
-#pragma comment(lib, "libcrypto.lib")
-
 #include <Wininet.h>
 #pragma comment(lib, "wininet.lib")
-
 
 std::string Utils::GenerateHash( const std::vector<BYTE> & input )
 {
@@ -98,7 +93,6 @@ bool Utils::encryptMessage( const std::string & plaintext , std::string & cipher
 	}
 }
 
-
 bool Utils::ExistsFile( const std::string & name )
 {
 	if ( FILE * file = fopen( name.c_str( ) , "r" ) ) {
@@ -117,7 +111,6 @@ void Utils::WarnMessage( COLORS color , std::string custom_text , std::string Me
 	Warn( color , custom_text );
 	ColoredText( xorstr_( " " ) + Message + xorstr_( "\n" ) , _col );
 }
-
 
 // Função para descriptografar a mensagem usando AES-256-CBC
 bool Utils::decryptMessage( const std::string & ciphertext , std::string & plaintext , const std::string & key , const std::string & iv ) {
@@ -156,7 +149,6 @@ bool Utils::decryptMessage( const std::string & ciphertext , std::string & plain
 	EVP_CIPHER_CTX_free( ctx );
 	return true;
 }
-
 
 void Utils::WarnMessage( MODULE_SENDER sender , std::string Message , COLORS _col ) {
 	std::lock_guard<std::mutex> lock( PrintMutex );
@@ -213,8 +205,6 @@ std::string Utils::GenerateHash( std::string msg ) {
 	sha1.add( msg.data( ) , msg.size( ) );
 	return sha1.getHash( );
 }
-
-
 
 std::string Utils::GetRandomCharacter( ) {
 	std::string letters[ ] = { "a", "b", "c", "d", "e", "f", "g", "h", "i",
@@ -286,7 +276,6 @@ bool Utils::isNumber( const std::string & str ) {
 	return true;
 }
 
-
 void Utils::ColoredText( std::string text , COLORS color )
 {
 	HANDLE hConsole = GetStdHandle( STD_OUTPUT_HANDLE );
@@ -314,7 +303,6 @@ void Utils::Warn( COLORS color , std::string custom_text )
 	ColoredText( xorstr_( "] " ) , WHITE );
 }
 
-
 int Utils::RandomNumber( int min , int max )
 {
 	std::random_device rd;
@@ -322,7 +310,6 @@ int Utils::RandomNumber( int min , int max )
 	std::uniform_int_distribution<int> uni( min , max );
 	return uni( rng );
 }
-
 
 std::string replaceAll( std::string subject , const std::string & search ,
 	const std::string & replace ) {

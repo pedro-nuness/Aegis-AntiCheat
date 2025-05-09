@@ -190,6 +190,7 @@
     <ClInclude Include="Process\PEB.hpp" />
     <ClInclude Include="Process\Process.hpp" />
     <ClInclude Include="Process\Thread.hpp" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="Systems\AntiTamper\Authentication.h" />
     <ClInclude Include="Systems\AntiTamper\remap.hpp" />
     <ClInclude Include="Globals\Globals.h" />
@@ -205,6 +206,13 @@
     <ClInclude Include="Systems\Utils\singleton.h" />
     <ClInclude Include="Systems\Utils\StringCrypt\StringCrypt.h" />
     <ClInclude Include="Systems\Utils\utils.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="AntiCheatProtector.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="rcdata1.bin" />
+    <None Include="rcdata2.bin" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

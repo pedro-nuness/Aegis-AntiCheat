@@ -9,13 +9,7 @@
 
 
 
-enum THREADS {
-	COMMUNICATION ,
-	DETECTIONS ,
-	TRIGGERS ,
-	ANTIDEBUGGER,
-	LISTENER
-};
+
 
 class ThreadGuard : public ThreadHolder {
 public:
@@ -26,14 +20,11 @@ public:
 	void AddThreadToList( DWORD PID );
 	std::vector<DWORD> GetRunningThreadsID( );
 	std::vector<HANDLE> GetRunningThreadHandle( );
-	bool isRunning( ) const override;
 
 private:
 	std::vector<DWORD> RunningThreadsID;
 
 	void threadFunction( ) override;
-
-	std::string GetThreadName( int thread );
 
 	std::vector<std::pair<ThreadHolder * , int>> m_threads;
 

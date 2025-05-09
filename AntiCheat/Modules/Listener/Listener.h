@@ -15,11 +15,7 @@ class Listener : public ThreadHolder {
 	void threadFunction( ) override;
 public:
 
-
-
 	Listener( );
 	~Listener( );
-
-	bool isRunning( ) const override;
 };
 

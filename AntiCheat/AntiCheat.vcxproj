@@ -23,7 +23,7 @@
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{8feb1442-4ee6-450c-88c8-1d9b402cd35a}</ProjectGuid>
     <RootNamespace>AntiCheat</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.22621.0</WindowsTargetPlatformVersion>
     <ProjectName>Aegis AntiCheat</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -47,7 +47,7 @@
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
@@ -75,7 +75,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>$(ProjectDir)Dependencies\release\include;$(IncludePath)</IncludePath>
     <TargetName>$(ProjectName)\aegis</TargetName>
-    <LibraryPath>$(ProjectDir)Dependencies\release\lib\openssl;$(ProjectDir)Dependencies\release\lib\windvert;$(ProjectDir)Dependencies\release\lib\minhook;$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(ProjectDir)Dependencies\release\lib\openssl;$(ProjectDir)Dependencies\release\lib\windvert;$(ProjectDir)Dependencies\release\lib\minhook;$(UniversalCRT_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(VC_LibraryPath_x64)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>$(ProjectDir)Dependencies\debug\include\dpp-10.0;$(ProjectDir)Dependencies\debug\include\kernelbridge;$(ProjectDir)Dependencies\release\include\minhook;$(IncludePath)</IncludePath>
@@ -129,11 +129,11 @@
       <WarningLevel>Level3</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;OPENSSL_USE_STATIC_LIBS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)Dependencies\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)Dependencies\include;D:\Code\includes\OPENSSL\Lib\x64\Release\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -141,11 +141,12 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
-      <AdditionalDependencies>libssl.lib;libcrypto.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Crypt32.lib;D:\Code\includes\OPENSSL\Lib\x64\Release\lib\libssl.lib;D:\Code\includes\OPENSSL\Lib\x64\Release\lib\libcrypto.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/ALIGN:0x10000 %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="externals\dumper\Dumper.cpp" />
     <ClCompile Include="externals\minhook\src\buffer.c" />
     <ClCompile Include="externals\minhook\src\hde\hde32.c" />
     <ClCompile Include="externals\minhook\src\hde\hde64.c" />
@@ -184,6 +185,7 @@
     <ClCompile Include="Systems\Utils\utils.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="externals\dumper\Dumper.h" />
     <ClInclude Include="externals\minhook\MinHook.h" />
     <ClInclude Include="externals\minhook\src\buffer.h" />
     <ClInclude Include="externals\minhook\src\hde\hde32.h" />
@@ -196,6 +198,7 @@
     <ClInclude Include="Modules\AntiDebugger\AntiDebugger.h" />
     <ClInclude Include="Obscure\ntldr.h" />
     <ClInclude Include="Process\Imports.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="Systems\AntiTamper\remap.hpp" />
     <ClInclude Include="Systems\Services\Services.h" />
     <ClInclude Include="Systems\AntiTamper\Authentication.h" />
@@ -207,7 +210,6 @@
     <ClInclude Include="Process\PEB.hpp" />
     <ClInclude Include="Process\Process.hpp" />
     <ClInclude Include="Process\Thread.hpp" />
-    <ClInclude Include="resource.h" />
     <ClInclude Include="Systems\Hardware\hardware.h" />
     <ClInclude Include="Systems\FileChecking\FileChecking.h" />
     <ClInclude Include="Modules\Communication\Communication.h" />
@@ -232,11 +234,21 @@
     <ClInclude Include="Systems\Utils\XorString\XorString.h" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="ico00001.ico" />
     <Image Include="icon1.ico" />
     <Image Include="x64\Release\Icon.ico" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Aegis AntiCheat.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\x64\release\aegis anticheat\rcdata1.bin" />
+    <None Include="..\x64\release\aegis anticheat\rcdata2.bin" />
+    <None Include="externals\bins\libcrypto-1_1-x64.dll" />
+    <None Include="externals\bins\rcdata2.bin" />
+    <None Include="externals\bins\rcdata3.bin" />
+    <None Include="externals\bins\windows.dll" />
+    <None Include="windows.dll" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

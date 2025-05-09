@@ -942,7 +942,7 @@ protected:
 	 * @brief Get a resolved object from the resolved set
 	 * 
 	 * @tparam T type of object to retrieve
-	 * @tparam C container defintion for resolved container
+	 * @tparam C container definition for resolved container
 	 * @param id Snowflake ID
 	 * @param resolved_set container for the type
 	 * @return const T& retrieved type
@@ -1556,7 +1556,8 @@ public:
 	/**
 	 * @brief Set the default permissions of the slash command
 	 * 
-	 * @param defaults default permissions to set. This is a permission bitmask of bits from dpp::permissions
+	 * @param defaults default permissions to set. This is a permission bitmask of bits from dpp::permissions.
+	 * This is also an AND list, which means the user must have **all** specified permissions to use the command.
 	 * @note You can set it to 0 to disable the command for everyone except admins by default
 	 *
 	 * @return slashcommand& reference to self for chaining of calls

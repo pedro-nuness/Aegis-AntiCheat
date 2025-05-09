@@ -33,7 +33,6 @@ void CUSTOM_SHA::reset()
     m_hash[4] = 0xc3d2e1f0;
 }
 
-
 namespace
 {
     // mix functions for processBlock()

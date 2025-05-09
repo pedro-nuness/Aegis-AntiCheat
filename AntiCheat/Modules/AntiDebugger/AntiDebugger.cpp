@@ -6,12 +6,14 @@
 #include <thread>             // Para manipulação de threads
 #include <chrono>             // Para controle de tempo com std::this_thread::sleep_for
 #include <string>             // Para manipulação de std::string
+#include <mutex>
 
 
 #include "../../Client/client.h"
 #include "../../Systems/Utils/utils.h"
 #include "../../Systems/Utils/xorstr.h"
 #include "../../Systems/LogSystem/Log.h"
+#include "../../Modules/ThreadGuard/ThreadGuard.h"
 
 
 #include "../../Globals/Globals.h"
@@ -178,7 +180,9 @@ typedef struct _KUSER_SHARED_DATA  //https://learn.microsoft.com/en-us/windows-h
 	ULONG                         Reserved10[ 210 ];
 } KUSER_SHARED_DATA , * PKUSER_SHARED_DATA;
 
-AntiDebugger::AntiDebugger( ) {
+AntiDebugger::AntiDebugger( )
+	: ThreadHolder( THREADS::ANTIDEBUGGER )
+{
 
 }
 AntiDebugger::~AntiDebugger( ) {
@@ -205,7 +209,7 @@ bool AntiDebugger::_IsKernelDebuggerPresent( )
 
 	if ( hModule == NULL )
 	{
-		LogSystem::Get( ).Log( xorstr_( "Error fetching ntdll.dll" ) , xorstr_( "Error fetching ntdll.dll" ) );
+		LogSystem::Get( ).Error( xorstr_( "Error fetching ntdll.dll" ) , xorstr_( "Error fetching ntdll.dll" ) );
 		return false;
 	}
 
@@ -352,14 +356,14 @@ bool AntiDebugger::_IsDebuggerPresent_VEH( )
 
 			if ( !VirtualProtect( ( void * ) veh_addr , 1 , PAGE_EXECUTE_READWRITE , &dwOldProt ) )
 			{
-				LogSystem::Get( ).Log( xorstr_( "VirtualProtect failed" ) );
+				LogSystem::Get( ).Error( xorstr_( "VirtualProtect failed" ) );
 			}
 
 			memcpy( ( void * ) veh_addr , "\xC3" , sizeof( BYTE ) ); //patch first byte of `InitializeVEH` with a ret, stops call to InitializeVEH from succeeding.
 
 			if ( !VirtualProtect( ( void * ) veh_addr , 1 , dwOldProt , &dwOldProt ) ) //change back to old prot's
 			{
-				LogSystem::Get( ).Log( xorstr_( "VirtualProtect failed" ) );
+				LogSystem::Get( ).Error( xorstr_( "VirtualProtect failed" ) );
 			}
 
 			if ( Process::ChangeModuleName( L"vehdebug-x86_64.dll" , L"STOP_CHEATING" ) )
@@ -461,6 +465,35 @@ bool AntiDebugger::_IsDebuggerPresent_ProcessDebugFlags( )
 
 void AntiDebugger::threadFunction( ) {
 
+	{
+		std::lock_guard<std::mutex> lock( _globals.threadReadyMutex );
+		_globals.threadsReady.at( THREADS::ANTIDEBUGGER ) = true;
+		LogSystem::Get( ).ConsoleLog( _ANTIDEBUGGER , xorstr_( "thread signalled ready!" ) , GREEN );
+	}
+
+	while ( true ) {
+		std::vector<bool> localthreadsReady;
+		{
+			std::lock_guard<std::mutex> lock( _globals.threadReadyMutex );
+			localthreadsReady = _globals.threadsReady;
+		}
+
+		bool found = false;
+
+		for ( int i = 0; i < localthreadsReady.size( ); i++ ) {
+			if ( !localthreadsReady.at( i ) ) {
+				found = true;
+				break;
+			}
+		}
+
+		if ( !found ) {
+			break;
+		}
+	}
+
+
+
 	LogSystem::Get( ).ConsoleLog( _ANTIDEBUGGER , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );
 
 	bool running_thread = true;
@@ -521,20 +554,4 @@ void AntiDebugger::threadFunction( ) {
 		std::this_thread::sleep_for( std::chrono::seconds( this->getThreadSleepTime( ) ) );
 	}
 }
-
-
-bool AntiDebugger::isRunning( ) const {
-	if ( this->ThreadObject->IsThreadSuspended( this->ThreadObject->GetHandle( ) ) ) {
-		//_client.SendPunishToServer( xorstr_( "AntiDebugger thread was found suspended, abormal execution" ) , true );
-		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
-	}
-
-	if ( !this->ThreadObject->IsThreadRunning( this->ThreadObject->GetHandle( ) ) && !this->ThreadObject->IsShutdownSignalled( ) ) {
-		//_client.SendPunishToServer( xorstr_( "AntiDebugger thread was found terminated, abormal execution" ) , true );
-		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
-	}
-
-	return true;
-}
-
 

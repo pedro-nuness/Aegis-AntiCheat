@@ -123,6 +123,9 @@
     <ClCompile Include="Modules\Listener\Listener.cpp">
       <Filter>Arquivos de Origem</Filter>
     </ClCompile>
+    <ClCompile Include="externals\dumper\Dumper.cpp">
+      <Filter>Arquivos de Origem</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Systems\Memory\memory.h">
@@ -194,9 +197,6 @@
     <ClInclude Include="Systems\Hardware\hardware.h">
       <Filter>Arquivos de Cabeçalho</Filter>
     </ClInclude>
-    <ClInclude Include="resource.h">
-      <Filter>Arquivos de Cabeçalho</Filter>
-    </ClInclude>
     <ClInclude Include="Process\Memory\ntdll.h">
       <Filter>Arquivos de Cabeçalho</Filter>
     </ClInclude>
@@ -263,6 +263,12 @@
     <ClInclude Include="Modules\Listener\Listener.h">
       <Filter>Arquivos de Cabeçalho</Filter>
     </ClInclude>
+    <ClInclude Include="externals\dumper\Dumper.h">
+      <Filter>Arquivos de Cabeçalho</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>Arquivos de Cabeçalho</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="x64\Release\Icon.ico">
@@ -271,10 +277,30 @@
     <Image Include="icon1.ico">
       <Filter>Arquivos de Recurso</Filter>
     </Image>
+    <Image Include="ico00001.ico">
+      <Filter>Arquivos de Recurso</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Aegis AntiCheat.rc">
       <Filter>Arquivos de Recurso</Filter>
     </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="windows.dll" />
+    <None Include="..\x64\release\aegis anticheat\rcdata1.bin">
+      <Filter>Arquivos de Recurso</Filter>
+    </None>
+    <None Include="..\x64\release\aegis anticheat\rcdata2.bin">
+      <Filter>Arquivos de Recurso</Filter>
+    </None>
+    <None Include="externals\bins\rcdata2.bin">
+      <Filter>Arquivos de Recurso</Filter>
+    </None>
+    <None Include="externals\bins\windows.dll" />
+    <None Include="externals\bins\rcdata3.bin">
+      <Filter>Arquivos de Recurso</Filter>
+    </None>
+    <None Include="externals\bins\libcrypto-1_1-x64.dll" />
   </ItemGroup>
 </Project>

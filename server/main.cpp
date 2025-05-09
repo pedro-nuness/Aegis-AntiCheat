@@ -204,11 +204,8 @@ void UpdateSessionID( ) {
 }
 
 void GenerateSessionID( ) {
-	std::string AntiCheatVersionID = memory::Get( ).GetFileHash( xorstr_("aegis.exe" ));
-	if ( AntiCheatVersionID.empty( ) )
-		return;
 
-	std::string ParentVersionID = memory::Get( ).GetFileHash( xorstr_( "parent.exe" ) );
+	std::string ParentVersionID = memory::Get( ).GetFileHash( xorstr_( "starter.exe" ) );
 
 	if ( ParentVersionID.empty( ) )
 		return;
@@ -218,7 +215,7 @@ void GenerateSessionID( ) {
 	if ( GameVersionID.empty( ) )
 		return;
 
-	std::string FinalVersionID = memory::Get( ).GenerateHash( AntiCheatVersionID + ParentVersionID + GameVersionID );
+	std::string FinalVersionID = memory::Get( ).GenerateHash( ParentVersionID + GameVersionID );
 
 	File newfile( xorstr_( "output.txt" ) );
 	newfile.Write( FinalVersionID );
@@ -278,7 +275,6 @@ int main( int argc , char * argv[ ] ) {
 				return 1;
 			}
 
-
 			if ( utils::Get( ).CheckStrings( argv[ i ] , xorstr_( "-watch" ) ) ) {
 				WatchFunction( );
 				return 1;
@@ -328,15 +324,12 @@ int main( int argc , char * argv[ ] ) {
 		_globals.whook.SetServerAddress( &connection_server );
 		_globals.whook.InitBot( );
 
-
 		while ( !_globals.whook.BotReady ) {
 			std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
 		}
 
-		_globals.whook.SendWebHookMessage( xorstr_( "Server initialized!" ) , xorstr_( "Server Message" ) , 0x00FFFF );
+		_globals.whook.SendWebHookMessage( ( "Server initialized!" ) , ( "Server Message" ) , 0x00FFFF );
 	}
-
-
 
 	if ( _globals.LockConnections ) {
 
@@ -361,16 +354,13 @@ int main( int argc , char * argv[ ] ) {
 			}
 		}
 
-		if ( handle == INVALID_HANDLE_VALUE ) {
+		if ( handle == INVALID_HANDLE_VALUE || handle == NULL) {
 			utils::Get( ).WarnMessage( _SERVER , xorstr_( "Failed to initialize packet capture, error: " ) + std::to_string( Error ) , RED );
 			std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
 			return -1;
 		}
 
-
 		utils::Get( ).WarnMessage( _SERVER , xorstr_( "Sucessfully started packet capture on port " ) + std::to_string( _config.GetCapturePort( ) ) , LIGHT_GREEN );
-
-
 
 		//Loop de monitoramento de pacotes
 		while ( true ) {
@@ -415,9 +405,9 @@ int main( int argc , char * argv[ ] ) {
 				std::cerr << xorstr_( "Failed to send packet." ) << std::endl;
 			}
 		}
-
 		WinDivertClose( handle );
 	}
+
 	while ( true ) {
 		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
 	}

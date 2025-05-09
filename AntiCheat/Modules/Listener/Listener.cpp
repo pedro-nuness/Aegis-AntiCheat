@@ -16,9 +16,14 @@
 #include "../../Systems/Utils/utils.h"
 #include "../../Client/client.h"
 
+#include "../../Globals/Globals.h"
+#include "../../Modules/ThreadGuard/ThreadGuard.h"
+
 #pragma comment(lib, "ws2_32.lib")
 
-Listener::Listener( ) {
+Listener::Listener( ) 
+	: ThreadHolder( THREADS::LISTENER )
+{
 
 }
 
@@ -35,19 +40,6 @@ using json = nlohmann::json;
 #define key xorstr_("W86ztLe5cLYZUDRBK61cVTJONv4IlivA")
 #define salt xorstr_("pJWjN6fCSfJmfL92vRnkdHUgzVSSYSks")
 
-bool Listener::isRunning( ) const {
-	if ( this->ThreadObject->IsThreadSuspended( this->ThreadObject->GetHandle( ) ) ) {
-		_client.SendPunishToServer( xorstr_( "Listener thread was found suspended, abormal execution" ) , BAN );
-		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
-	}
-
-	if ( !this->ThreadObject->IsThreadRunning( this->ThreadObject->GetHandle( ) ) && !this->ThreadObject->IsShutdownSignalled( ) ) {
-		_client.SendPunishToServer( xorstr_( "Listener thread was found terminated, abormal execution" ) , BAN );
-		LogSystem::Get( ).Log( xorstr_( "Failed to run thread" ) );
-	}
-
-	return true;
-}
 
 
 
@@ -114,14 +106,43 @@ void Listener::ProcessMessages( ) {
 
 void Listener::threadFunction( ) {
 	// Inicializa Winsock
+
+	{
+		std::lock_guard<std::mutex> lock( _globals.threadReadyMutex );
+		_globals.threadsReady.at( THREADS::LISTENER ) = true;
+		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "thread signalled ready!" ) , GREEN );
+	}
+
+	while ( true ) {
+		std::vector<bool> localthreadsReady;
+		{
+			std::lock_guard<std::mutex> lock( _globals.threadReadyMutex );
+			localthreadsReady = _globals.threadsReady;
+		}
+
+		bool found = false;
+
+		for ( int i = 0; i < localthreadsReady.size( ); i++ ) {
+			if ( !localthreadsReady.at( i ) ) {
+				found = true;
+				break;
+			}
+		}
+
+		if ( !found ) {
+			break;
+		}
+	}
+
 	WSADATA wsaData;
 	if ( WSAStartup( MAKEWORD( 2 , 2 ) , &wsaData ) != 0 ) {
 		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "WSAStartup failed." ) , COLORS::RED );
+		this->setThreadStatus( THREAD_STATUS::INITIALIZATION_FAILED );
 		return;
 	}
 
 	sockaddr_in serverAddr;
-	const int serverPort = 9669;
+	const int serverPort = 50505;
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_port = htons( serverPort );
 	// Configurar para escutar todos os endereços de IP disponíveis (INADDR_ANY)
@@ -131,6 +152,7 @@ void Listener::threadFunction( ) {
 	char hostName[ 256 ];
 	if ( gethostname( hostName , sizeof( hostName ) ) == SOCKET_ERROR ) {
 		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Failed to get host name. Error code: " ) + std::to_string( WSAGetLastError( ) ) , COLORS::RED );
+		this->setThreadStatus( THREAD_STATUS::INITIALIZATION_FAILED );
 		WSACleanup( );
 		return;
 	}
@@ -145,6 +167,7 @@ void Listener::threadFunction( ) {
 
 	if ( getaddrinfo( hostName , nullptr , &hints , &res ) != 0 ) {
 		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Failed to get address info." ) , COLORS::RED );
+		this->setThreadStatus( THREAD_STATUS::INITIALIZATION_FAILED );
 		WSACleanup( );
 		return;
 	}
@@ -154,6 +177,7 @@ void Listener::threadFunction( ) {
 	SOCKET listenSock = socket( res->ai_family , res->ai_socktype , res->ai_protocol );
 	if ( listenSock == INVALID_SOCKET ) {
 		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Socket creation failed." ) , COLORS::RED );
+		this->setThreadStatus( THREAD_STATUS::INITIALIZATION_FAILED );
 		WSACleanup( );
 		return;
 	}
@@ -162,6 +186,7 @@ void Listener::threadFunction( ) {
 	// eço IP encontrado e porta
 	if ( bind( listenSock , ( sockaddr * ) &serverAddr , sizeof( serverAddr ) ) == SOCKET_ERROR ) {
 		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Bind failed. Error code: " ) + std::to_string( WSAGetLastError( ) ) , COLORS::RED );
+		this->setThreadStatus( THREAD_STATUS::INITIALIZATION_FAILED );
 		closesocket( listenSock );
 		WSACleanup( );
 		return;
@@ -171,6 +196,7 @@ void Listener::threadFunction( ) {
 		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Listen failed. Error code: " ) + std::to_string( WSAGetLastError( ) ) , COLORS::RED );
 		closesocket( listenSock );
 		WSACleanup( );
+		this->setThreadStatus( THREAD_STATUS::INITIALIZATION_FAILED );
 		return;
 	}
 

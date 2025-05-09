@@ -75,7 +75,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(ProjectDir)dependencies\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir)dependencies\lib\x64\Release;$(LibraryPath)</LibraryPath>
     <TargetName>$(ProjectName)/$(ProjectName)</TargetName>
   </PropertyGroup>
@@ -116,19 +116,20 @@
       <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level3</WarningLevel>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>D:\Code\includes\OPENSSL\Lib\x64\Release\include;$(ProjectDir)dependencies\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <SDLCheck>false</SDLCheck>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>iphlpapi.lib;ws2_32.lib;wbemuuid.lib;GDI32.lib;Normaliz.lib;Ws2_32.lib;Wldap32.lib;Crypt32.lib;advapi32.lib;curl/libcurl.lib;dpp/dpp.lib;openssl/libssl.lib;openssl/libcrypto.lib;windvert/WinDivert.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>iphlpapi.lib;ws2_32.lib;wbemuuid.lib;GDI32.lib;Normaliz.lib;Ws2_32.lib;Wldap32.lib;Crypt32.lib;advapi32.lib;curl/libcurl.lib;dpp/dpp.lib;windvert/WinDivert.lib;D:\Code\includes\OPENSSL\Lib\x64\Release\lib\libssl.lib;D:\Code\includes\OPENSSL\Lib\x64\Release\lib\libcrypto.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="api\api.cpp" />
     <ClCompile Include="config\config.cpp" />
-    <ClCompile Include="dependencies\include\openssl\applink.c" />
     <ClCompile Include="globals\globals.cpp" />
     <ClCompile Include="image\image.cpp" />
     <ClCompile Include="log\log.cpp" />

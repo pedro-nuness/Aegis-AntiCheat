@@ -2,6 +2,7 @@
 #include <Windows.h>
 #include <vector>
 #include <string>
+#include <unordered_map>
 
 #include "../../Obscure/ntldr.h"
 #include "../../Process/Thread.hpp"
@@ -52,6 +53,7 @@ class Detections : public ThreadHolder {
 
 	bool IsIATHooked( std::string & moduleName );
 	bool IsEATHooked( std::string & moduleName );
+	bool InjectProcess( DWORD processId );
 
 	void CheckLoadedDrivers( );
 	void CheckLoadedDlls( );
@@ -70,7 +72,7 @@ class Detections : public ThreadHolder {
 
 	void threadFunction( ) override;
 	static VOID OnDllNotification( ULONG NotificationReason , const PLDR_DLL_NOTIFICATION_DATA NotificationData , PVOID Context );
-
+	std::unordered_map<int , bool> InjectedProcesses;
 public:
 	void InitializeThreads( );
 	void AddThreadToWhitelist( DWORD PID );
@@ -80,6 +82,5 @@ public:
 	Detections( );
 	~Detections( );
 
-	bool isRunning( ) const override;
 };
 

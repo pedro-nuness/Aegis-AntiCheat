@@ -136,7 +136,6 @@ bool FileChecking::GetNickname( ) {
 	_globals.Nickname = nickname;
 	_globals.NicknameHash = Utils::Get( ).GenerateStringHash( nickname );
 
-	LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "get nickname sucesfully: " ) + _globals.Nickname + xorstr_( " - " ) + _globals.NicknameHash , GREEN );
 	return true;
 }
 
@@ -335,11 +334,8 @@ bool FileChecking::UpdateRegValues( ) {
 		return false;
 	}
 
-
 	return true;
 }
-
-
 
 
 bool FileChecking::CheckCurrentPath( ) {
@@ -348,45 +344,42 @@ bool FileChecking::CheckCurrentPath( ) {
 
 	if ( CurrentPath.empty( ) ) {
 		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "failed to get path" ) , RED );
-		return true;
+		return false;
 	}
 
-	if ( !fs::exists( xorstr_( "ACLogs" ) ) )
-		fs::create_directory( xorstr_( "ACLogs" ) );
+	//try {
+	//	std::vector<std::string> SearchStrings {
+	//		xorstr_( ".i64" ),
+	//		xorstr_( ".ida" )
+	//	};
 
-	try {
-		std::vector<std::string> SearchStrings {
-			xorstr_( ".i64" ),
-			xorstr_( ".ida" )
-		};
+	//	if ( fs::exists( CurrentPath ) && fs::is_directory( CurrentPath ) ) {
+	//		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "scanning " ) + CurrentPath , RED );
 
-		if ( fs::exists( CurrentPath ) && fs::is_directory( CurrentPath ) ) {
-			LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "scanning " ) + CurrentPath , RED );
-
-			for ( const auto & entry : fs::directory_iterator( CurrentPath ) ) {
-				try {
-					for ( const std::string & name : SearchStrings ) {
-						if ( Utils::Get( ).CheckStrings( entry.path( ).filename( ).string( ) , name ) ) {
-							LogSystem::Get( ).ConsoleLog( _CHECKER , entry.path( ).filename( ).string( ) , YELLOW );
-						}
-					}
-				}
-				catch ( const std::filesystem::filesystem_error & ex ) {
-					LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "Error processing file: " ) + entry.path( ).filename( ).string( ) , RED );
-					continue;  // Se ocorrer erro em um arquivo, continua para o próximo
-				}
-			}
-		}
-		else {
-			LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "invalid directory: " ) + CurrentPath , RED );
-			LogSystem::Get( ).Log( xorstr_( "[02] Invalid directory" ) );
-			return false;
-		}
-	}
-	catch ( const std::filesystem::filesystem_error & ex ) {
-		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "unexpected error" ) , RED );
-		LogSystem::Get( ).Log( xorstr_( "[03] unexpected error" ) );
-	}
+	//		for ( const auto & entry : fs::directory_iterator( CurrentPath ) ) {
+	//			try {
+	//				for ( const std::string & name : SearchStrings ) {
+	//					if ( Utils::Get( ).CheckStrings( entry.path( ).filename( ).string( ) , name ) ) {
+	//						LogSystem::Get( ).ConsoleLog( _CHECKER , entry.path( ).filename( ).string( ) , YELLOW );
+	//					}
+	//				}
+	//			}
+	//			catch ( const std::filesystem::filesystem_error & ex ) {
+	//				LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "Error processing file: " ) + entry.path( ).filename( ).string( ) , RED );
+	//				continue;  // Se ocorrer erro em um arquivo, continua para o próximo
+	//			}
+	//		}
+	//	}
+	//	else {
+	//		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "invalid directory: " ) + CurrentPath , RED );
+	//		LogSystem::Get( ).Error( xorstr_( "[02] Invalid directory" ) );
+	//		return false;
+	//	}
+	//}
+	//catch ( const std::filesystem::filesystem_error & ex ) {
+	//	LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "unexpected error" ) , RED );
+	//	LogSystem::Get( ).Error( xorstr_( "[03] unexpected error" ) );
+	//}
 
 	return true;
 }
@@ -401,11 +394,19 @@ bool FileChecking::CheckHash( ) {
 
 bool FileChecking::ValidateFiles( ) {
 
+	/*if ( !this->CheckCurrentPath( ) ) {
+		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "cant get currentpath" ) , RED );
+		return false;
+	}
+
+	LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "Current path is ok" ) , GREEN );*/
+
 	if ( !this->UpdateRegValues( ) ) {
 		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "cant update reg values" ) , RED );
 		return false;
 	}
 
+	LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "Reg values are ok" ) , GREEN );
 
 	switch ( this->CheckWindowsDumpSetting( ) ) {
 	case FILECHECK_RETURN::FAILED:
@@ -414,6 +415,9 @@ bool FileChecking::ValidateFiles( ) {
 	case FILECHECK_RETURN::SUCESS_NEED_RESTART:
 		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "restarting system in one minute due to dump files settings" ) , RED );
 		break;
+	default:
+		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "WindowsDump values are ok" ) , GREEN );
+		break;
 	}
 
 	if ( !this->GetNickname( ) ) {
@@ -421,15 +425,14 @@ bool FileChecking::ValidateFiles( ) {
 		return false;
 	}
 
-	if ( !this->CheckCurrentPath( ) ) {
-		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "cant get currentpath" ) , RED );
-		return false;
-	}
+	LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "Nickname: " ) + _globals.Nickname , GREEN );
 
 	if ( !this->CheckHash( ) ) {
 		LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "cant checkhash" ) , RED );
 		return false;
 	}
+
+	LogSystem::Get( ).ConsoleLog( _CHECKER , xorstr_( "Hash checked successfully" ) , GREEN );
 
 	return true;
 }

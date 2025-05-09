@@ -35,6 +35,9 @@ std::vector<HWND> GetProcessWindows( DWORD processID ) {
 }
 
 DWORD WINAPI InitExec( PVOID base ) {
+
+	::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
+
 	if ( MH_Initialize( ) != MH_OK ) {
 		return 0;
 	}
@@ -68,7 +71,6 @@ DWORD WINAPI InitExec( PVOID base ) {
 	}
 
 	if ( MH_CreateHookApi( L"kernel32.dll" , xorstr_( "ReadProcessMemory" ) , &hookedReadProcessMemory , reinterpret_cast< void ** >( &pReadProcessMemory ) ) != MH_OK ) {
-		MessageBoxA( NULL , xorstr_( "Failed To Hook ReadProcessMemory" ) , "" , MB_OK );
 	}
 	else {
 	}
@@ -81,9 +83,9 @@ DWORD WINAPI InitExec( PVOID base ) {
 	}
 
 	while ( true ) {
-		Sleep( 1000 );
+		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
 		if ( StopThreads ) {
-			Sleep( 15000 );
+			std::this_thread::sleep_for( std::chrono::seconds( 15 ) );
 			DeallocHooks( );
 			break;
 		}

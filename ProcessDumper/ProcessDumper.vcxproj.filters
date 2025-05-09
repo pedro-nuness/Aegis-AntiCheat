@@ -113,10 +113,19 @@
     <ClInclude Include="utils\SHA1\sha1.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="externals\minhook\dll_resources\resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="externals\minhook\dll_resources\MinHook.def">
       <Filter>Source Files</Filter>
+    </None>
+    <None Include="externals\minhook\dll_resources\rcdata1.bin">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="externals\minhook\dll_resources\rcdata2.bin">
+      <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

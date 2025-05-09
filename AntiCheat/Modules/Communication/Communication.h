@@ -58,10 +58,9 @@ public:
 	static bool InitializeClient( );
 
 	Communication( DWORD Pid , DWORD GamePid  )
-		: ProcessPID( Pid ) , GamePID( GamePid )  {}
+		: ThreadHolder( THREADS::COMMUNICATION ),  
+		ProcessPID( Pid ) , GamePID( GamePid )  {}
 
 	~Communication( );
-
-	bool isRunning( ) const override;
 };
 

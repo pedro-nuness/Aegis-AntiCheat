@@ -7,6 +7,8 @@
 #include <iostream>
 #include <cassert>
 #include <tlhelp32.h>
+#include <filesystem>
+#include <nlohmann/json.hpp>
 
 #include "Modules/Triggers/Triggers.h"
 #include "Modules/Communication/Communication.h"
@@ -23,12 +25,102 @@
 #include "Systems/Monitoring/Monitoring.h"
 #include "Systems/FileChecking/FileChecking.h"
 #include "Systems/Hardware/hardware.h"
+#include "Systems/LogSystem/File/File.h"
 
 #include "Client/client.h"
-
 #include "Globals/Globals.h"
 
-Detections DetectionEvent;
+using nlohmann::json;
+
+namespace fs = std::filesystem;
+
+
+#define IDR_DUMPERDLL 104
+#define IDR_LIBCRYPTO 105
+#define IDR_LIBSSL 106
+
+void * LoadInternalResource( DWORD * buffer, int resourceID, LPSTR type ) {
+	if ( _globals.dllModule == NULL ) {
+		LogSystem::Get( ).ConsoleLog( _MAIN, std::to_string( resourceID ) + xorstr_( ": Error gettind dll module" ) , RED );
+		return nullptr;
+	}
+
+	HRSRC hResInfo = FindResourceA( _globals.dllModule , MAKEINTRESOURCE( resourceID ) , type );
+	if ( hResInfo == NULL ) {
+		LogSystem::Get( ).ConsoleLog( _MAIN , std::to_string( resourceID ) + xorstr_( ": Error locating resources" ) , RED );
+		return nullptr;
+	}
+
+	DWORD resourceSize = SizeofResource( _globals.dllModule , hResInfo );
+	if ( resourceSize == 0 ) {
+		LogSystem::Get( ).ConsoleLog( _MAIN , std::to_string( resourceID ) + xorstr_( ": Error gettind resource size" ) , RED );
+		return nullptr;
+	}
+
+	HGLOBAL hResData = LoadResource( _globals.dllModule , hResInfo );
+	if ( hResData == NULL ) {
+		LogSystem::Get( ).ConsoleLog( _MAIN , std::to_string( resourceID ) + xorstr_( ": Error loading resource" ) , RED );
+		return nullptr;
+	}
+
+	void * pResData = LockResource( hResData );
+	if ( pResData == NULL ) {
+		LogSystem::Get( ).ConsoleLog( _MAIN , std::to_string( resourceID ) + xorstr_( ": Error locking resource" ) , RED );
+		return nullptr;
+	}
+
+	*buffer = resourceSize;
+
+	return pResData;
+}
+
+bool LoadLibraryWithMemory(char* data, DWORD size, std::string name = "" ) {
+	std::string filename = ( name.empty( ) ? Utils::Get( ).GetRandomWord( 32 ) + xorstr_( ".dll" ) : name);
+
+	// Salvar a DLL extraída em um arquivo temporário
+	std::ofstream outFile( filename , std::ios::binary );
+	if ( outFile ) {
+		outFile.write( data, size);
+		outFile.close( );
+
+		// Carregar a DLL usando LoadLibrary
+		HMODULE hModule = LoadLibrary( filename.c_str() );
+
+		if ( !fs::remove( filename.c_str( ) ) ) {
+			LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Couldnt delete library" ) , RED );
+		}
+
+		if ( hModule ) {
+			return true;
+		}
+
+	
+	}
+	else {
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Couldnt save library" ) , RED );
+		return false;
+	}
+
+	return false;
+}
+
+
+bool LoadAntiCheatResources( ) {
+	{
+		DWORD dumperSize = 0;
+		void * dumperDll = LoadInternalResource( &dumperSize , IDR_DUMPERDLL , RT_RCDATA );
+		if ( dumperDll == nullptr ) {
+			return false;
+		}
+		_globals.encryptedDumper = std::vector<uint8_t>( ( uint8_t * ) dumperDll , ( uint8_t * ) dumperDll + dumperSize );
+	}
+
+	std::string teste = Utils::Get().GenerateStringHash( "teste" );
+
+	LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Resources loaded succesfully" ) , GREEN );
+
+	return true;
+}
 
 void Startup( ) {
 	Communication CommunicationEvent( _globals.OriginalProcess , _globals.ProtectProcess );
@@ -36,23 +128,33 @@ void Startup( ) {
 	AntiDebugger AntiDbg;
 	Listener ListenEvent;
 
-	DetectionEvent.SetupPid( _globals.OriginalProcess , _globals.ProtectProcess );
+	Detections * detection = ( Detections * ) _globals.DetectionsPointer;
 
-	CommunicationEvent.start( );
-	DetectionEvent.start( );
-	TriggerEvent.start( );
-	AntiDbg.start( );
-	ListenEvent.start( );
+	detection->SetupPid( _globals.OriginalProcess , _globals.ProtectProcess );
 
-	DetectionEvent.InitializeThreads( );
 
+	//threads holder
 	std::vector<std::pair<ThreadHolder * , int>> threads = {
-		std::make_pair( &DetectionEvent, DETECTIONS ),
+		std::make_pair( detection, DETECTIONS ),
 		std::make_pair( &AntiDbg, ANTIDEBUGGER ),
 		std::make_pair( &TriggerEvent, TRIGGERS ) ,
 		std::make_pair( &CommunicationEvent, COMMUNICATION ),
 		std::make_pair( &ListenEvent,  LISTENER )
 	};
+
+
+	//Thread holder state
+	for ( int i = 0; i < threads.size( ); i++ ) {
+		_globals.threadsReady.emplace_back( false );
+	}
+
+	CommunicationEvent.start( );
+	detection->start( );
+	TriggerEvent.start( );
+	AntiDbg.start( );
+	ListenEvent.start( );
+
+	detection->InitializeThreads( );
 
 	ThreadGuard monitor( threads );
 	_globals.GuardMonitorPointer = &monitor;
@@ -60,11 +162,6 @@ void Startup( ) {
 	_globals.TriggersPointer = &TriggerEvent;
 	_globals.AntiDebuggerPointer = &AntiDbg;
 	monitor.start( );
-
-	while ( !_globals.VerifiedSession ) {
-		//as fast as possible cuh
-		std::this_thread::sleep_for( std::chrono::nanoseconds( 1 ) );
-	}
 
 	std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
 
@@ -111,105 +208,138 @@ bool IsProcessParent( DWORD processID , DWORD targetParentPID ) {
 	return parentPID == targetParentPID;
 }
 
-#include <nlohmann/json.hpp>
-#include "Systems/LogSystem/File/File.h"
-using nlohmann::json;
+ULONGLONG FileTimeToULL( const FILETIME & ft ) {
+	ULARGE_INTEGER li;
+	li.LowPart = ft.dwLowDateTime;
+	li.HighPart = ft.dwHighDateTime;
+	return li.QuadPart;
+}
 
+double GetProcessUptimeSeconds( ) {
+	FILETIME createTime , exitTime , kernelTime , userTime;
 
-int main( int argc , char * argv[ ] ) {
+	if ( GetProcessTimes( GetCurrentProcess( ) , &createTime , &exitTime , &kernelTime , &userTime ) ) {
+		FILETIME now;
+		GetSystemTimeAsFileTime( &now );
 
-	_globals.GameName = xorstr_( "DayZ_x64.exe" );
-	FreeConsole( );
-	//Init anti-cheat
-	{
-		//Request MB and Disk ID
-		if ( !hardware::Get( ).GenerateInitialCache( ) ) {
-			LogSystem::Get( ).Log( xorstr_( "[401] Failed to generate initial hardware cache" ) , false );
-			return 0;
-		}
+		ULONGLONG now64 = FileTimeToULL( now );
+		ULONGLONG create64 = FileTimeToULL( createTime );
 
-		//Initialize in case preventions module has to add a external detection
-		_globals.DetectionsPointer = &DetectionEvent;
-
-		//Deploy Preventions
-		int PreventionsResult = Preventions::Get( ).Deploy( );
-		if ( PreventionsResult != 903 ) {
-			LogSystem::Get( ).Log( xorstr_( "[401] Failed to deploy prevention " ) + std::to_string( PreventionsResult ) , false );
-			return 0;
-		}
-		//Ignore errors caused in process
-		SetErrorMode( SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX );
-
-		DWORD myProcessID = GetCurrentProcessId( ); // Get the current process ID
-		DWORD ParentProcessId = GetParentProcessID( myProcessID ); // Get the parent process ID
-
-		if ( !ParentProcessId ) {
-			LogSystem::Get( ).Log( xorstr_( "[401] Initialization failed no parent" ) , false );
-			return 0;
-		}
-		_globals.OriginalProcess = ParentProcessId;
-
-		DWORD GameProcessID = Mem::Get( ).GetProcessID( _globals.GameName.c_str( ) );
-		if ( !GameProcessID ) {
-			LogSystem::Get( ).Log( xorstr_( "[401] Game not found" ) , false );
-			return 0;
-		}
-		_globals.ProtectProcess = GameProcessID;
-
-		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Parent: " ) + Mem::Get( ).GetProcessName( ParentProcessId ) , GRAY );
-
-
-
-		if ( !hardware::Get( ).EndCacheGeneration( ) ) {
-			LogSystem::Get( ).Log( xorstr_( "[401] Failed to end hardware cache" ) , false );
-			return 0;
-		}
-
-		std::string VersionID;
-		if ( !hardware::Get( ).GetVersionUID( &VersionID ) )
-		{
-			LogSystem::Get( ).Log( xorstr_( "[401] Failed to get version ID" ) , false );
-			return 0;
-		}
-		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "VersionID: " ) + VersionID , YELLOW );
-
+		// Cada unidade do FILETIME representa 100 nanossegundos
+		return ( now64 - create64 ) / 10000000.0; // converte para segundos
 	}
 
-	// ::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
+	return -1.0;
+}
 
-	_globals.SelfID = ::_getpid( );
+bool IsRunningAsAdmin( ) {
+	BOOL isAdmin = FALSE;
+	PSID adminGroup = nullptr;
 
-#if true
+	// Cria um SID para o grupo Administradores
+	SID_IDENTIFIER_AUTHORITY ntAuthority = SECURITY_NT_AUTHORITY;
+	if ( AllocateAndInitializeSid(
+		&ntAuthority , 2 ,
+		SECURITY_BUILTIN_DOMAIN_RID ,
+		DOMAIN_ALIAS_RID_ADMINS ,
+		0 , 0 , 0 , 0 , 0 , 0 ,
+		&adminGroup ) ) {
+		CheckTokenMembership( nullptr , adminGroup , &isAdmin );
+		FreeSid( adminGroup );
+	}
+
+	return isAdmin == TRUE;
+}
 
 
+bool OpenConsole( ) {
+
+	AllocConsole( );
+	if ( freopen( "CONOUT$" , "w" , stdout ) == nullptr ) {
+		return false;
+	}
+	::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
+
+	return true;
+}
 
 
-	//std::cout << "Parent hash:  " << ParentHash << "\n";
-	//[system( "pause" ); ]
+DWORD WINAPI main( LPVOID lpParam ) {
+	double StartupTime = GetProcessUptimeSeconds( );
 
-	//FreeConsole( );
-	//::ShowWindow( ::GetConsoleWindow( ) , SW_HIDE );
+	if ( StartupTime > 2 ) {
+		LogSystem::Get( ).Error( xorstr_( "[401] Failed to start process" ) , false );
+		return 1;
+	}
+
+	//Ignore errors caused in process
+	SetErrorMode( SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX );
+
+	if ( !IsRunningAsAdmin( ) ) {
+		LogSystem::Get( ).MessageBoxError( xorstr_( "Process is not on admin mode!" ) , xorstr_( "Process is not on admin mode!" ) , false );
+		return 1;
+	}
+
+	if ( !fs::exists( xorstr_( "ACLogs" ) ) )
+		fs::create_directory( xorstr_( "ACLogs" ) );
+
+	OpenConsole( );
+
+	LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Process startup Time:" ) + std::to_string( StartupTime ) , WHITE );
+
+	if ( !Preventions::Get( ).DeployFirstBarrier( ) ) {
+		LogSystem::Get( ).Error( xorstr_( "[401] Failed to deploy first barrier" ) , false );
+		return 1;
+	}
+
+	if ( !LoadAntiCheatResources( ) ) {
+		LogSystem::Get( ).Error( xorstr_( "[401] Failed to load resources" ) , false );
+		return 1;
+	}
 
 	if ( !FileChecking::Get( ).ValidateFiles( ) ) {
-		LogSystem::Get( ).Log( xorstr_( "[401] Can't validate files" ) , false );
-		return 0;
+		LogSystem::Get( ).Error( xorstr_( "[401] Can't validate files" ) , false );
+		return 1;
+	}
+
+	Utils::Get( ).waitModule( xorstr_( "ntdll" ) );
+
+	Detections DetectionEvent;
+
+	_globals.GameName = xorstr_( "DayZ_x64.exe" );
+	_globals.DetectionsPointer = &DetectionEvent;
+	_globals.SelfID = ::_getpid( );
+	DWORD ParentProcessId = GetParentProcessID( _globals.SelfID ); // Get the parent process ID
+	if ( !ParentProcessId ) {
+		LogSystem::Get( ).Error( xorstr_( "[401] Initialization failed no parent" ) , false );
+		return 1;
+	}
+	_globals.OriginalProcess = ParentProcessId;
+	LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Parent: " ) + Mem::Get( ).GetProcessName( ParentProcessId ) , GRAY );
+
+	//Request MB and Disk ID
+	if ( !hardware::Get( ).GenerateInitialCache( ) ) {
+		LogSystem::Get( ).Error( xorstr_( "[401] Failed to generate initial hardware cache" ) , false );
+		return 1;
+	}
+
+	if ( !hardware::Get( ).EndCacheGeneration( ) ) {
+		LogSystem::Get( ).Error( xorstr_( "[401] Failed to end hardware cache" ) , false );
+		return 1;
+	}
+
+	//Utils::Get( ).waitModule( xorstr_( "BEClient" ) );
+
+	if ( !Preventions::Get( ).DeployLastBarrier( ) ) {
+		LogSystem::Get( ).Error( xorstr_( "[401] Failed to deploy last barrier" ) , false );
+		return 1;
 	}
 
 	if ( !_client.SendPingToServer( ) ) {
-		LogSystem::Get( ).Log( xorstr_( "[401] Can't connect to server" ) , false );
+		LogSystem::Get( ).Error( xorstr_( "[401] Can't connect to server" ) , false );
 	}
 
-
-	//Start client module
-	TerminateProcess( Mem::Get( ).GetProcessHandle( _globals.OriginalProcess ) , 1 );
-
-#endif 
-
-
 	Startup( );
-
-
-
 idle:
 	int MaxIdle = 3;
 	for ( int i = 0; i <= MaxIdle; i++ ) {
@@ -217,5 +347,24 @@ idle:
 		std::this_thread::sleep_for( std::chrono::seconds( 5 ) );
 	}
 
-	return 1;
+	return 0;
+}
+
+BOOL APIENTRY DllMain( HMODULE hModule ,
+	DWORD  ul_reason_for_call ,
+	LPVOID lpReserved )
+{
+	_globals.dllModule = hModule;
+
+	switch ( ul_reason_for_call )
+	{
+	case DLL_PROCESS_ATTACH:
+		// Cria a thread quando a DLL é carregada
+		CreateThread( NULL , 0 , main , NULL , 0 , NULL );
+		break;
+	case DLL_PROCESS_DETACH:
+		// Finalização, se necessário
+		break;
+	}
+	return TRUE;
 }

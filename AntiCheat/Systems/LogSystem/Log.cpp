@@ -192,8 +192,8 @@ void LogSystem::ConsoleLog( MODULE_SENDER sender , std::string Message , COLORS 
 	}
 	CachedLogs.emplace_back( StringCrypt::Get( ).EncryptString( xorstr_( "[" ) + custom_text + xorstr_( "] " ) + Message ) );
 
-	//Warn( custom_col , custom_text );
-	//ColoredText( xorstr_( " " ) + Message + xorstr_( "\n" ) , _col );
+	Warn( custom_col , custom_text );
+	ColoredText( xorstr_( " " ) + Message + xorstr_( "\n" ) , _col );
 
 #else
 
@@ -204,7 +204,7 @@ void LogSystem::ConsoleLog( MODULE_SENDER sender , std::string Message , COLORS 
 #endif
 }
 
-void LogSystem::Log( std::string Message , bool Async ) {
+void LogSystem::Error( std::string Message , bool Async ) {
 
 	//Multiple Log calls
 	if ( GotInsideOfALog )
@@ -220,7 +220,7 @@ void LogSystem::Log( std::string Message , bool Async ) {
 		DetachModules( Message , "" , false );
 }
 
-void LogSystem::LogWithMessageBox( std::string Message , std::string BoxMessage , bool Async ) {
+void LogSystem::MessageBoxError( std::string Message , std::string BoxMessage , bool Async ) {
 
 	//Multiple Log calls
 	if ( GotInsideOfALog )
