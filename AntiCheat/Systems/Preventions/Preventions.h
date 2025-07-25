@@ -20,6 +20,7 @@ public:
 	bool DeployDllLoadNotifation( );
 
 	bool DeployFirstBarrier( );
+	bool DeployMidBarrier( );
 	bool DeployLastBarrier( );
 };
 

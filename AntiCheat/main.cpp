@@ -26,6 +26,7 @@
 #include "Systems/FileChecking/FileChecking.h"
 #include "Systems/Hardware/hardware.h"
 #include "Systems/LogSystem/File/File.h"
+#include "Systems/Services/Services.h"
 
 #include "Client/client.h"
 #include "Globals/Globals.h"
@@ -146,12 +147,24 @@ HRESULT __stdcall hkPresent( IDXGISwapChain * pSwapChain , UINT SyncInterval , U
 	return oPresent( pSwapChain , SyncInterval , Flags );
 }
 
-void HookPresent( ) {
+bool HookPresent( ) {
+
+	LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Waiting game window" ) , GREEN );
+	while ( !FindWindowA( NULL, xorstr_("DayZ") ) ) {
+		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
+	}
+
+	HWND window = GetForegroundWindow( );
+	if ( !window ) {
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "can't get foreground window!" ) , RED );
+		return false;
+	}
+
 	DXGI_SWAP_CHAIN_DESC scd = {};
 	scd.BufferCount = 1;
 	scd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 	scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	scd.OutputWindow = GetForegroundWindow( );  // Qualquer janela
+	scd.OutputWindow = window;// Qualquer janela
 	scd.SampleDesc.Count = 1;
 	scd.Windowed = TRUE;
 	scd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
@@ -163,22 +176,30 @@ void HookPresent( ) {
 
 	if ( D3D11CreateDeviceAndSwapChain( nullptr , D3D_DRIVER_TYPE_HARDWARE , nullptr , 0 , nullptr ,
 		0 , D3D11_SDK_VERSION , &scd , &pSwapChain , &pDevice , &featureLevel , &pContext ) != S_OK ) {
-		return;
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Failed to create d3d11 Device" ) , GREEN );
+		return false;
 	}
 
 	void ** pVTable = *reinterpret_cast< void *** >( pSwapChain ); // VTable do SwapChain
 	void * pPresent = pVTable[ 8 ]; // Index 8 = Present()
 
-	// Inicia o MinHook e aplica o hook
-	MH_Initialize( );
-	MH_CreateHook( pPresent , &hkPresent , reinterpret_cast< void ** >( &oPresent ) );
-	MH_EnableHook( pPresent );
-	LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "pPresent hooked!" ) , GREEN );
+
+	if ( pPresent != nullptr && pSwapChain != nullptr) {
+		MH_CreateHook( pPresent , &hkPresent , reinterpret_cast< void ** >( &oPresent ) );
+		MH_EnableHook( pPresent );
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "pPresent hooked!" ) , GREEN );
+	}
+	else {
+		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Failed to find pPresent!" ) , RED );
+		return false;
+	}
 
 	// Cleanup
 	pSwapChain->Release( );
 	pDevice->Release( );
 	pContext->Release( );
+
+	return true;
 }
 
 void * LoadInternalResource( DWORD * buffer, int resourceID, LPSTR type ) {
@@ -219,24 +240,28 @@ void * LoadInternalResource( DWORD * buffer, int resourceID, LPSTR type ) {
 bool LoadLibraryWithMemory(char* data, DWORD size, std::string name = "" ) {
 	std::string filename = ( name.empty( ) ? Utils::Get( ).GetRandomWord( 32 ) + xorstr_( ".dll" ) : name);
 
+	// Pega caminho da pasta TEMP
+	char tempPath[ MAX_PATH ];
+	if ( !GetTempPathA( MAX_PATH , tempPath ) ) return "";
+
+	std::string fullPath = std::string( tempPath ) + filename;
+
 	// Salvar a DLL extraída em um arquivo temporário
-	std::ofstream outFile( filename , std::ios::binary );
+	std::ofstream outFile( fullPath , std::ios::binary );
 	if ( outFile ) {
 		outFile.write( data, size);
 		outFile.close( );
 
 		// Carregar a DLL usando LoadLibrary
-		HMODULE hModule = LoadLibrary( filename.c_str() );
+		HMODULE hModule = LoadLibrary( fullPath.c_str() );
 
-		if ( !fs::remove( filename.c_str( ) ) ) {
+		if ( !fs::remove( fullPath.c_str( ) ) ) {
 			LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Couldnt delete library" ) , RED );
 		}
 
 		if ( hModule ) {
 			return true;
 		}
-
-	
 	}
 	else {
 		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Couldnt save library" ) , RED );
@@ -388,26 +413,6 @@ double GetProcessUptimeSeconds( ) {
 	return -1.0;
 }
 
-bool IsRunningAsAdmin( ) {
-	BOOL isAdmin = FALSE;
-	PSID adminGroup = nullptr;
-
-	// Cria um SID para o grupo Administradores
-	SID_IDENTIFIER_AUTHORITY ntAuthority = SECURITY_NT_AUTHORITY;
-	if ( AllocateAndInitializeSid(
-		&ntAuthority , 2 ,
-		SECURITY_BUILTIN_DOMAIN_RID ,
-		DOMAIN_ALIAS_RID_ADMINS ,
-		0 , 0 , 0 , 0 , 0 , 0 ,
-		&adminGroup ) ) {
-		CheckTokenMembership( nullptr , adminGroup , &isAdmin );
-		FreeSid( adminGroup );
-	}
-
-	return isAdmin == TRUE;
-}
-
-
 bool OpenConsole( ) {
 
 	AllocConsole( );
@@ -440,16 +445,22 @@ DWORD WINAPI main( LPVOID lpParam ) {
 	//Ignore errors caused in process
 	SetErrorMode( SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX );
 
-	if ( !IsRunningAsAdmin( ) ) {
+	if ( !Services::Get().IsRunningAsAdmin( ) ) {
 		LogSystem::Get( ).MessageBoxError( xorstr_( "Process is not on admin mode!" ) , xorstr_( "Process is not on admin mode!" ) , false );
 		return 1;
 	}
 
 	if ( !fs::exists( xorstr_( "ACLogs" ) ) )
 		fs::create_directory( xorstr_( "ACLogs" ) );
-
+	
 	OpenConsole( );
 
+	if ( MH_Initialize( ) != MH_OK ) {
+		LogSystem::Get( ).Error(  xorstr_( "MinHook initialization failed!" ), false );
+		return 1;
+	}
+	LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "minhook initialized" ) , GREEN );
+	
 	LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Process startup Time:" ) + std::to_string( StartupTime ) , WHITE );
 
 	if ( !Preventions::Get( ).DeployFirstBarrier( ) ) {
@@ -492,11 +503,18 @@ DWORD WINAPI main( LPVOID lpParam ) {
 		LogSystem::Get( ).Error( xorstr_( "[401] Failed to end hardware cache" ) , false );
 		return 1;
 	}
-
-	HookPresent( );
+	if ( !HookPresent( ) ) {
+		LogSystem::Get( ).Error( xorstr_( "Failed to hook directx" ) , false );
+		return 1;
+	}
 
 	while(!loadingScreenStarted ) {
 		std::this_thread::sleep_for( std::chrono::seconds( 1 ) );
+	}
+
+	if ( !Preventions::Get( ).DeployMidBarrier( ) ) {
+		LogSystem::Get( ).Error( xorstr_( "[401] Failed to deploy mid barrier" ) , false );
+		return 1;
 	}
 
 	if ( !_client.SendPingToServer( ) ) {

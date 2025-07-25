@@ -650,13 +650,13 @@ bool Mem::ReadFileToMemory( const std::string & file_path , std::vector<uint8_t>
 	return true;
 }
 
-std::string  Mem::GetFileHash( std::string path )
+std::string Mem::GetFileHash( std::string path )
 {
 	std::vector<uint8_t> CurrentBytes;
 	if ( !ReadFileToMemory( path , &CurrentBytes ) )
 	{
-		Sleep( 1000 );
-		exit( 0 );
+		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "failed to read file memory!" ) , RED );
+		return xorstr_( "" );
 	}
 
 	SHA1 sha1;

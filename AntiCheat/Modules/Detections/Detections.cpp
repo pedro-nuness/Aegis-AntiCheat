@@ -313,6 +313,9 @@ std::string Detections::GenerateDetectionStatus( FLAG_DETECTION flag , Detection
 	case INVALID_THREAD_CREATION:
 		_result += xorstr_( "** Invalid Thread creation attempted **\n" );
 		break;
+	case IAT_HOOKED:
+		_result += xorstr_( "** IAT Hooked **\n" );
+		break;
 	}
 
 	_result += xorstr_( "`" ) + _detection.Log + xorstr_( "`\n" );
@@ -524,7 +527,6 @@ void Detections::ScanWindows( ) {
 		std::this_thread::sleep_for( std::chrono::milliseconds( 1 ) );
 	}
 
-
 	for ( const auto & [processId , _] : processedProcesses ) {
 
 		if ( processId == 4 || processId == 0 || processId == _globals.ProtectProcess )
@@ -581,7 +583,6 @@ void Detections::ScanWindows( ) {
 	}
 
 	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "ending window scan" ) , GREEN );
-	this->ScanModules( );
 }
 
 void Detections::ScanModules( ) {
@@ -595,8 +596,21 @@ void Detections::ScanModules( ) {
 	send it
 	and pop a warning
 	*/
+	std::vector<ModuleInfo> LoadedModules = Mem::Module::Get( ).EnumerateModules( _globals.SelfID );
 
-	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning modules" ) , WHITE );
+	for ( ModuleInfo & Module : LoadedModules ) {
+
+		bool iatHooked = IsIATHooked( Module.moduleName );
+
+		if ( iatHooked ) {
+			AddDetection( IAT_HOOKED , DetectionStruct( Module.moduleName + xorstr_( ": IAT HOOKED" ) , SUSPECT ) );
+		}
+
+		std::string StringStatus = iatHooked ? xorstr_( "true" ) : xorstr_( "false" );
+
+		LogSystem::Get( ).ConsoleLog( _DETECTION , Module.moduleName + xorstr_( " IAT Hooked: " ) + StringStatus , iatHooked? RED :GRAY );
+
+	}
 }
 
 void Detections::ScanParentModules( ) {
@@ -635,6 +649,8 @@ bool Detections::IsEATHooked( std::string & moduleName ) {
 	return false;
 }
 
+
+
 bool Detections::IsIATHooked( std::string & moduleName ) {
 	HMODULE module = GetModuleHandleA( moduleName.c_str( ) );
 	if ( !module ) {
@@ -643,7 +659,25 @@ bool Detections::IsIATHooked( std::string & moduleName ) {
 	}
 
 	auto dosHeader = reinterpret_cast< PIMAGE_DOS_HEADER >( module );
+	if ( dosHeader->e_magic != IMAGE_DOS_SIGNATURE ) {
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Failed to get dosHeader for: " ) + moduleName , RED );
+		return false;
+	}
+
 	auto ntHeaders = reinterpret_cast< PIMAGE_NT_HEADERS >( reinterpret_cast< uintptr_t >( module ) + dosHeader->e_lfanew );
+
+	if ( ntHeaders->Signature != IMAGE_NT_SIGNATURE ) {
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Failed to get ntHeaders for: " ) + moduleName , RED );
+		return false;
+	}
+
+	auto importDir = ntHeaders->OptionalHeader.DataDirectory[ IMAGE_DIRECTORY_ENTRY_IMPORT ];
+
+	if ( !importDir.VirtualAddress || !importDir.Size ) {
+		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Dont have IAT: " ) + moduleName , RED );
+		return false;
+	}
+
 	auto importDescriptor = reinterpret_cast< PIMAGE_IMPORT_DESCRIPTOR >(
 		reinterpret_cast< uintptr_t >( module ) + ntHeaders->OptionalHeader.DataDirectory[ IMAGE_DIRECTORY_ENTRY_IMPORT ].VirtualAddress
 		);
@@ -674,9 +708,6 @@ bool Detections::IsIATHooked( std::string & moduleName ) {
 
 	return false;
 }
-
-
-
 
 void Detections::CheckFunctions( ) {
 
@@ -766,12 +797,125 @@ void Detections::AddThreadToWhitelist( DWORD threadPID ) {
 	this->AllowedThreads.emplace_back( threadPID );
 }
 
+// define MessageBoxA prototype
+using PrototypeMessageBox = int ( WINAPI * )( HWND hWnd , LPCSTR lpText , LPCSTR lpCaption , UINT uType );
+
+// remember memory address of the original MessageBoxA routine
+PrototypeMessageBox originalMsgBox = MessageBoxA;
+
+// hooked function with malicious code that eventually calls the original MessageBoxA
+int hookedMessageBox( HWND hWnd , LPCSTR lpText , LPCSTR lpCaption , UINT uType )
+{
+	printf( "gjfdaisobgfidahgfuijdagioufdajhgioufdaiogjfdaisobgfidahgfuijdagioufdajhgioufdaiogjfdaisobgfidahgfuijdagioufdajhgioufdaiogjfdaisobgfidahgfuijdagioufdajhgioufdaiogjfdaisobgfidahgfuijdagioufdajhgioufdaiogjfdaisobgfidahgfuijdagioufdajhgioufdaio\n" );
+	// execute the original NessageBoxA
+	return originalMsgBox( hWnd , lpText , lpCaption , uType );
+}
+
+bool HOOKIAT( )
+{
+	MessageBoxA( NULL , "Hello Before Hooking" , "Hello Before Hooking" , 0 );
+	printf( "[HOOKIAT] Iniciando função HOOKIAT\n" );
+
+	LPVOID imageBase = GetModuleHandleA( NULL );
+	if ( !imageBase ) {
+		printf( "[HOOKIAT] Falha ao obter o handle do módulo %s\n", _globals.ModuleName.c_str() );
+		return false;
+	}
+	printf( "[HOOKIAT] Handle do módulo %s obtido com sucesso\n", _globals.ModuleName.c_str( ) );
+
+	PIMAGE_DOS_HEADER dosHeaders = ( PIMAGE_DOS_HEADER ) imageBase;
+	if ( dosHeaders->e_magic != IMAGE_DOS_SIGNATURE ) {
+		printf( "[HOOKIAT] Assinatura DOS inválida\n" );
+		return false;
+	}
+
+	PIMAGE_NT_HEADERS ntHeaders = ( PIMAGE_NT_HEADERS ) ( ( DWORD_PTR ) imageBase + dosHeaders->e_lfanew );
+	if ( ntHeaders->Signature != IMAGE_NT_SIGNATURE ) {
+		printf( "[HOOKIAT] Assinatura NT inválida\n" );
+		return false;
+	}
+
+	auto importDir = ntHeaders->OptionalHeader.DataDirectory[ IMAGE_DIRECTORY_ENTRY_IMPORT ];
+	if ( !importDir.VirtualAddress || !importDir.Size ) {
+		printf( "[HOOKIAT] Diretório de importação não encontrado\n" );
+		return false;
+	}
+	printf( "[HOOKIAT] Diretório de importação localizado\n" );
+
+	PIMAGE_IMPORT_DESCRIPTOR importDescriptor = ( PIMAGE_IMPORT_DESCRIPTOR ) ( ( DWORD_PTR ) imageBase + importDir.VirtualAddress );
+	bool Found = false;
+
+	while ( importDescriptor->Name != NULL )
+	{
+		if ( Found )
+			break;
+
+		LPCSTR libraryName = ( LPCSTR ) ( ( DWORD_PTR ) imageBase + importDescriptor->Name );
+		printf( "[HOOKIAT] Verificando biblioteca: %s\n" , libraryName );
+
+		HMODULE library = LoadLibraryA( libraryName );
+		if ( !library ) {
+			printf( "[HOOKIAT] Falha ao carregar biblioteca: %s\n" , libraryName );
+			importDescriptor++;
+			continue;
+		}
+
+		PIMAGE_THUNK_DATA originalFirstThunk = ( PIMAGE_THUNK_DATA ) ( ( DWORD_PTR ) imageBase + importDescriptor->OriginalFirstThunk );
+		PIMAGE_THUNK_DATA firstThunk = ( PIMAGE_THUNK_DATA ) ( ( DWORD_PTR ) imageBase + importDescriptor->FirstThunk );
+
+		while ( originalFirstThunk->u1.AddressOfData != NULL )
+		{
+			PIMAGE_IMPORT_BY_NAME functionName = ( PIMAGE_IMPORT_BY_NAME ) ( ( DWORD_PTR ) imageBase + originalFirstThunk->u1.AddressOfData );
+			printf( "[HOOKIAT] Função importada encontrada: %s\n" , functionName->Name );
+
+			if ( strcmp( functionName->Name , "MessageBoxA" ) == 0 )
+			{
+				printf( "[HOOKIAT] Encontrada função MessageBoxA! Iniciando hook...\n" );
+
+				DWORD oldProtect = 0;
+				if ( VirtualProtect( ( LPVOID ) &firstThunk->u1.Function , sizeof( DWORD_PTR ) , PAGE_READWRITE , &oldProtect ) ) {
+					firstThunk->u1.Function = ( DWORD_PTR ) hookedMessageBox;
+					VirtualProtect( ( LPVOID ) &firstThunk->u1.Function , sizeof( DWORD_PTR ) , oldProtect , &oldProtect );
+					printf( "[HOOKIAT] Hook aplicado com sucesso em MessageBoxA\n" );
+					Found = true;
+					break;
+				}
+				else {
+					printf( "[HOOKIAT] Falha ao alterar proteção de memória para hook\n" );
+				}
+			}
+
+			++originalFirstThunk;
+			++firstThunk;
+		}
+
+		importDescriptor++;
+	}
+
+	MessageBoxA( NULL , "Hello after Hooking" , "Hello after Hooking" , 0 );
+	printf( "[HOOKIAT] Função HOOKIAT finalizada\n" );
+
+	return Found;
+}
+bool doOnce = false;
+
 void Detections::threadFunction( ) {
 
 	
 
 
 	LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "thread started sucessfully, id: " ) + std::to_string( this->ThreadObject->GetId( ) ) , GREEN );
+
+	if ( !doOnce ) { 
+		if ( !HOOKIAT() ) {
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Failed to hook iat" ), RED );
+		}
+		else {
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "Hooked IAT" ) , GREEN );
+		}
+		doOnce = true;
+	} 
+
 
 	bool Running = true;
 
@@ -819,6 +963,10 @@ void Detections::threadFunction( ) {
 			this->ScanParentModules( );
 			break;
 		case 7:
+			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "scanning modules!" ) , GRAY );
+			this->ScanModules( );
+			break;
+		case 8:
 			LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "digesting detecions!" ) , GRAY );
 			this->DigestDetections( );
 			break;
@@ -829,11 +977,10 @@ void Detections::threadFunction( ) {
 			break;
 		}
 
-
 		LogSystem::Get( ).ConsoleLog( _DETECTION , xorstr_( "ping" ) , GRAY );
 
 		CurrentDetection++;
 
-		std::this_thread::sleep_for( std::chrono::milliseconds( 250 ) );
+		std::this_thread::sleep_for( std::chrono::milliseconds( 500 ) );
 	}
 }

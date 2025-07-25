@@ -21,7 +21,7 @@
 
 #pragma comment(lib, "ws2_32.lib")
 
-std::string portPath = xorstr_( "Software\\AegisPort" );
+
 
 Listener::Listener( ) 
 	: ThreadHolder( THREADS::LISTENER )
@@ -109,38 +109,6 @@ void Listener::GenerateRandomPort( ) {
 	this->port = Utils::Get( ).RandomNumber( 1024 , 65535 );
 }
 
-bool Listener::savePort( std::string porta ) {
-	HKEY hKey;
-	
-	// Cria ou abre a chave no registro
-	if ( RegCreateKeyExA( HKEY_CURRENT_USER , portPath.c_str() , 0 , nullptr , 0 , KEY_WRITE , nullptr , &hKey , nullptr ) == ERROR_SUCCESS ) {
-		// Escreve o valor da porta como string
-		RegSetValueExA( hKey , xorstr_( "Porta") , 0 , REG_SZ , reinterpret_cast< const BYTE * >( porta.c_str( ) ) , porta.size( ) + 1 );
-		RegCloseKey( hKey );
-		return true;
-	}
-	
-	return false;
-}
-
-std::string Listener::readPort( ) {
-	HKEY hKey;
-	char buffer[ 256 ];
-	DWORD bufferSize = sizeof( buffer );
-	DWORD tipo = 0;
-
-	if ( RegOpenKeyExA( HKEY_CURRENT_USER , portPath.c_str() , 0 , KEY_READ , &hKey ) == ERROR_SUCCESS ) {
-		if ( RegQueryValueExA( hKey , xorstr_("Porta") , nullptr , &tipo , reinterpret_cast< LPBYTE >( buffer ) , &bufferSize ) == ERROR_SUCCESS ) {
-			if ( tipo == REG_SZ ) {
-				RegCloseKey( hKey );
-				return std::string( buffer );
-			}
-		}
-		RegCloseKey( hKey );
-	}
-
-	return xorstr_("");
-}
 
 
 void Listener::threadFunction( ) {
@@ -204,7 +172,7 @@ void Listener::threadFunction( ) {
 		else {
 			initializedPort = true;
 
-			if ( !savePort( std::to_string( this->port ) ) ) {
+			if ( !_regfiles.savePort( std::to_string( this->port ) ) ) {
 				LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Can't save port" ) , RED );
 				this->setThreadStatus( THREAD_STATUS::INITIALIZATION_FAILED );
 				closesocket( listenSock );
@@ -242,24 +210,46 @@ void Listener::threadFunction( ) {
 	inet_ntop( AF_INET , &serverAddr.sin_addr , ipStr , sizeof( ipStr ) );
 	LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Server listening on port " ) + std::to_string( this->port ) , COLORS::GREEN );
 
+#define ACCEPT_TIMEOUT_MS 10000 // Timeout de 10000ms (10 segundo)
+
 	while ( true ) {
 		if ( this->ThreadObject->IsShutdownSignalled( ) ) {
-			LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Shutdown signalled!" ) , COLORS::GREEN );
+			LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "off!" ) , COLORS::RED );
 			break;
 		}
 
-		sockaddr_in clientAddr;
-		int clientAddrLen = sizeof( clientAddr );
-		SOCKET clientSock = accept( listenSock , ( sockaddr * ) &clientAddr , &clientAddrLen );
-		if ( clientSock == INVALID_SOCKET ) {
-			LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "No connections found" ) , COLORS::GRAY );
+		fd_set readSet;
+		FD_ZERO( &readSet );
+		FD_SET( listenSock , &readSet );
+
+		timeval timeout;
+		timeout.tv_sec = 0;
+		timeout.tv_usec = ACCEPT_TIMEOUT_MS * 1000; // microssegundos
+
+		int result = select( 0 , &readSet , nullptr , nullptr , &timeout );
+		if ( result == SOCKET_ERROR ) {
+			int err = WSAGetLastError( );
+			LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "select() failed. Code: " ) + std::to_string( err ) , COLORS::RED );
+			break;
+		}
+
+		if ( result == 0 ) {
+			LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "No connections found" ), COLORS::GRAY );
 			continue;
 		}
 
-		LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Received new connection" ) , COLORS::GREEN );
+		if ( FD_ISSET( listenSock , &readSet ) ) {
+			sockaddr_in clientAddr;
+			int clientAddrLen = sizeof( clientAddr );
+			SOCKET clientSock = accept( listenSock , ( sockaddr * ) &clientAddr , &clientAddrLen );
+			if ( clientSock == INVALID_SOCKET ) {
+				LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "accept() failed" ) , COLORS::RED );
+				continue;
+			}
 
-		// Criar uma nova thread para lidar com a conexão do cliente
-		std::thread( &Listener::handleClient , this , clientSock ).detach( ); // A nova thread gerencia a conexão do cliente
+			LogSystem::Get( ).ConsoleLog( _LISTENER , xorstr_( "Received new connection" ) , COLORS::GREEN );
+			std::thread( &Listener::handleClient , this , clientSock ).detach( );
+		}
 	}
 
 	closesocket( listenSock );

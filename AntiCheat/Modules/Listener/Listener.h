@@ -18,8 +18,6 @@ class Listener : public ThreadHolder {
 	void GenerateRandomPort( );
 	int port = -1;
 
-	bool savePort( std::string port );
-	std::string readPort( );
 
 public:
 

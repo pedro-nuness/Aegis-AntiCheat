@@ -2,9 +2,11 @@
 #include <string>
 #include <vector>
 #include <mutex>
-#include "../Systems/Utils/singleton.h"
-#include <windows.h>
 
+#include "../Systems/Utils/singleton.h"
+#include "../Systems/RegeditFiles/regFiles.h"
+
+#include <windows.h>
 
 enum DETECTION_STATUS {
 	NOTHING_DETECTED ,
@@ -15,9 +17,9 @@ enum DETECTION_STATUS {
 class Globals
 {
 public:
-	int OriginalProcess;
-	int ProtectProcess;
-	int SelfID;
+	DWORD OriginalProcess;
+	DWORD ProtectProcess;
+	DWORD SelfID;
 
 	void * GuardMonitorPointer;
 	void * DetectionsPointer;
@@ -33,6 +35,7 @@ public:
 	std::string NicknameHash;
 	std::string OriginalProcessHash;
 	std::string GameName;
+	std::string ModuleName;
 
 	std::string CLIENT_NAME;
 	std::string DUMPER_NAME;
@@ -41,5 +44,7 @@ public:
 
 	std::vector<std::uint8_t> encryptedDumper;
 };
+
+extern regFiles _regfiles;
 extern Globals _globals;
 

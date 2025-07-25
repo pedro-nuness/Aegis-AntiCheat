@@ -38,7 +38,7 @@ int client::readPort( ) {
 	DWORD tipo = 0;
 
 	if ( RegOpenKeyExA( HKEY_CURRENT_USER , portPath.c_str( ) , 0 , KEY_READ , &hKey ) == ERROR_SUCCESS ) {
-		if ( RegQueryValueExA( hKey , "Porta" , nullptr , &tipo , reinterpret_cast< LPBYTE >( buffer ) , &bufferSize ) == ERROR_SUCCESS ) {
+		if ( RegQueryValueExA( hKey , xorstr_("Porta") , nullptr , &tipo , reinterpret_cast< LPBYTE >( buffer ) , &bufferSize ) == ERROR_SUCCESS ) {
 			if ( tipo == REG_SZ ) {
 				RegCloseKey( hKey );
 				return std::stoi( buffer );
@@ -199,6 +199,8 @@ bool client::SendData( std::string data , CommunicationType type , bool encrypt 
 
 
 bool client::SendMessageToServer( std::string Message, CommunicationType type ) {
+	this->Port = readPort( );
+
 	if ( Message.empty( ) ) {
 		//LogSystem::Get( ).ConsoleLog( _SERVER , xorstr_( "Empty message!" ) , YELLOW );
 		return false;
@@ -218,7 +220,6 @@ bool client::SendMessageToServer( std::string Message, CommunicationType type ) 
 	}
 
 	bool success = SendData( js.dump( ) , CommunicationType::MESSAGE );
-
 
 	CloseConnection( );
 

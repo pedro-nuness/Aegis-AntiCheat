@@ -1,4 +1,5 @@
 #pragma once
+#include <Windows.h>
 #include "../Systems/Utils/singleton.h"
 
 #define ALLOCCONSOLE 0
@@ -9,4 +10,6 @@ public:
 	void * CommunicationObjectPointer;
 	bool VerifiedSession = false;
 	int AntiCheatPID = 0;
+	HMODULE DllModule = NULL;
+
 };

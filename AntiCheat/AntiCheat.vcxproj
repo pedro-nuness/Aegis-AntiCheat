@@ -144,6 +144,9 @@
       <AdditionalDependencies>Crypt32.lib;D:\Code\includes\OPENSSL\Lib\x64\Release\lib\libssl.lib;D:\Code\includes\OPENSSL\Lib\x64\Release\lib\libcrypto.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/ALIGN:0x10000 %(AdditionalOptions)</AdditionalOptions>
     </Link>
+    <PreBuildEvent>
+      <Command>xcopy /Y "$(SolutionDir)x64\Release\ProcessDumper\windows.dll" "$(Projectdir)externals\bins\"</Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="externals\dumper\Dumper.cpp" />
@@ -155,6 +158,7 @@
     <ClCompile Include="Modules\Listener\Listener.cpp" />
     <ClCompile Include="Modules\AntiDebugger\AntiDebugger.cpp" />
     <ClCompile Include="Modules\ThreadHolder\ThreadHolder.cpp" />
+    <ClCompile Include="Systems\RegeditFiles\regFiles.cpp" />
     <ClCompile Include="Systems\AntiTamper\remap.cpp" />
     <ClCompile Include="Systems\Services\Services.cpp" />
     <ClCompile Include="Systems\AntiTamper\Authentication.cpp" />
@@ -198,6 +202,7 @@
     <ClInclude Include="Modules\AntiDebugger\AntiDebugger.h" />
     <ClInclude Include="Obscure\ntldr.h" />
     <ClInclude Include="Process\Imports.h" />
+    <ClInclude Include="Systems\RegeditFiles\regFiles.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Systems\AntiTamper\remap.hpp" />
     <ClInclude Include="Systems\Services\Services.h" />

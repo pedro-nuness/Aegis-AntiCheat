@@ -79,6 +79,7 @@ bool hardware::EndCacheGeneration( ) {
 	if ( getMacAddress( ).empty() ) {
 		return false;
 	}
+
 	if ( !GetVersionUID( nullptr ) ) {
 		return false;
 	}
@@ -170,7 +171,7 @@ bool hardware::GetMotherboardSerialNumber( std::string * buffer ) {
 }
 
 bool hardware::GetVersionUID( std::string * buffer ) {
-	if ( !CachedVersionID.EncryptedString.empty( ) && buffer ) {
+	if ( !CachedVersionID.EncryptedString.empty( ) && buffer != nullptr ) {
 		std::string * Str = StringCrypt::Get( ).DecryptString( CachedVersionID );
 		*buffer = *Str;
 		StringCrypt::Get( ).CleanString( Str );
@@ -178,11 +179,23 @@ bool hardware::GetVersionUID( std::string * buffer ) {
 	}
 
 	{
+		if ( !_globals.OriginalProcess ) {
+			LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "No original process setupped!" ) , RED );
+			return false;
+
+		}
+
 		std::string AntiCheatVersionID = Mem::Get( ).GetFileHash( Mem::Get( ).GetProcessExecutablePath( GetCurrentProcessId( ) ) );
+
+		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "[A]: " ) + AntiCheatVersionID , GREEN );
+
 		if ( AntiCheatVersionID.empty( ) )
 			return false;
 
+		
 		std::string ParentVersionID = Mem::Get( ).GetFileHash( Mem::Get( ).GetProcessExecutablePath( _globals.OriginalProcess ) );
+
+		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "[P]: " ) + ParentVersionID , GREEN );
 
 		if ( ParentVersionID.empty( ) )
 			return false;
@@ -194,10 +207,13 @@ bool hardware::GetVersionUID( std::string * buffer ) {
 
 		std::string FinalVersionID = Mem::Get( ).GenerateHash( ParentVersionID + AntiCheatVersionID  );
 
+		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_("[F]: ") + FinalVersionID , GREEN );
 		if ( FinalVersionID.empty( ) )
 			return false;
 
 		CachedVersionID = StringCrypt::Get( ).EncryptString( FinalVersionID );
+
+		LogSystem::Get( ).ConsoleLog( _HWID , xorstr_( "Encrypted succesfully " ) , GREEN );
 	}
 
 	return true;

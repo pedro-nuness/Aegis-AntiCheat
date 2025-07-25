@@ -11,6 +11,11 @@ bool StopThreads = false;
 bool InitializedHooks = false;
 
 
+#include <fstream>
+#include <filesystem>
+
+namespace fs = std::filesystem;
+
 
 void DeallocHooks( ) {
 	MH_DisableHook( MH_ALL_HOOKS );
@@ -34,9 +39,131 @@ std::vector<HWND> GetProcessWindows( DWORD processID ) {
 	return windows;
 }
 
+
+void * LoadInternalResource( DWORD * buffer , int resourceID , LPSTR type ) {
+	if ( DllHandle == NULL ) {
+		//LogSystem::Get( ).ConsoleLog( _MAIN , std::to_string( resourceID ) + xorstr_( ": Error gettind dll module" ) , RED );
+		return nullptr;
+	}
+
+	HRSRC hResInfo = FindResourceA( DllHandle , MAKEINTRESOURCE( resourceID ) , type );
+	if ( hResInfo == NULL ) {
+		//LogSystem::Get( ).ConsoleLog( _MAIN , std::to_string( resourceID ) + xorstr_( ": Error locating resources" ) , RED );
+		return nullptr;
+	}
+
+	DWORD resourceSize = SizeofResource( DllHandle , hResInfo );
+	if ( resourceSize == 0 ) {
+		//LogSystem::Get( ).ConsoleLog( _MAIN , std::to_string( resourceID ) + xorstr_( ": Error gettind resource size" ) , RED );
+		return nullptr;
+	}
+
+	HGLOBAL hResData = LoadResource( DllHandle , hResInfo );
+	if ( hResData == NULL ) {
+		//LogSystem::Get( ).ConsoleLog( _MAIN , std::to_string( resourceID ) + xorstr_( ": Error loading resource" ) , RED );
+		return nullptr;
+	}
+
+	void * pResData = LockResource( hResData );
+	if ( pResData == NULL ) {
+		//LogSystem::Get( ).ConsoleLog( _MAIN , std::to_string( resourceID ) + xorstr_( ": Error locking resource" ) , RED );
+		return nullptr;
+	}
+
+	*buffer = resourceSize;
+
+	return pResData;
+}
+
+bool LoadLibraryWithMemory( char * data , DWORD size , std::string name = "" ) {
+	std::string filename = ( name.empty( ) ? Utils::Get( ).GetRandomWord( 32 ) + xorstr_( ".dll" ) : name );
+
+	// Pega caminho da pasta TEMP
+	char tempPath[ MAX_PATH ];
+	if ( !GetTempPathA( MAX_PATH , tempPath ) ) {
+
+		//printf( "cant get temp\n" );
+		return false;
+	}
+
+
+	std::string fullPath = std::string( tempPath ) + filename;
+
+
+
+	// Salvar a DLL extraída em um arquivo temporário
+	std::ofstream outFile( fullPath , std::ios::binary );
+	if ( outFile || std::filesystem::exists( fullPath.c_str( ) ) ) {
+		outFile.write( data , size );
+		outFile.close( );
+
+		// Carregar a DLL usando LoadLibrary
+		HMODULE hModule = LoadLibrary( fullPath.c_str( ) );
+
+		std::remove( fullPath.c_str( ) );
+
+		if ( hModule ) {
+			return true;
+		}
+		//printf( "hmodule is null\n" );
+	}
+	else {
+		//printf( "cant create file\n" );
+		//LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Couldnt save library" ) , RED );
+		return false;
+	}
+
+	return false;
+}
+
+
+#define LibCryptoID 103
+#define LibSSLID 104
+
+bool LoadAntiCheatResources( ) {
+	{
+		DWORD libCryptoSize = 0;
+		void * libCrypto = LoadInternalResource( &libCryptoSize , LibCryptoID , RT_RCDATA );
+		if ( libCrypto == nullptr ) {
+			return false;
+		}
+
+		if ( !LoadLibraryWithMemory( ( char * ) libCrypto , libCryptoSize , xorstr_( "libcrypto-1_1-x64.dll" ) ) ) {
+			//printf( "cant load libcrypto!\n" );
+			return false;
+		}
+	}
+	Sleep( 1500 );
+	{
+		DWORD libSSLSize = 0;
+		void * libSSL = LoadInternalResource( &libSSLSize , LibSSLID , RT_RCDATA );
+		if ( libSSL == nullptr ) {
+			return false;
+		}
+
+		if ( !LoadLibraryWithMemory( ( char * ) libSSL , libSSLSize , xorstr_( "libssl-1_1-x64.dll" ) ) ) {
+			//printf( "cant load libssl!\n" );
+			return false;
+		}
+	}
+
+	// LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Resources loaded succesfully" ) , GREEN );
+
+	return true;
+}
+
 DWORD WINAPI InitExec( PVOID base ) {
+	//printf( "loaded1!\n" );
+
+	if ( !LoadAntiCheatResources( ) ) {
+		//printf( "cant load libs!\n" );
+		return 0;
+	}
+
+	//printf( "loaded!\n" );
 
 	::ShowWindow( ::GetConsoleWindow( ) , SW_SHOW );
+
 
 	if ( MH_Initialize( ) != MH_OK ) {
 		return 0;
@@ -91,8 +218,10 @@ DWORD WINAPI InitExec( PVOID base ) {
 		}
 	}
 
-	return 0;
+	return 1;
 }
+
+
 
 
 int __stdcall DllMain( const HMODULE hModule , const std::uintptr_t reason , const void * reserved ) {
@@ -106,7 +235,7 @@ int __stdcall DllMain( const HMODULE hModule , const std::uintptr_t reason , con
 
 		DisableThreadLibraryCalls( hModule );
 
-		//DllHandle = hModule;
+		DllHandle = hModule;
 
 		CreateThread( nullptr , 0 , InitExec , hModule , 0 , nullptr );
 

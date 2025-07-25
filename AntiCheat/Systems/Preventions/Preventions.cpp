@@ -7,6 +7,8 @@
 #include <tchar.h>      
 #include <sstream>
 #include <iomanip>
+#include <functional>
+#include <string_view>
 
 #include "../../Process/Process.hpp"
 #include "../../Process/Exports.hpp"
@@ -319,8 +321,7 @@ bool Preventions::RandomizeModuleName( )
 
 	int moduleNameSize = OriginalModuleName.size( );
 
-	if ( moduleNameSize == 0 )
-	{
+	if ( moduleNameSize == 0 ) {
 		return false;
 	}
 
@@ -335,12 +336,15 @@ bool Preventions::RandomizeModuleName( )
 	if ( Process::ChangeModuleName( wStrOriginalModuleName.c_str( ) , wStrNewModuleName.c_str( ) ) ) //in addition to changing export function names, we can also modify the names of loaded modules/libraries.
 	{
 		success = true;
+		_globals.ModuleName = newModuleName->c_str();
 		/*UnmanagedGlobals::wCurrentModuleName = wstring( newModuleName );
 		UnmanagedGlobals::CurrentModuleName = Utility::ConvertWStringToString( UnmanagedGlobals::wCurrentModuleName );*/
 		// LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "changed module name to " ) + *newModuleName , GREEN );
 
 		// Logger::logfw( "UltimateAnticheat.log" , Info , L"Changed module name to: %s\n" , UnmanagedGlobals::wCurrentModuleName.c_str( ) );
 	}
+
+
 	std::fill( newModuleName->begin( ) , newModuleName->end( ) , '\0' );
 	delete newModuleName;
 	return success;
@@ -625,11 +629,6 @@ bool UnhookApis( ) {
 bool Preventions::EnableApiHooks( bool Log ) {
 	HooksLog = Log;
 
-	if ( MH_Initialize( ) != MH_OK ) {
-		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "MinHook initialization failed!" ) , YELLOW );
-		return false;
-	}
-
 	// Hook CreateThread
 	if ( MH_CreateHookApi( L"kernel32.dll" , "CreateThread" , &MyCreateThread , reinterpret_cast< LPVOID * >( &originalCreateThread ) ) != MH_OK ) {
 		LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Failed to create hook for CreateThread!" ) , YELLOW );
@@ -666,25 +665,33 @@ bool Preventions::EnableApiHooks( bool Log ) {
 	return true;
 }
 
+bool LogAndCheck( const std::function<bool( )> & check , std::string_view name ) {
+	if ( !check( ) ) {
+		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , name.data( ) , RED );
+		return false;
+	}
 
+	LogSystem::Get( ).ConsoleLog( _PREVENTIONS , name.data( ) , GREEN );
+	return true;
+}
 
 bool Preventions::DeployFirstBarrier( ) {
-	if ( !Preventions::Get( ).RandomizeModuleName( ) ) {
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Preventions:DeployFirstBarrier" ) , RED );
-		return false;
-	}
 
-	LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Preventions:DeployFirstBarrier" ) , GREEN );
-
-	if ( !Preventions::Get( ).EnableApiHooks( true ) ) {
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Preventions:EnableApiHooks" ) , RED );
+	if ( !LogAndCheck( [ ] { return Preventions::Get( ).EnableApiHooks( false ); } , xorstr_( "Preventions:EnableApiHooks" ) ) )
 		return false;
-	}
-	LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Preventions:EnableApiHooks" ) , GREEN );
 
 	LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "first barrier deployed sucessfully" ) , GREEN );
 	return true;
 }
+
+bool Preventions::DeployMidBarrier( ) {
+
+	if ( !LogAndCheck( [ ] { return Preventions::Get( ).RandomizeModuleName( ); } , xorstr_( "Preventions:RandomizeModuleName" ) ) )
+		return false;
+
+	LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "first barrier deployed sucessfully" ) , GREEN );
+}
+
 
 bool Preventions::DeployLastBarrier( ) {
 
@@ -695,32 +702,25 @@ bool Preventions::DeployLastBarrier( ) {
 
 	LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Preventions:RestrictProcessAccess" ) , GREEN );*/
 
-	if ( !Preventions::Get( ).PreventDllInjection( ) ) {
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Preventions:PreventDllInjection" ) , RED );
+	if ( !LogAndCheck( [ ] { return Preventions::Get( ).PreventDllInjection( ); } , xorstr_( "Preventions:PreventDllInjection" ) ) )
 		return false;
-	}
 
-	LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Preventions:PreventDllInjection" ) , GREEN );
-
-	if ( !Preventions::Get( ).PreventThreadCreation( ) ) {
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Preventions:PreventThreadCreation" ) , RED );
+	if ( !LogAndCheck( [ ] { return Preventions::Get( ).PreventThreadCreation( ); } , xorstr_( "Preventions:PreventThreadCreation" ) ) )
 		return false;
-	}
 
-	LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Preventions:PreventThreadCreation" ) , GREEN );
-
-	/*if ( !Preventions::Get( ).RemapProgramSections( ) ) {
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "ApiHooks failed!" ) , RED );
+	if ( !LogAndCheck( [ ] { return Preventions::Get( ).EnableProcessMitigations( true , true , false , true , false ); } , xorstr_( "Preventions:EnableProcessMitigations" ) ) )
 		return false;
-	}*/
 
-	/*if ( !Preventions::Get( ).EnableProcessMitigations( true , true , false , true , false ) ) {
-		LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "ApiHooks failed!" ) , RED );
-		return false;
-	}*/
+
+	//if ( !Preventions::Get( ).RemapProgramSections( ) ) {
+	//	LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Preventions:RemapProgramSections" ) , RED );
+	//	return false;
+	//}
+	//LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "Preventions:RemapProgramSections" ) , GREEN );
 
 	LogSystem::Get( ).ConsoleLog( _PREVENTIONS , xorstr_( "last barrier deployed sucessfully" ) , GREEN );
 
 	return true;
 }
+
 

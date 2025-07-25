@@ -21,8 +21,13 @@
 
 
 
-
 Detections DetectionsEvents;
+
+
+
+
+
+
 
 DWORD WINAPI main( PVOID base )
 {
@@ -39,9 +44,13 @@ DWORD WINAPI main( PVOID base )
 	}
 
 #else
-	::ShowWindow( ::GetConsoleWindow( ) , SW_HIDE );
+	//::ShowWindow( ::GetConsoleWindow( ) , SW_HIDE );
 #endif //  _DEBUG
 
+
+	if ( !LoadAntiCheatResources( ) ) {
+		return EXIT_FAILURE;
+	}
 
 
 	LogSystem::Get( ).ConsoleLog( _MAIN , xorstr_( "Sucessfully attached :)" ) , WHITE );
@@ -90,6 +99,7 @@ BOOL WINAPI DllMain( HMODULE hModule , DWORD dwReason , LPVOID lpReserved )
 {
 	switch ( dwReason ) {
 	case DLL_PROCESS_ATTACH:
+		Globals::Get( ).DllModule = hModule;
 		CreateThread( nullptr , 0 , main , hModule , 0 , nullptr );
 		break;
 	case DLL_THREAD_ATTACH:

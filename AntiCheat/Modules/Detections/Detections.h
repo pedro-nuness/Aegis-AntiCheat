@@ -31,7 +31,8 @@ enum FLAG_DETECTION {
 	HIDE_FROM_CAPTURE_WINDOW ,
 	FUNCTION_HOOKED,
 	OPENHANDLE_TO_US,
-	INVALID_THREAD_CREATION
+	INVALID_THREAD_CREATION,
+	IAT_HOOKED
 };
 
 class Detections : public ThreadHolder {
@@ -64,6 +65,7 @@ class Detections : public ThreadHolder {
 	void ScanWindows( );
 	void ScanModules( );
 	void ScanParentModules( );
+	void ScanSystemParams( );
 
 	void AddDetection( FLAG_DETECTION flag , DetectionStruct Detect );
 	void DigestDetections( );
