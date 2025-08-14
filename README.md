@@ -17,15 +17,6 @@
 
 ---
 
-<div style="display:flex; flex-direction:row; align-items:center; justify-content:center;">
-  <img src="https://raw.githubusercontent.com/pedro-nuness/Aegis-AntiCheat/refs/heads/main/AEGIS.jpg" style="width:400px;">
-  <img src="https://raw.githubusercontent.com/pedro-nuness/Aegis-AntiCheat/refs/heads/main/AEGIS2.jpg" style="width:400px;">
-  <img src="https://raw.githubusercontent.com/pedro-nuness/Aegis-AntiCheat/refs/heads/main/AEGIS3.jpg" style="width:400px;">
-</div>
-
-
----
-
 ## 🚀 Tecnologias Utilizadas
 
 <p align="center">
@@ -39,6 +30,19 @@
 </p>
 
 ---
+
+## Discord Log
+
+<div style="display:flex; flex-direction:row; align-items:center; justify-content:center;">
+  <img src="https://raw.githubusercontent.com/pedro-nuness/Aegis-AntiCheat/refs/heads/main/AEGIS.jpg" style="width:400px;">
+  <img src="https://raw.githubusercontent.com/pedro-nuness/Aegis-AntiCheat/refs/heads/main/AEGIS2.jpg" style="width:400px;">
+  <img src="https://raw.githubusercontent.com/pedro-nuness/Aegis-AntiCheat/refs/heads/main/AEGIS3.jpg" style="width:400px;">
+</div>
+
+
+---
+
+
 
 ## 📜 Sobre o Projeto
 
