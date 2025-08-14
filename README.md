@@ -17,6 +17,20 @@
 
 ---
 
+## 🚀 Tecnologias Utilizadas
+
+<p align="center">
+  <img src="https://img.shields.io/badge/C++-00599C?style=for-the-badge&logo=cplusplus&logoColor=white">
+  <img src="https://img.shields.io/badge/MinHook-1f1f1f?style=for-the-badge&logo=windows&logoColor=white">
+  <img src="https://img.shields.io/badge/WinDivert-1f1f1f?style=for-the-badge">
+  <img src="https://img.shields.io/badge/OpenSSL-721412?style=for-the-badge&logo=openssl&logoColor=white">
+  <img src="https://img.shields.io/badge/cURL-073551?style=for-the-badge&logo=curl&logoColor=white">
+  <img src="https://img.shields.io/badge/D++-1f1f1f?style=for-the-badge&logo=discord&logoColor=white">
+  <img src="https://img.shields.io/badge/nlohmann/json-1f1f1f?style=for-the-badge&logo=json&logoColor=white">
+</p>
+
+---
+
 ## 📜 Sobre o Projeto
 
 O **AEGIS-ANTICHEAT** é um sistema de segurança robusto, construído em C++ e projetado para proteger jogos contra cheaters.  
@@ -31,19 +45,6 @@ Ele utiliza uma arquitetura **cliente-servidor** com técnicas avançadas de inj
 
 ---
 
-## 🚀 Tecnologias Utilizadas
-
-<p align="center">
-  <img src="https://img.shields.io/badge/C++-00599C?style=for-the-badge&logo=cplusplus&logoColor=white">
-  <img src="https://img.shields.io/badge/MinHook-1f1f1f?style=for-the-badge&logo=windows&logoColor=white">
-  <img src="https://img.shields.io/badge/WinDivert-1f1f1f?style=for-the-badge">
-  <img src="https://img.shields.io/badge/OpenSSL-721412?style=for-the-badge&logo=openssl&logoColor=white">
-  <img src="https://img.shields.io/badge/cURL-073551?style=for-the-badge&logo=curl&logoColor=white">
-  <img src="https://img.shields.io/badge/D++-1f1f1f?style=for-the-badge&logo=discord&logoColor=white">
-  <img src="https://img.shields.io/badge/nlohmann/json-1f1f1f?style=for-the-badge&logo=json&logoColor=white">
-</p>
-
----
 
 ## 📂 Estrutura do Projeto
 
