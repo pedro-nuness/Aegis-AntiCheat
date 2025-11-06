@@ -76,24 +76,3 @@ Aegis-AntiCheat/
 ```
 
 ---
-
-## 🛠️ Instalação
-
-> ⚠️ Pré-requisitos:
-> - **Windows 10/11**
-> - **Visual Studio 2022** com C++ Desktop Development
-> - **Windows SDK 10**
-> - vcpkg (opcional, para dependências)
-
-```bash
-# 1. Clone o repositório
-git clone https://github.com/seu-usuario/Aegis-AntiCheat.git
-cd Aegis-AntiCheat
-
-# 2. Compile a solução
-# Abra o AegisAnticheat.sln no Visual Studio e compile em modo Release
-
-# 3. Configure o servidor
-# Edite server/config/config.json com as suas chaves e portas
-```
-
